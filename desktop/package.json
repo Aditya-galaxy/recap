@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Recap screen recorder for Windows and Linux",
   "author": "Aditya",
+  "homepage": "https://github.com/Aditya-galaxy/recap",
   "license": "MIT",
   "main": "main.js",
   "scripts": {

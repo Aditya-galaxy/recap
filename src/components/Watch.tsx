@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
-import { CommentsPanel, InsightsPanel, ReactionsBar, type Viewer } from "@/components/Social";
+import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
 type Version = "original" | "clean";
@@ -185,6 +185,11 @@ export default function Watch({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
+      {meta.disabled && (
+        <p className="mb-4 rounded-sm border border-border-strong px-3 py-2 text-[12px]">
+          This video was taken down after a report. Only {owner ? "you" : "its owner"} and admins can open it.
+        </p>
+      )}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           {owner && editing ? (
@@ -282,6 +287,7 @@ export default function Watch({
           </div>
 
           {ready && !local && <ReactionsBar videoId={id} now={origNow} duration={duration} />}
+          {!owner && !local && <ReportButton videoId={id} />}
           {meta.clean.status === "ready" && (
             <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]">
               {(["clean", "original"] as const).map((v) => (

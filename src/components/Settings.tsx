@@ -218,7 +218,11 @@ export default function Settings({
 
       {user.isAdmin && (
         <section className="space-y-3">
-          <h2 className="label">add a user</h2>
+          <h2 className="label">moderation</h2>
+          <p className="text-[13px] text-muted">
+            Reported videos land in the <a href="/admin" className="text-text underline">review queue</a>; you&apos;ll get an email when a video gets its first report.
+          </p>
+          <h2 className="label pt-3">add a user</h2>
           <form onSubmit={addUser} className="card grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto]">
             <input name="email" type="email" required placeholder="email" className={input} />
             <input name="password" type="text" required minLength={10} placeholder="temporary password" className={input} />

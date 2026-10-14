@@ -136,6 +136,13 @@ const MIGRATIONS = [
     created_at TEXT NOT NULL
   );
   `,
+  // v3: moderation queue
+  `
+  ALTER TABLE reports ADD COLUMN resolved_at TEXT;
+  ALTER TABLE reports ADD COLUMN resolution TEXT;
+  CREATE INDEX reports_open ON reports(resolved_at, video_id);
+  CREATE UNIQUE INDEX reports_once ON reports(video_id, reporter) WHERE resolved_at IS NULL;
+  `,
 ];
 
 function open() {

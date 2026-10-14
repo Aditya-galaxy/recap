@@ -27,7 +27,7 @@ type Row = {
   id: string; owner_id: string | null; title: string; visibility: Visibility; status: VideoMeta["status"];
   stage: string | null; error: string | null; duration: number | null; width: number | null; height: number | null;
   clean_status: VideoMeta["clean"]["status"]; clean_options: string | null; clean_duration: number | null;
-  clean_error: string | null; views: number; created_at: string;
+  clean_error: string | null; views: number; disabled: number; created_at: string;
 };
 
 const opt = <T,>(v: T | null) => (v === null ? undefined : v);
@@ -40,6 +40,7 @@ function toMeta(r: Row): VideoMeta {
     visibility: r.visibility,
     views: r.views,
     createdAt: r.created_at,
+    disabled: !!r.disabled || undefined,
     status: r.status,
     stage: opt(r.stage),
     error: opt(r.error),
@@ -125,8 +126,12 @@ export function setSize(id: string, bytes: number) {
 
 export const isOwner = (m: VideoMeta, u: User | null) => !!u && m.ownerId === u.id;
 
-/** Unlisted videos are watchable by anyone with the link; private ones only by their owner. */
-export const canView = (m: VideoMeta, u: User | null) => m.visibility === "unlisted" || isOwner(m, u);
+/**
+ * Unlisted videos are watchable by anyone with the link; private ones only by their owner. A video taken down
+ * after a report stays visible to its owner, and to admins so they can review it; nobody else.
+ */
+export const canView = (m: VideoMeta, u: User | null) =>
+  isOwner(m, u) || (m.visibility === "unlisted" && (!m.disabled || !!u?.isAdmin));
 
 export async function exists(p: string) {
   try {

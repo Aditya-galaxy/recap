@@ -234,3 +234,72 @@ export function InsightsPanel({ videoId }: { videoId: string }) {
     </div>
   );
 }
+
+const REPORT_REASONS = ["spam or scam", "harassment or hate", "sexual content", "violence", "copyright", "other"];
+
+/** Lets any viewer flag a shared video for the server's admins. */
+export function ReportButton({ videoId }: { videoId: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [state, setState] = useState<"idle" | "busy" | "done">("idle");
+  const [error, setError] = useState("");
+
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    setState("busy");
+    setError("");
+    const r = await fetch(`/api/videos/${videoId}/report`, { method: "POST", body: JSON.stringify({ reason, details }) });
+    if (r.ok) return setState("done");
+    setState("idle");
+    setError((await r.json().catch(() => ({}))).error ?? "Couldn't send the report.");
+  }
+
+  if (!open)
+    return (
+      <button className="text-[11px] text-muted underline hover:text-text" onClick={() => setOpen(true)}>
+        report
+      </button>
+    );
+  return (
+    <div className="card w-full max-w-sm space-y-2 p-3 text-[12px]">
+      {state === "done" ? (
+        <p>Thanks. An admin will review it.</p>
+      ) : (
+        <form onSubmit={send} className="space-y-2">
+          <p className="label">report this video</p>
+          <select
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            required
+            className="w-full rounded-sm border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
+          >
+            <option value="" disabled>
+              why?
+            </option>
+            {REPORT_REASONS.map((r) => (
+              <option key={r}>{r}</option>
+            ))}
+          </select>
+          <textarea
+            value={details}
+            onChange={(e) => setDetails(e.target.value)}
+            rows={2}
+            maxLength={500}
+            placeholder="details (optional)"
+            className="w-full resize-none rounded-sm border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
+          />
+          {error && <p className="text-muted">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
+              cancel
+            </button>
+            <button className="btn-primary" disabled={!reason || state === "busy"}>
+              {state === "busy" ? "…" : "send report"}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}

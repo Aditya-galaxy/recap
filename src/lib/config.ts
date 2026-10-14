@@ -26,6 +26,23 @@ export const config = {
   /** Where the in-app feedback box sends messages. Set FEEDBACK_URL="" to hide the box. */
   feedbackUrl: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",
   maxUploadBytes: Number(process.env.MAX_UPLOAD_MB ?? 4096) * 1024 * 1024,
+  /**
+   * Recap Cloud mode (the hosted service): email verification is required, accounts get a plan
+   * (founding / standard) with storage quotas, and the first FOUNDER_LIMIT verified accounts are founders.
+   * Self-hosted servers leave this off and behave as before.
+   */
+  cloud: bool(process.env.CLOUD_MODE, false),
+  founderLimit: Number(process.env.FOUNDER_LIMIT ?? 100),
+  quotaBytes: {
+    founder: Number(process.env.FOUNDER_QUOTA_GB ?? 25) * 1024 ** 3,
+    standard: Number(process.env.STANDARD_QUOTA_GB ?? 2) * 1024 ** 3,
+  } as Record<string, number>,
+  /** Price shown for the paid plan once founding spots are gone (display only until billing ships). */
+  paidPriceLabel: process.env.PAID_PRICE_LABEL ?? "$8/month",
+  /** Transactional email (verification, password reset, notifications) via Resend. Unset = log to console. */
+  resendApiKey: process.env.RESEND_API_KEY || null,
+  // A domain verified in Resend (kronagent.com). Override with EMAIL_FROM.
+  emailFrom: process.env.EMAIL_FROM ?? "Recap <recap@kronagent.com>",
   /** Absolute base URL for share links and link previews, e.g. https://recap.example.com. Optional. */
   publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, "") || null,
   /** Force the Secure flag on cookies. Defaults to on when PUBLIC_URL is https. */

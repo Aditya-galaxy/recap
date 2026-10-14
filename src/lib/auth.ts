@@ -16,6 +16,12 @@ export interface User {
   email: string;
   name: string;
   isAdmin: boolean;
+  emailVerified: boolean;
+  /** "founder" (first FOUNDER_LIMIT verified cloud accounts) or "standard". */
+  plan: string;
+  founderNumber: number | null;
+  notifyComments: boolean;
+  notifyViews: boolean;
 }
 
 const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
@@ -35,8 +41,26 @@ export async function verifyPassword(pw: string, stored: string) {
   return timingSafeEqual(actual, expected);
 }
 
-type UserRow = { id: string; email: string; name: string; is_admin: number };
-const toUser = (r: UserRow): User => ({ id: r.id, email: r.email, name: r.name, isAdmin: !!r.is_admin });
+type UserRow = {
+  id: string; email: string; name: string; is_admin: number; email_verified_at: string | null; plan: string;
+  founder_number: number | null; notify_comments: number; notify_views: number;
+};
+const toUser = (r: UserRow): User => ({
+  id: r.id,
+  email: r.email,
+  name: r.name,
+  isAdmin: !!r.is_admin,
+  emailVerified: !!r.email_verified_at,
+  plan: r.plan,
+  founderNumber: r.founder_number,
+  notifyComments: !!r.notify_comments,
+  notifyViews: !!r.notify_views,
+});
+
+export function getUser(id: string): User | null {
+  const r = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow | undefined;
+  return r ? toUser(r) : null;
+}
 
 export function userCount() {
   return (db.prepare("SELECT count(*) AS n FROM users").get() as { n: number }).n;
@@ -45,15 +69,102 @@ export function userCount() {
 /** Signup is open for the very first account (who becomes admin), then governed by ALLOW_SIGNUP. */
 export const signupOpen = () => userCount() === 0 || config.allowSignup;
 
-export async function createUser(email: string, password: string, name = "") {
+export async function createUser(email: string, password: string, name = "", { verified = !config.cloud } = {}) {
   const id = randomId();
   const first = userCount() === 0;
-  db.prepare("INSERT INTO users (id, email, name, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?)").run(
-    id, email.trim().toLowerCase(), name.trim(), await hashPassword(password), first ? 1 : 0, now(),
+  // In Recap Cloud, accounts start unverified (double opt-in); the first account (the operator) never needs it.
+  const verifiedAt = verified || first ? now() : null;
+  db.prepare("INSERT INTO users (id, email, name, password_hash, is_admin, email_verified_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    id, email.trim().toLowerCase(), name.trim(), await hashPassword(password), first ? 1 : 0, verifiedAt, now(),
   );
   // The first account adopts videos recorded before accounts existed (v0.1 data).
   if (first) db.prepare("UPDATE videos SET owner_id = ? WHERE owner_id IS NULL").run(id);
   return toUser(db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow);
+}
+
+// ---- email verification, founding spots, password reset -------------------------------------
+
+/** Single-use, expiring token for an emailed link. Only its hash is stored. */
+export function issueEmailToken(userId: string, purpose: "verify" | "reset", ttlMs: number) {
+  const token = randomId(32);
+  db.prepare("DELETE FROM email_tokens WHERE user_id = ? AND purpose = ? AND used_at IS NULL").run(userId, purpose);
+  db.prepare("INSERT INTO email_tokens (token_hash, user_id, purpose, expires_at, created_at) VALUES (?, ?, ?, ?, ?)").run(
+    sha256(token), userId, purpose, Date.now() + ttlMs, now(),
+  );
+  return token;
+}
+
+/** Returns the user id if the token is valid, unexpired and unused, and marks it used. */
+export function consumeEmailToken(token: string, purpose: "verify" | "reset"): string | null {
+  const row = db
+    .prepare("SELECT user_id, expires_at, used_at FROM email_tokens WHERE token_hash = ? AND purpose = ?")
+    .get(sha256(token), purpose) as { user_id: string; expires_at: number; used_at: string | null } | undefined;
+  if (!row || row.used_at || row.expires_at < Date.now()) return null;
+  db.prepare("UPDATE email_tokens SET used_at = ? WHERE token_hash = ?").run(now(), sha256(token));
+  return row.user_id;
+}
+
+/**
+ * Marks the email verified and, in Recap Cloud, hands out the next founding spot if any are left.
+ * Runs in an IMMEDIATE transaction (plus a unique index on founder_number) so two verifications at the
+ * same moment can never take the same spot or exceed the limit.
+ */
+export function markVerified(userId: string): User | null {
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const u = db.prepare("SELECT email_verified_at, founder_number FROM users WHERE id = ?").get(userId) as
+      | { email_verified_at: string | null; founder_number: number | null }
+      | undefined;
+    if (!u) {
+      db.exec("ROLLBACK");
+      return null;
+    }
+    if (!u.email_verified_at) db.prepare("UPDATE users SET email_verified_at = ? WHERE id = ?").run(now(), userId);
+    if (config.cloud && u.founder_number === null) {
+      const taken = (db.prepare("SELECT count(*) AS n FROM users WHERE founder_number IS NOT NULL").get() as { n: number }).n;
+      if (taken < config.founderLimit) {
+        db.prepare("UPDATE users SET founder_number = ?, plan = 'founder' WHERE id = ?").run(taken + 1, userId);
+      }
+    }
+    db.exec("COMMIT");
+  } catch (e) {
+    db.exec("ROLLBACK");
+    throw e;
+  }
+  return getUser(userId);
+}
+
+/** Public, real numbers for the founding offer (never inflated). */
+export function founderStats() {
+  const taken = (db.prepare("SELECT count(*) AS n FROM users WHERE founder_number IS NOT NULL").get() as { n: number }).n;
+  return { limit: config.founderLimit, taken, left: Math.max(0, config.founderLimit - taken) };
+}
+
+export async function setPassword(userId: string, password: string) {
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(await hashPassword(password), userId);
+  // A password change signs out every other session.
+  db.prepare("DELETE FROM sessions WHERE user_id = ?").run(userId);
+}
+
+export function findUserByEmail(email: string): User | null {
+  const r = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim().toLowerCase()) as UserRow | undefined;
+  return r ? toUser(r) : null;
+}
+
+export function setNotifications(userId: string, comments: boolean, views: boolean) {
+  db.prepare("UPDATE users SET notify_comments = ?, notify_views = ? WHERE id = ?").run(comments ? 1 : 0, views ? 1 : 0, userId);
+}
+
+// ---- storage quotas ------------------------------------------------------------------------
+
+export function storageUsed(userId: string) {
+  return (db.prepare("SELECT coalesce(sum(size_bytes), 0) AS n FROM videos WHERE owner_id = ?").get(userId) as { n: number }).n;
+}
+
+/** Bytes this user may store, or null for unlimited (self-hosted servers, admins). */
+export function quotaFor(user: User): number | null {
+  if (!config.cloud || user.isAdmin) return null;
+  return config.quotaBytes[user.plan] ?? config.quotaBytes.standard;
 }
 
 export async function checkLogin(email: string, password: string): Promise<User | null> {
@@ -121,7 +232,7 @@ function localUser(): User {
   if (!row) {
     const id = randomId();
     // Unusable password: local mode never signs in with one.
-    db.prepare("INSERT INTO users (id, email, name, password_hash, is_admin, created_at) VALUES (?, ?, 'You', '!', 1, ?)").run(id, LOCAL_EMAIL, now());
+    db.prepare("INSERT INTO users (id, email, name, password_hash, is_admin, email_verified_at, created_at) VALUES (?, ?, 'You', '!', 1, ?, ?)").run(id, LOCAL_EMAIL, now(), now());
     db.prepare("UPDATE videos SET owner_id = ? WHERE owner_id IS NULL").run(id);
     row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow;
   }

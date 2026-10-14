@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
+import { CommentsPanel, InsightsPanel, ReactionsBar, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
 type Version = "original" | "clean";
@@ -14,18 +15,24 @@ export default function Watch({
   owner,
   shareUrl,
   local = false,
+  viewer = null,
 }: {
   initialMeta: VideoMeta;
   initialTranscript: Transcript | null;
   owner: boolean;
   shareUrl: string;
   local?: boolean;
+  viewer?: Viewer | null;
 }) {
   const router = useRouter();
   const [meta, setMeta] = useState(initialMeta);
   const [transcript, setTranscript] = useState(initialTranscript);
   const [version, setVersion] = useState<Version>(initialMeta.clean.status === "ready" ? "clean" : "original");
-  const [tab, setTab] = useState<"transcript" | "clean">("transcript");
+  type Tab = "transcript" | "comments" | "clean" | "insights";
+  const [tab, setTab] = useState<Tab>("transcript");
+  // Local (desktop) libraries have one person, so comments and insights only exist on servers.
+  const tabs: Tab[] = local ? ["transcript", "clean"] : owner ? ["transcript", "comments", "clean", "insights"] : ["transcript", "comments"];
+  const tabLabel: Record<Tab, string> = { transcript: "transcript", comments: "comments", clean: "clean up", insights: "insights" };
   const [opts, setOpts] = useState<CleanOptions>(initialMeta.clean.options ?? DEFAULT_CLEAN);
   const [previewing, setPreviewing] = useState(false);
   const [now, setNow] = useState(0);
@@ -103,6 +110,7 @@ export default function Watch({
       if (c) v.currentTime = c.end;
     }
     setNow(v.currentTime);
+    if (!v.paused) pingView();
   }
 
   function seekOriginal(t: number) {
@@ -144,10 +152,20 @@ export default function Watch({
     router.refresh();
   }
 
+  // Viewer insights: report how far the viewer got when playback starts, every 10 s, and on pause/end.
+  // Throttled by playback position (every 10 s of video), not wall-clock time.
+  const lastPing = useRef(-Infinity);
+  function pingView(force = false) {
+    if (owner || local) return;
+    const v = videoRef.current;
+    if (!force && Math.abs(origNow - lastPing.current) < 10) return;
+    lastPing.current = origNow;
+    const progress = duration ? Math.min(1, origNow / duration) : 0;
+    fetch(`/api/videos/${id}/view`, { method: "POST", body: JSON.stringify({ progress: v?.ended ? 1 : progress }), keepalive: true }).catch(() => {});
+  }
   function onPlay() {
-    if (owner || viewCounted.current) return;
     viewCounted.current = true;
-    fetch(`/api/videos/${id}/view`, { method: "POST" }).catch(() => {});
+    pingView(true);
   }
 
   async function setVisibility(visibility: VideoMeta["visibility"]) {
@@ -234,6 +252,8 @@ export default function Watch({
                 poster={`/api/videos/${id}/thumb`}
                 onTimeUpdate={onTime}
                 onPlay={onPlay}
+                onPause={() => pingView(true)}
+                onEnded={() => pingView(true)}
                 onSeeked={onTime}
                 className="aspect-video w-full bg-black"
                 src={`/api/videos/${id}/media${q}${rev ? `${q ? "&" : "?"}r=${rev}` : ""}`}
@@ -261,6 +281,7 @@ export default function Watch({
             )}
           </div>
 
+          {ready && !local && <ReactionsBar videoId={id} now={origNow} duration={duration} />}
           {meta.clean.status === "ready" && (
             <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]">
               {(["clean", "original"] as const).map((v) => (
@@ -280,19 +301,30 @@ export default function Watch({
         </div>
 
         <aside className="card flex max-h-[min(80vh,640px)] flex-col overflow-hidden">
-          <div className={`grid border-b border-border text-[13px] ${owner ? "grid-cols-2" : "grid-cols-1"}`}>
-            {(owner ? (["transcript", "clean"] as const) : (["transcript"] as const)).map((t) => (
+          <div className="grid border-b border-border text-[13px]" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+            {tabs.map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}
                 className={`border-b py-2.5 text-[12px] uppercase tracking-[0.12em] ${tab === t ? "border-border-strong text-text" : "border-transparent text-muted hover:text-text"}`}
               >
-                {t === "transcript" ? "transcript" : "clean up"}
+                {tabLabel[t]}
               </button>
             ))}
           </div>
 
-          {!ready ? (
+          {tab === "comments" ? (
+            <CommentsPanel
+              videoId={id}
+              viewer={viewer}
+              owner={owner}
+              now={origNow}
+              onSeek={seekOriginal}
+              loginHref={`/login?next=${encodeURIComponent(`/v/${id}`)}`}
+            />
+          ) : tab === "insights" ? (
+            <InsightsPanel videoId={id} />
+          ) : !ready ? (
             <p className="p-5 text-[13px] text-muted">transcript appears once processing finishes.</p>
           ) : tab === "transcript" ? (
             <div className="overflow-y-auto p-5 text-[13px] leading-7">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import FeedbackButton from "@/components/FeedbackButton";
 import Nav from "@/components/Nav";
+import VerifyBanner from "@/components/VerifyBanner";
 import { config } from "@/lib/config";
 import "./globals.css";
 
@@ -36,6 +37,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             </Suspense>
           </div>
         </header>
+        <Suspense>
+          <VerifyBanner />
+        </Suspense>
         <main className="flex-1">{children}</main>
         <footer className="mx-auto w-full max-w-6xl px-4 py-6 text-[11px] text-muted">
           {config.localToken ? "local" : "self-hosted"} · whisper.cpp + ffmpeg · <a className="underline" href="https://github.com/Aditya-galaxy/recap">source</a>

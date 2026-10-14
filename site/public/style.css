@@ -56,3 +56,16 @@ th { font-weight: 500; }
 td:first-child { color: var(--muted); }
 pre { background: var(--inv-bg); color: var(--inv-text); padding: 14px 16px; border-radius: 3px; overflow-x: auto; font-size: 12px; }
 .foot { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); padding: 32px 16px 48px; border-top: 1px solid var(--border); margin-top: 24px; }
+
+nav a + a { margin-left: 6px; }
+.feedback { padding: 24px 0; }
+.fb { display: grid; gap: 10px; max-width: 640px; }
+.kinds { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; }
+.kinds label { cursor: pointer; }
+.fb textarea, .fb input[type="email"] {
+  font: inherit; padding: 10px 12px; border: 1px solid var(--border); border-radius: 3px;
+  background: var(--surface); color: var(--text); outline: none; width: 100%; resize: vertical;
+}
+.fb textarea:focus, .fb input[type="email"]:focus { border-color: var(--strong); }
+.fb-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.fb-row input { flex: 1 1 240px; }

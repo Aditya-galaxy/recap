@@ -17,7 +17,7 @@
 <body>
   <header class="wrap top">
     <a class="logo" href="/"><span class="muted">~/</span>recap<span class="cursor"></span></a>
-    <nav><a href="https://github.com/Aditya-galaxy/recap">github</a></nav>
+    <nav><a href="#feedback">feedback</a> <a href="https://github.com/Aditya-galaxy/recap">github</a></nav>
   </header>
 
   <main class="wrap">
@@ -69,6 +69,27 @@
       <pre><code>curl -O https://raw.githubusercontent.com/Aditya-galaxy/recap/main/docker-compose.yml
 docker compose up -d   # → http://localhost:3217</code></pre>
       <p><a href="https://github.com/Aditya-galaxy/recap#quick-start">setup guide →</a></p>
+    </section>
+    <section class="feedback" id="feedback">
+      <p class="label">feedback</p>
+      <p>Tried it? Something broken, missing, or great? This goes straight to the person building Recap.</p>
+      <form id="fb" class="fb" novalidate>
+        <div class="kinds" role="radiogroup" aria-label="kind">
+          <label><input type="radio" name="kind" value="idea" checked /> idea</label>
+          <label><input type="radio" name="kind" value="bug" /> bug</label>
+          <label><input type="radio" name="kind" value="praise" /> praise</label>
+          <label><input type="radio" name="kind" value="other" /> other</label>
+        </div>
+        <label class="sr" for="fb-message">message</label>
+        <textarea id="fb-message" name="message" rows="4" maxlength="4000" required placeholder="what would make Recap useful for you or your team?"></textarea>
+        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <div class="fb-row">
+          <label class="sr" for="fb-email">email (optional)</label>
+          <input id="fb-email" name="email" type="email" autocomplete="email" placeholder="email, optional, if you'd like a reply" />
+          <button type="submit" class="btn primary">send</button>
+        </div>
+        <p class="fine" id="fb-status" role="status"></p>
+      </form>
     </section>
   </main>
 

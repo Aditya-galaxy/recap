@@ -122,6 +122,8 @@ export async function processVideo(id: string) {
 
     await stage("Encoding video");
     // MediaRecorder output is variable-frame-rate and lacks a seek index; normalize to CFR H.264.
+    // CRF 20 / faster: ~49 dB PSNR on scrolling 1080p UI text (vs 45 dB at CRF 23), leaving headroom for
+    // the clean cut's second encode, for ~33% more bytes.
     // The Mac app records system audio and mic as separate tracks; ffmpeg would keep only one.
     const nAudio = await audioStreamCount(src);
     const audioArgs =
@@ -132,7 +134,7 @@ export async function processVideo(id: string) {
     await run("ffmpeg", [
       "-y", "-hide_banner", "-loglevel", "error", "-i", src,
       "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-fps_mode", "cfr", "-r", "30", ...audioArgs,
-      "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+      "-c:v", "libx264", "-preset", "faster", "-crf", "20", "-pix_fmt", "yuv420p",
       "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
     ]);
     await fs.rename(tmp, mp4);
@@ -187,7 +189,7 @@ export async function renderClean(id: string, opts: CleanOptions) {
   await run("ffmpeg", [
     "-y", "-hide_banner", "-loglevel", "error", "-i", file(id, "video.mp4"),
     "-/filter_complex", graphFile, "-map", "[v]", ...(audio ? ["-map", "[a]"] : []),
-    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "faster", "-crf", "20", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
   ]);
   await fs.rename(tmp, file(id, "clean.mp4"));

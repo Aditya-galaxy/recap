@@ -111,6 +111,48 @@ async function subscribe(req, res) {
   return json(res, 200, { ok: true });
 }
 
+// Feedback from the landing page and from inside the app (self-hosted servers and the desktop app
+// post here cross-origin, so this endpoint allows any origin and takes no credentials).
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Methods": "POST, OPTIONS", "Access-Control-Allow-Headers": "Content-Type", "Access-Control-Max-Age": "86400" };
+const KINDS = ["bug", "idea", "praise", "other"];
+
+async function feedback(req, res) {
+  const reply = (status, obj) => send(res, status, JSON.stringify(obj), { "Content-Type": "application/json", "Cache-Control": "no-store", ...CORS });
+  const ip = (req.headers["x-forwarded-for"] ?? "").toString().split(",")[0].trim() || req.socket.remoteAddress || "?";
+  if (limited(`fb:${ip}`, 8, 60 * 60_000)) return reply(429, { error: "Too much feedback from here for now. Try again later." });
+
+  let body;
+  try {
+    body = JSON.parse(await readBody(req, 16_384));
+  } catch {
+    return reply(400, { error: "Bad request." });
+  }
+  if (body.website) return reply(200, { ok: true }); // honeypot
+  const message = String(body.message ?? "").trim();
+  if (message.length < 3) return reply(400, { error: "Write a few words first." });
+  const email = String(body.email ?? "").trim().toLowerCase();
+  if (email && (email.length > 254 || !EMAIL_RE.test(email))) return reply(400, { error: "That email doesn't look right (it's optional)." });
+
+  const doc = {
+    message: message.slice(0, 4000),
+    kind: KINDS.includes(body.kind) ? body.kind : "other",
+    email: email || undefined,
+    where: ["site", "web", "desktop", "mac"].includes(body.where) ? body.where : "site",
+    version: String(body.version ?? "").slice(0, 40) || undefined,
+    page: String(body.page ?? "").slice(0, 200) || undefined,
+    userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300) || undefined,
+    createdAt: FieldValue.serverTimestamp(),
+  };
+  try {
+    if (db) await db.collection("feedback").add(doc);
+    else console.log("[dry-run] feedback", doc.kind, doc.where, doc.message.slice(0, 60));
+  } catch (err) {
+    console.error("feedback failed", err);
+    return reply(500, { error: "Something went wrong. Please try again." });
+  }
+  return reply(200, { ok: true });
+}
+
 async function serveStatic(req, res, pathname) {
   const file = pathname === "/" ? "index.html" : pathname.slice(1);
   const full = path.join(PUBLIC, path.normalize(file));
@@ -129,6 +171,8 @@ createServer(async (req, res) => {
   const { pathname } = new URL(req.url ?? "/", "http://x");
   try {
     if (pathname === "/api/subscribe" && req.method === "POST") return await subscribe(req, res);
+    if (pathname === "/api/feedback" && req.method === "OPTIONS") return send(res, 204, undefined, CORS);
+    if (pathname === "/api/feedback" && req.method === "POST") return await feedback(req, res);
     if (pathname === "/api/health") return json(res, 200, { ok: true });
     if (req.method === "GET" || req.method === "HEAD") return await serveStatic(req, res, pathname);
     send(res, 405, "Method not allowed");

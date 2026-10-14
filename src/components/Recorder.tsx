@@ -82,6 +82,8 @@ export default function Recorder() {
   const [level, setLevel] = useState(0);
   const [title, setTitle] = useState("");
   const [pip, setPip] = useState<Window | null>(null);
+  // A recording whose upload failed. Kept so it can be retried or saved, never silently lost.
+  const [failed, setFailed] = useState<Blob | null>(null);
   const pipRef = useRef<Window | null>(null);
 
   const camStream = useRef<MediaStream | null>(null);
@@ -284,7 +286,7 @@ export default function Recorder() {
       ...(audioTracks ? dest.stream.getAudioTracks() : []),
     ]);
     const mimeType = pickMime();
-    const recorder = new MediaRecorder(out, { mimeType, videoBitsPerSecond: 6_000_000 });
+    const recorder = new MediaRecorder(out, { mimeType, videoBitsPerSecond: 8_000_000 });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
 
@@ -361,20 +363,46 @@ export default function Recorder() {
     xhr.setRequestHeader("Content-Type", blob.type);
     if (title.trim()) xhr.setRequestHeader("x-title", encodeURIComponent(title.trim()));
     xhr.upload.onprogress = (e) => e.lengthComputable && setProgress(e.loaded / e.total);
-    xhr.onload = () => {
-      if (xhr.status === 201) {
-        router.push(`/v/${JSON.parse(xhr.responseText).id}`);
-      } else {
-        setError(`Upload failed (${xhr.status}). ${xhr.responseText}`);
-        setPhase("error");
-      }
-    };
-    xhr.onerror = () => {
-      setError("Upload failed: network error.");
+    const fail = (msg: string) => {
+      setFailed(blob);
+      setError(`${msg} Your recording is safe on this page: retry, or save it to your computer.`);
       setPhase("error");
     };
+    xhr.onload = () => {
+      if (xhr.status === 201) {
+        setFailed(null);
+        router.push(`/v/${JSON.parse(xhr.responseText).id}`);
+      } else if (xhr.status === 401) {
+        fail("Upload failed: you've been signed out (sign in in another tab, then retry).");
+      } else {
+        let detail = "";
+        try {
+          detail = JSON.parse(xhr.responseText).error ?? "";
+        } catch {}
+        fail(`Upload failed (${xhr.status}${detail ? `: ${detail}` : ""}).`);
+      }
+    };
+    xhr.onerror = () => fail("Upload failed: network error.");
     xhr.send(blob);
   }
+
+  function saveFailed() {
+    if (!failed) return;
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(failed);
+    a.download = `recap-${new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19)}.webm`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+  }
+
+  // Closing the tab mid-recording or mid-upload would lose the video; make the browser ask first.
+  useEffect(() => {
+    const risky = phase === "recording" || phase === "paused" || phase === "countdown" || phase === "uploading" || !!failed;
+    if (!risky) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [phase, failed]);
 
   // Document Picture-in-Picture: a camera bubble + controls that float above every app.
   async function popOut() {
@@ -599,8 +627,20 @@ export default function Recorder() {
         </fieldset>
 
         {error && <p className="rounded-sm border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{error}</p>}
+        {failed && phase === "error" && (
+          <div className="grid grid-cols-2 gap-2">
+            <button className="btn-primary" onClick={() => upload(failed)}>retry upload</button>
+            <button className="btn-ghost" onClick={saveFailed}>save to computer</button>
+            <button
+              className="col-span-2 text-[11px] text-muted underline"
+              onClick={() => confirm("Discard this recording? It hasn't been uploaded.") && (setFailed(null), setError(""), setPhase("idle"))}
+            >
+              discard and record again
+            </button>
+          </div>
+        )}
 
-        {!live && phase !== "uploading" && (
+        {!live && phase !== "uploading" && !failed && (
           <button className="btn-primary w-full py-3" onClick={start}>
             <span className="h-2 w-2 rounded-full bg-current" /> start recording
           </button>

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
+import FeedbackButton from "@/components/FeedbackButton";
 import Nav from "@/components/Nav";
+import { config } from "@/lib/config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,7 +38,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </header>
         <main className="flex-1">{children}</main>
         <footer className="mx-auto w-full max-w-6xl px-4 py-6 text-[11px] text-muted">
-          self-hosted · whisper.cpp + ffmpeg · <a className="underline" href="https://github.com/Aditya-galaxy/recap">source</a>
+          {config.localToken ? "local" : "self-hosted"} · whisper.cpp + ffmpeg · <a className="underline" href="https://github.com/Aditya-galaxy/recap">source</a>
+          {config.feedbackUrl && (
+            <>
+              {" · "}
+              <FeedbackButton url={config.feedbackUrl} where={config.localToken ? "desktop" : "web"} version={process.env.RECAP_VERSION ?? process.env.npm_package_version ?? ""} />
+            </>
+          )}
         </footer>
       </body>
     </html>

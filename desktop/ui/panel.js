@@ -247,7 +247,7 @@ window.recap.on("begin", async (o) => {
 
     const out = new MediaStream([...video.getVideoTracks(), ...audioTracks]);
     const mimeType = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"].find((t) => MediaRecorder.isTypeSupported(t));
-    rec = new MediaRecorder(out, { mimeType, videoBitsPerSecond: 5_000_000 });
+    rec = new MediaRecorder(out, { mimeType, videoBitsPerSecond: 8_000_000 });
     writes = Promise.resolve();
     rec.ondataavailable = (e) => {
       if (!e.data.size || discarding) return;

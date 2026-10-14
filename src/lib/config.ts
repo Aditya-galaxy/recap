@@ -24,6 +24,8 @@ export const config = {
   allowSignup: bool(process.env.ALLOW_SIGNUP, true),
   /** If set, creating the first (admin) account requires this code, so a fresh public server can't be claimed by someone else. */
   setupCode: process.env.SETUP_CODE || null,
+  /** Where the in-app feedback box sends messages. Set FEEDBACK_URL="" to hide the box. */
+  feedbackUrl: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",
   maxUploadBytes: Number(process.env.MAX_UPLOAD_MB ?? 4096) * 1024 * 1024,
   /** Absolute base URL for share links and link previews, e.g. https://recap.example.com. Optional. */
   publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, "") || null,

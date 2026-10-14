@@ -35,3 +35,36 @@ form.addEventListener("submit", async (e) => {
     button.disabled = false;
   }
 });
+
+const fb = document.getElementById("fb");
+const fbStatus = document.getElementById("fb-status");
+fb.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = fb.querySelector("button");
+  btn.disabled = true;
+  fbStatus.classList.remove("ok");
+  fbStatus.textContent = "…";
+  try {
+    const res = await fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message: fb.message.value,
+        email: fb.email.value,
+        kind: fb.querySelector('input[name="kind"]:checked')?.value,
+        website: fb.website.value,
+        where: "site",
+        page: location.pathname,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+    fb.reset();
+    fbStatus.classList.add("ok");
+    fbStatus.textContent = "✓ Thanks, it's been received and will be read.";
+  } catch (err) {
+    fbStatus.textContent = err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});

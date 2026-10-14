@@ -1,0 +1,22 @@
+# Recap: self-hosted async video.
+#   docker compose up -d   →   http://localhost:3217 (the first account you create is the admin)
+services:
+  recap:
+    image: ghcr.io/aditya-galaxy/recap:latest
+    build: .
+    restart: unless-stopped
+    ports:
+      - "3217:3000"
+    volumes:
+      - recap-data:/data          # database, videos and the Whisper model; back this up
+    environment:
+      # Public address people will open share links on (enables secure cookies when https).
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      # Set to "false" after creating your accounts to close public sign-up.
+      ALLOW_SIGNUP: ${ALLOW_SIGNUP:-true}
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-4096}
+      # base.en (fast) · small.en (more accurate) · base / small (multilingual)
+      WHISPER_MODEL_NAME: ${WHISPER_MODEL_NAME:-base.en}
+
+volumes:
+  recap-data:

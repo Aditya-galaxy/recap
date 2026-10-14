@@ -65,7 +65,11 @@
     <div class="last"><code id="lastLink"></code><button class="btn" id="copy">copy</button><button class="btn" id="openLink">open</button></div>
   </div>
 
-  <label class="field" id="serverField" hidden><span class="label">server</span><input type="text" id="server" /></label>
+  <div class="field" id="serverField" hidden>
+    <label class="field"><span class="label">server</span><input type="text" id="server" /></label>
+    <label class="field"><span class="label">api token</span><input type="password" id="token" placeholder="rcp_…  (Settings → create token)" autocomplete="off" /></label>
+    <div class="row"><button class="btn" id="check">check connection</button><span class="muted" id="connStatus" style="font-size:10px;text-align:right"></span></div>
+  </div>
 
   <footer>
     <button class="btn" id="library">library</button>

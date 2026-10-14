@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+data
+models
+mac
+desktop
+docs
+*.md
+.claude
+.env*

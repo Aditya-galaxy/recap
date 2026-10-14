@@ -2,6 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { fmtDate, fmtTime } from "@/lib/format";
+import { currentUser, userCount } from "@/lib/auth";
 import { listVideos } from "@/lib/store";
 
 export default function Library() {
@@ -13,8 +14,10 @@ export default function Library() {
 }
 
 async function VideoGrid() {
-  await connection(); // the library lives on disk and changes on every upload
-  const videos = await listVideos();
+  await connection(); // the library changes on every upload
+  const user = await currentUser();
+  if (!user) return <Landing fresh={userCount() === 0} />;
+  const videos = await listVideos(user.id);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
@@ -71,6 +74,43 @@ $ recap record --screen --cam`}
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+function Landing({ fresh }: { fresh: boolean }) {
+  const points = [
+    ["record", "screen + camera bubble from the browser or the Mac, Windows and Linux apps"],
+    ["share", "an unlisted link with captions and a transcript; viewers don't need an account"],
+    ["clean up", "cut the ums and long pauses in one click, transcribed locally with whisper.cpp"],
+    ["own it", "self-hosted, unlimited videos, nothing leaves your server"],
+  ];
+  return (
+    <div className="mx-auto max-w-3xl px-4 py-16">
+      <p className="label">self-hosted async video</p>
+      <h1 className="mt-3 text-2xl font-medium leading-tight sm:text-3xl">
+        Record it once. Share a link.
+        <br />
+        <span className="text-muted">Skip the meeting.</span>
+      </h1>
+      <ul className="mt-8 space-y-3 text-[13px]">
+        {points.map(([k, v]) => (
+          <li key={k} className="flex gap-4">
+            <span className="w-20 shrink-0 text-muted">{k}</span>
+            <span>{v}</span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-10 flex gap-2">
+        {fresh ? (
+          <Link href="/signup" className="btn-primary">set up this server</Link>
+        ) : (
+          <>
+            <Link href="/login" className="btn-primary">sign in</Link>
+            <Link href="/signup" className="btn-ghost">create account</Link>
+          </>
+        )}
+      </div>
     </div>
   );
 }

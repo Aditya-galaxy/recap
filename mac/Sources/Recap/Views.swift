@@ -48,7 +48,10 @@ struct MenuView: View {
         .font(mono)
         .padding(14)
         .frame(width: 320)
-        .onAppear { state.refreshDevices() }
+        .onAppear {
+            state.refreshDevices()
+            if state.token.isEmpty { showSettings = true }
+        }
     }
 
     private var isUploading: Bool { if case .uploading = state.phase { return true }; return false }
@@ -166,6 +169,14 @@ struct MenuView: View {
             field("server") {
                 TextField("http://localhost:3217", text: $state.server).textFieldStyle(.plain).padding(6).overlay(box)
             }
+            field("api token") {
+                SecureField("rcp_…  (Settings → create token)", text: $state.token).textFieldStyle(.plain).padding(6).overlay(box)
+            }
+            HStack {
+                Button("check connection") { state.checkConnection() }.buttonStyle(MonoButton())
+                Spacer()
+                Text(connectionText).font(monoSmall).foregroundStyle(.secondary).lineLimit(2)
+            }
         }
         HStack(spacing: 8) {
             Button("library") {
@@ -176,6 +187,15 @@ struct MenuView: View {
             Button(showSettings ? "done" : "server") { showSettings.toggle() }.buttonStyle(MonoButton())
             Spacer()
             Button("quit") { NSApp.terminate(nil) }.buttonStyle(MonoButton())
+        }
+    }
+
+    private var connectionText: String {
+        switch state.connection {
+        case .unknown: state.token.isEmpty ? "not connected" : ""
+        case .checking: "checking…"
+        case .ok(let email): "✓ \(email)"
+        case .failed(let msg): msg
         }
     }
 

@@ -8,7 +8,17 @@ import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type Vid
 
 type Version = "original" | "clean";
 
-export default function Watch({ initialMeta, initialTranscript }: { initialMeta: VideoMeta; initialTranscript: Transcript | null }) {
+export default function Watch({
+  initialMeta,
+  initialTranscript,
+  owner,
+  shareUrl,
+}: {
+  initialMeta: VideoMeta;
+  initialTranscript: Transcript | null;
+  owner: boolean;
+  shareUrl: string;
+}) {
   const router = useRouter();
   const [meta, setMeta] = useState(initialMeta);
   const [transcript, setTranscript] = useState(initialTranscript);
@@ -26,6 +36,7 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
   const activeWord = useRef<HTMLSpanElement>(null);
   const id = meta.id;
   const cleanStatus = useRef(initialMeta.clean.status);
+  const viewCounted = useRef(false);
 
   // Poll while the server is doing work.
   const working = meta.status === "uploaded" || meta.status === "processing" || meta.clean.status === "rendering";
@@ -131,8 +142,19 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
     router.refresh();
   }
 
+  function onPlay() {
+    if (owner || viewCounted.current) return;
+    viewCounted.current = true;
+    fetch(`/api/videos/${id}/view`, { method: "POST" }).catch(() => {});
+  }
+
+  async function setVisibility(visibility: VideoMeta["visibility"]) {
+    const r = await fetch(`/api/videos/${id}`, { method: "PATCH", body: JSON.stringify({ visibility }) });
+    if (r.ok) setMeta(await r.json());
+  }
+
   function copyLink() {
-    navigator.clipboard.writeText(location.href);
+    navigator.clipboard.writeText(shareUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
   }
@@ -145,7 +167,7 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
     <div className="mx-auto max-w-6xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          {editing ? (
+          {owner && editing ? (
             <input
               autoFocus
               defaultValue={meta.title}
@@ -158,9 +180,9 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
             />
           ) : (
             <h1
-              className="cursor-text truncate rounded-sm px-2 py-1 text-[17px] font-medium hover:bg-surface-2"
-              title="Click to rename"
-              onClick={() => setEditing(true)}
+              className={`truncate rounded-sm px-2 py-1 text-[17px] font-medium ${owner ? "cursor-text hover:bg-surface-2" : ""}`}
+              title={owner ? "Click to rename" : undefined}
+              onClick={() => owner && setEditing(true)}
             >
               {meta.title}
             </h1>
@@ -169,16 +191,31 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
             {fmtDate(meta.createdAt)}
             {meta.duration ? ` · ${fmtTime(onClean ? meta.clean.duration : meta.duration)}` : ""}
             {onClean && meta.clean.duration ? ` (was ${fmtTime(meta.duration)})` : ""}
+            {owner ? ` · ${meta.views} view${meta.views === 1 ? "" : "s"}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {owner && (
+            <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]" title="Who can watch">
+              {(["unlisted", "private"] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setVisibility(v)}
+                  title={v === "unlisted" ? "Anyone with the link" : "Only you"}
+                  className={`rounded-sm px-2.5 py-1 ${meta.visibility === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+                >
+                  {v === "unlisted" ? "link" : "private"}
+                </button>
+              ))}
+            </div>
+          )}
           <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>
           {ready && (
             <a className="btn-ghost" href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
               download
             </a>
           )}
-          <button className="btn-danger" onClick={remove}>delete</button>
+          {owner && <button className="btn-danger" onClick={remove}>delete</button>}
         </div>
       </div>
 
@@ -194,6 +231,7 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
                 preload="metadata"
                 poster={`/api/videos/${id}/thumb`}
                 onTimeUpdate={onTime}
+                onPlay={onPlay}
                 onSeeked={onTime}
                 className="aspect-video w-full bg-black"
                 src={`/api/videos/${id}/media${q}${rev ? `${q ? "&" : "?"}r=${rev}` : ""}`}
@@ -240,8 +278,8 @@ export default function Watch({ initialMeta, initialTranscript }: { initialMeta:
         </div>
 
         <aside className="card flex max-h-[min(80vh,640px)] flex-col overflow-hidden">
-          <div className="grid grid-cols-2 border-b border-border text-[13px]">
-            {(["transcript", "clean"] as const).map((t) => (
+          <div className={`grid border-b border-border text-[13px] ${owner ? "grid-cols-2" : "grid-cols-1"}`}>
+            {(owner ? (["transcript", "clean"] as const) : (["transcript"] as const)).map((t) => (
               <button
                 key={t}
                 onClick={() => setTab(t)}

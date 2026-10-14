@@ -11,6 +11,9 @@ contextBridge.exposeInMainWorld("recap", {
   open: (what) => ipcRenderer.send("open", what),
   copy: (text) => ipcRenderer.send("copy", text),
   requestState: () => ipcRenderer.send("state?"),
+  hasToken: () => ipcRenderer.invoke("token:has"),
+  setToken: (token) => ipcRenderer.invoke("token:set", token),
+  checkConnection: (server) => ipcRenderer.invoke("connection:check", server),
   on: (channel, fn) => {
     if (!["state", "begin", "control", "hotkey"].includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => fn(data));

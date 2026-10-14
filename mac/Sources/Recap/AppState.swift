@@ -44,7 +44,11 @@ final class AppState: ObservableObject {
             bubble?.resize(to: bubbleSize)
         }
     }
-    @Published var server: String { didSet { defaults.set(server, forKey: "server") } }
+    @Published var server: String { didSet { defaults.set(server, forKey: "server"); connection = .unknown } }
+    @Published var token: String { didSet { Keychain.write(token); connection = .unknown } }
+    @Published var connection: Connection = .unknown
+
+    enum Connection: Equatable { case unknown, checking, ok(String), failed(String) }
     @Published var displayID: CGDirectDisplayID = CGMainDisplayID()
     @Published var title = ""
 
@@ -75,6 +79,17 @@ final class AppState: ObservableObject {
         systemAudio = defaults.object(forKey: "systemAudio") as? Bool ?? true
         bubbleSize = BubbleSize(rawValue: defaults.string(forKey: "bubble") ?? "") ?? .m
         server = defaults.string(forKey: "server") ?? "http://localhost:3217"
+        token = Keychain.read()
+    }
+
+    func checkConnection() {
+        guard let url = serverURL else { connection = .failed("Server URL is invalid."); return }
+        guard !token.isEmpty else { connection = .failed("Paste an API token from Settings on your Recap server."); return }
+        connection = .checking
+        Task {
+            do { connection = .ok(try await Uploader.check(server: url, token: token)) }
+            catch { connection = .failed(error.localizedDescription) }
+        }
     }
 
     var serverURL: URL? {
@@ -127,6 +142,10 @@ final class AppState: ObservableObject {
         }
         guard serverURL != nil else {
             phase = .error("Server URL is invalid.")
+            return
+        }
+        guard !token.isEmpty else {
+            phase = .error("Not connected. Open “server” and paste an API token from Settings on your Recap server.")
             return
         }
 
@@ -238,7 +257,7 @@ final class AppState: ObservableObject {
         guard let server = serverURL else { return }
         phase = .uploading(0)
         do {
-            let link = try await Uploader.upload(file, title: title, server: server) { p in
+            let link = try await Uploader.upload(file, title: title, server: server, token: token) { p in
                 Task { @MainActor in
                     if case .uploading = AppState.shared.phase { AppState.shared.phase = .uploading(p) }
                 }

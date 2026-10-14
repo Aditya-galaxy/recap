@@ -44,9 +44,25 @@ enum Media {
 enum Uploader {
     private struct Created: Decodable { let id: String }
 
-    static func upload(_ file: URL, title: String, server: URL, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
+    private struct Me: Decodable { let email: String }
+
+    /// Verifies the server URL + token. Returns the signed-in email.
+    static func check(server: URL, token: String) async throws -> String {
+        var req = URLRequest(url: server.appendingPathComponent("api/me"))
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.timeoutInterval = 10
+        let (data, resp) = try await URLSession.shared.data(for: req)
+        switch (resp as? HTTPURLResponse)?.statusCode ?? 0 {
+        case 200: return try JSONDecoder().decode(Me.self, from: data).email
+        case 401: throw RecapError("The token was rejected. Create a new one under Settings on your Recap server.")
+        case let code: throw RecapError("Server answered HTTP \(code). Is the URL right?")
+        }
+    }
+
+    static func upload(_ file: URL, title: String, server: URL, token: String, progress: @escaping @Sendable (Double) -> Void) async throws -> URL {
         var req = URLRequest(url: server.appendingPathComponent("api/videos"))
         req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         req.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
         let t = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if !t.isEmpty, let enc = t.addingPercentEncoding(withAllowedCharacters: .alphanumerics) {
@@ -54,6 +70,7 @@ enum Uploader {
         }
         let (data, resp) = try await URLSession.shared.upload(for: req, fromFile: file, delegate: ProgressDelegate(progress))
         let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+        if code == 401 { throw RecapError("Not connected: the server rejected the token. Update it under “server”.") }
         guard code == 201 else {
             throw RecapError("Upload failed (HTTP \(code)): \(String(data: data, encoding: .utf8)?.prefix(200) ?? "")")
         }

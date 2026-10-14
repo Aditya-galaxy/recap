@@ -1,13 +1,16 @@
 import "server-only";
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
-import path from "node:path";
+import { config } from "./config";
 import { cutRanges, keepRanges, snapToSilences, tagFillers, total } from "./cuts";
 import { exists, file, readMeta, readTranscript, updateMeta } from "./store";
 import type { CleanOptions, Range, Transcript, Word } from "./types";
 
-const WHISPER_BIN = process.env.WHISPER_BIN ?? "whisper-cli";
-const WHISPER_MODEL = process.env.WHISPER_MODEL ?? path.join(process.cwd(), "models", "ggml-base.en.bin");
+const WHISPER_BIN = config.whisperBin;
+const WHISPER_MODEL = config.whisperModel;
+
+/** An error retrying won't fix (bad upload, nothing to render). */
+export class PermanentError extends Error {}
 // Priming the decoder with disfluencies stops Whisper from silently "cleaning up" ums and uhs.
 const WHISPER_PROMPT = "Um, so, uh, I was like, you know, thinking. Hmm.";
 
@@ -98,17 +101,20 @@ async function transcribe(id: string, wav: string): Promise<Word[]> {
   return tagFillers(speech);
 }
 
-const running = new Set<string>();
-
-/** Transcode → thumbnail → transcribe → detect silences. Runs detached from the request. */
+/** Transcode → thumbnail → transcribe → detect silences. Throws on failure; the job queue retries. */
 export async function processVideo(id: string) {
-  if (running.has(id)) return;
-  running.add(id);
   const stage = (s: string) => updateMeta(id, (m) => { m.status = "processing"; m.stage = s; });
-  try {
-    const src = file(id, "original"); // webm from the browser, mp4/mov from the Mac app
-    const mp4 = file(id, "video.mp4");
-    const wav = file(id, "audio.wav");
+  const src = file(id, "original"); // webm from the browser/Electron, mp4/mov from the Mac app
+  const mp4 = file(id, "video.mp4");
+  const wav = file(id, "audio.wav");
+
+  if (!(await exists(src))) {
+    // A previous attempt finished encoding and removed the upload; only metadata steps remain.
+    if (!(await exists(mp4))) throw new PermanentError("Upload is missing.");
+  } else {
+    await stage("Checking upload");
+    const { stdout } = await run("ffprobe", ["-v", "error", "-select_streams", "v", "-show_entries", "stream=codec_type", "-of", "csv=p=0", src]).catch(() => ({ stdout: "" }));
+    if (!stdout.includes("video")) throw new PermanentError("That file isn't a video Recap can read.");
 
     await stage("Encoding video");
     // MediaRecorder output is variable-frame-rate and lacks a seek index; normalize to CFR H.264.
@@ -118,72 +124,81 @@ export async function processVideo(id: string) {
       nAudio > 1
         ? ["-filter_complex", `${Array.from({ length: nAudio }, (_, i) => `[0:a:${i}]`).join("")}amix=inputs=${nAudio}:normalize=0[a]`, "-map", "0:v:0", "-map", "[a]"]
         : [];
+    const tmp = file(id, "video.tmp.mp4");
     await run("ffmpeg", [
       "-y", "-hide_banner", "-loglevel", "error", "-i", src,
       "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-fps_mode", "cfr", "-r", "30", ...audioArgs,
       "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", mp4,
+      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
     ]);
-    const info = await probe(mp4);
-    await updateMeta(id, (m) => { m.duration = info.duration; m.width = info.width; m.height = info.height; });
-
-    await run("ffmpeg", [
-      "-y", "-hide_banner", "-loglevel", "error", "-ss", String(Math.min(1, info.duration / 2)), "-i", mp4,
-      "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", file(id, "thumb.jpg"),
-    ]);
-
-    let transcript: Transcript = { words: [], silences: [] };
-    if (await hasAudio(mp4)) {
-      await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", mp4, "-ar", "16000", "-ac", "1", wav]);
-      await stage("Transcribing");
-      const words = await transcribe(id, wav);
-      await stage("Finding pauses");
-      const silences = await detectSilences(wav, info.duration);
-      transcript = { words: snapToSilences(words, silences), silences };
-    }
-    await fs.writeFile(file(id, "transcript.json"), JSON.stringify(transcript));
-    await fs.rm(src, { force: true }).catch(() => {});
-    await updateMeta(id, (m) => { m.status = "ready"; delete m.stage; delete m.error; });
-  } catch (err) {
-    console.error(`[pipeline ${id}]`, err);
-    await updateMeta(id, (m) => { m.status = "error"; m.error = String((err as Error).message ?? err); }).catch(() => {});
-  } finally {
-    running.delete(id);
+    await fs.rename(tmp, mp4);
   }
+  const info = await probe(mp4);
+  await updateMeta(id, (m) => { m.duration = info.duration; m.width = info.width; m.height = info.height; });
+
+  await run("ffmpeg", [
+    "-y", "-hide_banner", "-loglevel", "error", "-ss", String(Math.min(1, info.duration / 2)), "-i", mp4,
+    "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", file(id, "thumb.jpg"),
+  ]);
+
+  let transcript: Transcript = { words: [], silences: [] };
+  if (await hasAudio(mp4)) {
+    await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", mp4, "-ar", "16000", "-ac", "1", wav]);
+    await stage("Transcribing");
+    const words = await transcribe(id, wav);
+    await stage("Finding pauses");
+    const silences = await detectSilences(wav, info.duration);
+    transcript = { words: snapToSilences(words, silences), silences };
+    await fs.rm(wav, { force: true });
+    await fs.rm(file(id, "whisper.json"), { force: true });
+  }
+  await fs.writeFile(file(id, "transcript.json"), JSON.stringify(transcript));
+  await fs.rm(src, { force: true });
+  await updateMeta(id, (m) => { m.status = "ready"; delete m.stage; delete m.error; });
+}
+
+/** Validate a clean-up request and mark it as rendering. The render itself runs as a job. */
+export async function prepareClean(id: string, opts: CleanOptions) {
+  const meta = await readMeta(id);
+  const t = await readTranscript(id);
+  if (!meta?.duration || !t) throw new PermanentError("Video isn't ready yet.");
+  const keep = keepRanges(cutRanges(t, opts, meta.duration), meta.duration);
+  if (keep.length === 0) throw new PermanentError("Those settings would cut the whole video.");
+  await updateMeta(id, (m) => { m.clean = { status: "rendering", options: opts }; });
 }
 
 /** Render a cleaned cut with fillers and long pauses removed. */
 export async function renderClean(id: string, opts: CleanOptions) {
   const meta = await readMeta(id);
   const t = await readTranscript(id);
-  if (!meta?.duration || !t) throw new Error("video not ready");
+  if (!meta?.duration || !t) throw new PermanentError("Video isn't ready yet.");
   const keep = keepRanges(cutRanges(t, opts, meta.duration), meta.duration);
-  if (keep.length === 0) throw new Error("nothing left to keep");
-  await updateMeta(id, (m) => { m.clean = { status: "rendering", options: opts }; });
+  const sel = keep.map((k) => `between(t,${k.start.toFixed(3)},${k.end.toFixed(3)})`).join("+");
+  const audio = await hasAudio(file(id, "video.mp4"));
+  const graph = [`[0:v]select='${sel}',setpts=N/FRAME_RATE/TB[v]`];
+  if (audio) graph.push(`[0:a]aselect='${sel}',asetpts=N/SR/TB[a]`);
+  const graphFile = file(id, "clean.filter");
+  await fs.writeFile(graphFile, graph.join(";"));
+  const tmp = file(id, "clean.tmp.mp4");
+  await run("ffmpeg", [
+    "-y", "-hide_banner", "-loglevel", "error", "-i", file(id, "video.mp4"),
+    "-/filter_complex", graphFile, "-map", "[v]", ...(audio ? ["-map", "[a]"] : []),
+    "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
+  ]);
+  await fs.rename(tmp, file(id, "clean.mp4"));
+  await fs.writeFile(file(id, "clean.keep.json"), JSON.stringify(keep));
+  await updateMeta(id, (m) => { m.clean = { status: "ready", options: opts, duration: total(keep) }; });
+}
 
-  void (async () => {
-    try {
-      const sel = keep.map((k) => `between(t,${k.start.toFixed(3)},${k.end.toFixed(3)})`).join("+");
-      const audio = await hasAudio(file(id, "video.mp4"));
-      const graph = [`[0:v]select='${sel}',setpts=N/FRAME_RATE/TB[v]`];
-      if (audio) graph.push(`[0:a]aselect='${sel}',asetpts=N/SR/TB[a]`);
-      const graphFile = file(id, "clean.filter");
-      await fs.writeFile(graphFile, graph.join(";"));
-      const tmp = file(id, "clean.tmp.mp4");
-      await run("ffmpeg", [
-        "-y", "-hide_banner", "-loglevel", "error", "-i", file(id, "video.mp4"),
-        "-/filter_complex", graphFile, "-map", "[v]", ...(audio ? ["-map", "[a]"] : []),
-        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-        "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
-      ]);
-      await fs.rename(tmp, file(id, "clean.mp4"));
-      await fs.writeFile(file(id, "clean.keep.json"), JSON.stringify(keep));
-      await updateMeta(id, (m) => { m.clean = { status: "ready", options: opts, duration: total(keep) }; });
-    } catch (err) {
-      console.error(`[clean ${id}]`, err);
-      await updateMeta(id, (m) => { m.clean = { status: "error", options: opts, error: String((err as Error).message) }; }).catch(() => {});
-    }
-  })();
+/** Is the toolchain installed? Used by /api/health. */
+export async function toolchain() {
+  const ok = async (cmd: string, args: string[]) => run(cmd, args).then(() => true, () => false);
+  return {
+    ffmpeg: await ok("ffmpeg", ["-version"]),
+    whisper: await ok(WHISPER_BIN, ["--help"]),
+    model: await exists(WHISPER_MODEL),
+  };
 }
 
 export async function readKeep(id: string): Promise<Range[] | null> {

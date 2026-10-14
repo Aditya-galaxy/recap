@@ -10,9 +10,14 @@ export interface CleanOptions {
   aggressive: boolean;
 }
 
+export type Visibility = "unlisted" | "private";
+
 export interface VideoMeta {
   id: string;
+  ownerId: string | null;
   title: string;
+  visibility: Visibility;
+  views: number;
   createdAt: string;
   status: VideoStatus;
   stage?: string;

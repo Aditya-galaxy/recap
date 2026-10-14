@@ -129,6 +129,26 @@ $("openLink").onclick = () => window.recap.open(state.lastLink);
 $("library").onclick = () => window.recap.open(settings.server);
 $("folder").onclick = () => window.recap.open("folder");
 $("toggleServer").onclick = () => ($("serverField").hidden = !$("serverField").hidden);
+$("token").addEventListener("change", async (e) => {
+  await window.recap.setToken(e.target.value);
+  e.target.value = "";
+  e.target.placeholder = "saved (encrypted). paste to replace";
+  checkConnection();
+});
+$("check").onclick = () => checkConnection();
+async function checkConnection() {
+  $("connStatus").textContent = "checking…";
+  const r = await window.recap.checkConnection(settings.server);
+  $("connStatus").textContent = r.message;
+}
+window.recap.hasToken().then((has) => {
+  if (has) {
+    $("token").placeholder = "saved (encrypted). paste to replace";
+  } else {
+    $("serverField").hidden = false;
+    $("connStatus").textContent = "not connected";
+  }
+});
 
 function startRecording() {
   if (!["idle", "error"].includes(state.phase)) return;

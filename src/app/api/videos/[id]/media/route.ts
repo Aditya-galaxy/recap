@@ -1,11 +1,13 @@
 import { createReadStream, promises as fs } from "node:fs";
 import { Readable } from "node:stream";
-import { file, readMeta } from "@/lib/store";
+import { currentUser } from "@/lib/auth";
+import { canView, file, readMeta } from "@/lib/store";
 
 /** Serves video.mp4 (or clean.mp4 with ?v=clean) with HTTP range support so the player can seek. */
 export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/media">) {
   const { id } = await ctx.params;
-  if (!(await readMeta(id))) return new Response("not found", { status: 404 });
+  const meta = await readMeta(id);
+  if (!meta || !canView(meta, await currentUser())) return new Response("not found", { status: 404 });
   const url = new URL(req.url);
   const clean = url.searchParams.get("v") === "clean";
   const p = file(id, clean ? "clean.mp4" : "video.mp4");
@@ -20,7 +22,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/medi
   const headers: Record<string, string> = {
     "Content-Type": "video/mp4",
     "Accept-Ranges": "bytes",
-    "Cache-Control": "no-cache",
+    "Cache-Control": "private, no-cache",
   };
   if (url.searchParams.has("download")) headers["Content-Disposition"] = `attachment; filename="${id}${clean ? "-clean" : ""}.mp4"`;
 

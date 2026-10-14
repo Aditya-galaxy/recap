@@ -4,7 +4,7 @@
 //   panel  – settings + start; also hosts the MediaRecorder (kept alive while hidden)
 //   bubble – circular camera window, always on top, captured with the screen on purpose
 //   bar    – timer / pause / stop / discard, always on top, excluded from capture where the OS allows
-const { app, BrowserWindow, Tray, Menu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Readable } = require("node:stream");
@@ -142,10 +142,49 @@ function closeOverlays() {
   bar = null;
 }
 
+// ---- API token (encrypted with the OS keychain / DPAPI / libsecret via safeStorage) ------
+
+const tokenFile = () => path.join(app.getPath("userData"), "token.bin");
+
+function readToken() {
+  try {
+    const buf = fs.readFileSync(tokenFile());
+    return safeStorage.isEncryptionAvailable() ? safeStorage.decryptString(buf) : buf.toString("utf8");
+  } catch {
+    return "";
+  }
+}
+
+function writeToken(token) {
+  const t = String(token || "").trim();
+  if (!t) return fs.rmSync(tokenFile(), { force: true });
+  fs.writeFileSync(tokenFile(), safeStorage.isEncryptionAvailable() ? safeStorage.encryptString(t) : Buffer.from(t, "utf8"), { mode: 0o600 });
+}
+
+async function checkConnection(server) {
+  const token = readToken();
+  if (!token) return { ok: false, message: "Paste an API token from Settings on your Recap server." };
+  try {
+    const res = await fetch(`${String(server).replace(/\/+$/, "")}/api/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 200) return { ok: true, message: `✓ ${(await res.json()).email}` };
+    if (res.status === 401) return { ok: false, message: "Token rejected. Create a new one under Settings on your server." };
+    return { ok: false, message: `Server answered HTTP ${res.status}. Is the URL right?` };
+  } catch (err) {
+    return { ok: false, message: `Can't reach the server (${err.cause?.code ?? err.name}).` };
+  }
+}
+
 // ---- recording flow ----------------------------------------------------------
 
 async function start(opts) {
   if (!["idle", "error"].includes(session.phase)) return;
+  if (!readToken()) {
+    panel?.show();
+    return setPhase("error", { error: "Not connected. Open “server” and paste an API token from Settings on your Recap server." });
+  }
   if (process.platform === "darwin" && opts.mode !== "cam" && systemPreferences.getMediaAccessStatus("screen") !== "granted") {
     // Triggers the macOS prompt; on Windows/Linux there is no such gate.
     await desktopCapturer.getSources({ types: ["screen"] }).catch(() => {});
@@ -218,10 +257,11 @@ async function upload(file) {
         setPhase("uploading", { progress: p });
       }
     });
-    const headers = { "Content-Type": "video/webm", "Content-Length": String(size) };
+    const headers = { "Content-Type": "video/webm", "Content-Length": String(size), Authorization: `Bearer ${readToken()}` };
     const title = (session.opts?.title || "").trim();
     if (title) headers["x-title"] = encodeURIComponent(title);
     const res = await fetch(`${server}/api/videos`, { method: "POST", headers, body: Readable.toWeb(stream), duplex: "half" });
+    if (res.status === 401) throw new Error("the server rejected the token; update it under “server”");
     if (res.status !== 201) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const { id } = await res.json();
     const link = `${server}/v/${id}`;
@@ -279,6 +319,9 @@ ipcMain.on("open", (_e, what) => {
 });
 ipcMain.on("copy", (_e, text) => clipboard.writeText(String(text)));
 ipcMain.on("state?", () => broadcast());
+ipcMain.handle("token:has", () => !!readToken());
+ipcMain.handle("token:set", (_e, token) => writeToken(token));
+ipcMain.handle("connection:check", (_e, server) => checkConnection(server));
 
 // ---- app lifecycle --------------------------------------------------------------------
 

@@ -1,0 +1,84 @@
+name: server image
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["desktop/**", "mac/**", "docs/**", "**.md"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/aditya-galaxy/recap
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - run: npx next typegen && npx tsc --noEmit
+      - run: npx eslint src
+
+  image:
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build (amd64) for smoke test
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: recap:test
+          build-args: RECAP_VERSION=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke test (sign up, upload, process, share page)
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
+          ffmpeg -loglevel error -f lavfi -i testsrc2=size=640x360:rate=30 -f lavfi -i "sine=f=300:d=6" -t 6 -c:v libvpx -c:a libopus sample.webm
+          docker run -d --name recap -p 3000:3000 -e ALLOW_SIGNUP=false recap:test
+          for i in $(seq 1 90); do curl -fsS localhost:3000/api/health && break || sleep 3; done
+          echo; curl -fsS localhost:3000/api/health | grep '"ok":true'
+          curl -fsS -c jar -H 'Content-Type: application/json' -d '{"email":"ci@example.com","password":"ci password 123"}' localhost:3000/api/auth/signup
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"x@example.com","password":"ci password 123"}' localhost:3000/api/auth/signup)" = 403
+          ID=$(curl -fsS -b jar -H 'x-title: CI%20smoke' --data-binary @sample.webm localhost:3000/api/videos | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+          for i in $(seq 1 60); do S=$(curl -fsS -b jar localhost:3000/api/videos/$ID | python3 -c "import sys,json;print(json.load(sys.stdin)['meta']['status'])"); [ "$S" = ready ] && break; [ "$S" = error ] && exit 1; sleep 2; done
+          test "$S" = ready
+          curl -fsS localhost:3000/v/$ID | grep -q 'og:title'
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/videos)" = 401
+          docker exec recap test ! -e /app/data
+          echo "smoke test passed"
+      - if: always()
+        run: docker logs recap || true
+
+      - name: Publish multi-arch image (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/setup-qemu-action@v3
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: RECAP_VERSION=${{ github.ref_name }}
+          tags: |
+            ${{ env.IMAGE }}:${{ github.ref_name }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha

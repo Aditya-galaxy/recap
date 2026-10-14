@@ -1,29 +1,62 @@
 import { createWriteStream } from "node:fs";
-import { Readable } from "node:stream";
+import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
-import { connection } from "next/server";
-import { processVideo } from "@/lib/pipeline";
-import { createVideo, deleteVideo, file, listVideos } from "@/lib/store";
+import { currentUser, unauthorized } from "@/lib/auth";
+import { config } from "@/lib/config";
+import { enqueue } from "@/lib/jobs";
+import { rateLimit } from "@/lib/ratelimit";
+import { createVideo, deleteVideo, file, listVideos, setSize } from "@/lib/store";
 
 export async function GET() {
-  await connection();
-  return Response.json(await listVideos());
+  const user = await currentUser();
+  if (!user) return unauthorized();
+  return Response.json(await listVideos(user.id));
 }
+
+class TooLarge extends Error {}
 
 /** Upload a raw recording as the request body. Title comes from the x-title header. */
 export async function POST(req: Request) {
-  if (!req.body) return Response.json({ error: "empty body" }, { status: 400 });
-  const raw = req.headers.get("x-title");
-  const title = (raw ? decodeURIComponent(raw) : "").trim().slice(0, 200) || defaultTitle();
-  const meta = await createVideo(title);
+  const user = await currentUser();
+  if (!user) return unauthorized();
+  const limited = rateLimit(`upload:${user.id}`, 60, 60 * 60_000);
+  if (limited) return limited;
+  if (!req.body) return Response.json({ error: "Empty upload." }, { status: 400 });
+
+  const max = config.maxUploadBytes;
+  const tooLarge = () => Response.json({ error: `Upload is larger than the ${Math.round(max / 1048576)} MB limit.` }, { status: 413 });
+  if (Number(req.headers.get("content-length") ?? 0) > max) return tooLarge();
+
+  let title = "";
   try {
-    await pipeline(Readable.fromWeb(req.body as NodeReadableStream), createWriteStream(file(meta.id, "original")));
+    title = decodeURIComponent(req.headers.get("x-title") ?? "").trim().slice(0, 200);
+  } catch {
+    /* malformed header: fall back to a default title */
+  }
+  const meta = await createVideo(title || defaultTitle(), user.id);
+
+  // Count bytes as they stream in; chunked uploads have no Content-Length to check up front.
+  let bytes = 0;
+  const limiter = new Transform({
+    transform(chunk, _enc, cb) {
+      bytes += chunk.length;
+      cb(bytes > max ? new TooLarge() : null, chunk);
+    },
+  });
+  try {
+    await pipeline(Readable.fromWeb(req.body as NodeReadableStream), limiter, createWriteStream(file(meta.id, "original")));
   } catch (err) {
     await deleteVideo(meta.id);
-    return Response.json({ error: `upload failed: ${(err as Error).message}` }, { status: 500 });
+    if (err instanceof TooLarge) return tooLarge();
+    return Response.json({ error: `Upload failed: ${(err as Error).message}` }, { status: 500 });
   }
-  void processVideo(meta.id);
+  if (bytes === 0) {
+    await deleteVideo(meta.id);
+    return Response.json({ error: "Empty upload." }, { status: 400 });
+  }
+  setSize(meta.id, bytes);
+  enqueue("process", meta.id);
   return Response.json(meta, { status: 201 });
 }
 

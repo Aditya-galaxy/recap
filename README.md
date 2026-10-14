@@ -4,9 +4,8 @@
 share link with a transcript and captions, and remove the "um"s and dead air in one click.
 Transcription runs on your own machine with whisper.cpp. No account, no cloud, no API keys.
 
-> **Status: v0.1, early release.** The full pipeline is tested end to end. The desktop apps have
-> not yet had wide real-world testing, and the server has **no authentication**, so run it locally
-> or on a private network, not on the open internet. Issues and PRs welcome.
+> **Status: early release.** Accounts, private/unlisted videos, API tokens for the desktop apps, a crash-safe
+> job queue and a Docker image are in. See [docs/ROADMAP.md](docs/ROADMAP.md) for what's next. Issues and PRs welcome.
 
 - **Record:** screen + draggable camera bubble, mic and system audio, pause/resume.
   Use the web app in Chrome, or the native apps for macOS, Windows and Linux (global hotkey ⌥⌘R / Ctrl+Alt+R).
@@ -18,41 +17,68 @@ Original implementation: no code from Loom; the name is only used to describe th
 
 ## Quick start
 
-### 1. Run the server (required: the apps upload to it)
+### 1. Run the server
 
-macOS:
+**Docker (recommended).** Any Linux box, VPS, NAS or Mac with Docker:
 
 ```bash
-brew install ffmpeg whisper-cpp
+curl -O https://raw.githubusercontent.com/Aditya-galaxy/recap/main/docker-compose.yml
+docker compose up -d
+```
+
+Open http://localhost:3217 and create your account; **the first account is the admin**. On first start the
+container downloads the Whisper model (~140 MB) into the data volume.
+
+| Variable | Default | |
+| --- | --- | --- |
+| `PUBLIC_URL` | (unset) | The address people open share links on, e.g. `https://recap.example.com`. Enables secure cookies for https. |
+| `ALLOW_SIGNUP` | `true` | Set `false` once your team has accounts. Admins can still add users under Settings. |
+| `MAX_UPLOAD_MB` | `4096` | Per-upload size cap. |
+| `WHISPER_MODEL_NAME` | `base.en` | `small.en` is more accurate; `base` / `small` handle other languages. |
+
+**Putting it on the internet:** run it behind a reverse proxy with HTTPS (Caddy, Traefik, nginx, Cloudflare Tunnel)
+and set `PUBLIC_URL`. For example, with Caddy: `recap.example.com { reverse_proxy localhost:3217 }`.
+
+**Backups:** everything (database, videos, model) is in the `recap-data` volume. Back that up.
+
+<details>
+<summary>Without Docker (macOS / Linux, for development)</summary>
+
+```bash
+brew install ffmpeg whisper-cpp        # Linux: ffmpeg from your package manager + build whisper.cpp
 git clone https://github.com/Aditya-galaxy/recap && cd recap
 mkdir -p models && curl -L -o models/ggml-base.en.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
 npm install
-npm run build && npm start -- -p 3217      # or: npm run dev -- -p 3217
+npm run dev -- -p 3217                 # or: npm run build && npm start -- -p 3217
 ```
 
-Linux: install `ffmpeg` from your package manager and build
-[whisper.cpp](https://github.com/ggml-org/whisper.cpp) (it provides `whisper-cli`). Then follow the same steps.
-Point to the binary and model with `WHISPER_BIN` / `WHISPER_MODEL` if they aren't on the default paths.
-`ggml-small.en.bin` is more accurate than `base.en` but slower.
+Data goes to `./data` (override with `DATA_DIR`); point to whisper with `WHISPER_BIN` / `WHISPER_MODEL`.
+</details>
 
-Open http://localhost:3217 to record from the browser, or use a desktop app:
+### 2. Record
 
-### 2. Desktop apps
-
-Download from [Releases](https://github.com/Aditya-galaxy/recap/releases/latest):
+- **Browser:** sign in and press **record** (Chrome or Edge).
+- **Desktop apps:** download from [Releases](https://github.com/Aditya-galaxy/recap/releases/latest). In the
+  server's **Settings → connect the desktop apps**, create an API token, then paste the server URL and token
+  into the app's **server** section and press **check connection**.
 
 | OS | File | First launch |
 | --- | --- | --- |
-| macOS 15+ | `Recap-macOS.zip` | The app isn't notarized: unzip, move it to Applications, then run `xattr -dr com.apple.quarantine /Applications/Recap.app`, or use System Settings → Privacy & Security → "Open Anyway". Grant Screen Recording, then reopen the app. |
-| Windows 10/11 | `Recap.Setup.0.1.0.exe` (installer) or `Recap.0.1.0.exe` (portable) | It isn't code-signed: on the SmartScreen prompt choose "More info" → "Run anyway". |
+| macOS 15+ | `Recap-macOS.zip` | Not notarized: move it to Applications, run `xattr -dr com.apple.quarantine /Applications/Recap.app`, then grant Screen Recording and reopen. |
+| Windows 10/11 | `Recap.Setup.<version>.exe` (installer) or `Recap.<version>.exe` (portable) | Not code-signed: on the SmartScreen prompt choose "More info" → "Run anyway". |
 | Linux | `.AppImage` or `.deb` | `chmod +x Recap-*.AppImage && ./Recap-*.AppImage` |
 
-All apps upload to `http://localhost:3217` by default. Change this under **server** in the app.
+### Sharing and privacy
+
+- Videos are **unlisted** by default: anyone with the link can watch without an account, and pages are never indexed.
+  Switch a video to **private** to make it visible only to you.
+- Unlisted links show a title and thumbnail preview in Slack, X, iMessage and so on. Private ones show nothing.
+- Owners see view counts. Viewers can watch, read the transcript and download; only owners can edit or delete.
 
 ## Known limitations
 
-- **No authentication.** Anyone who can reach the server can watch, rename and delete videos.
+- Password-only sign-in (no SSO or password reset email yet; an admin can create a new account).
 - Apps are unsigned or ad-hoc signed (see the first-launch notes above).
 - Linux: no system audio (mic only). The control bar is visible in recordings because Linux has no way to exclude a window from capture.
 - The macOS app records whole displays, not single windows.

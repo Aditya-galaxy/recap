@@ -74,7 +74,9 @@ jobs:
             macos) APP=("dist/mac-arm64/Recap.app/Contents/MacOS/Recap") ;;
             windows) APP=("dist/win-unpacked/Recap.exe") ;;
           esac
-          RECAP_SELFTEST="$OUT" RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.webm" timeout 900 "${APP[@]}" || true
+          # macOS has no `timeout`; perl's alarm does the same job there.
+          if command -v timeout >/dev/null; then LIMIT=(timeout 900); else LIMIT=(perl -e 'alarm shift; exec @ARGV' 900); fi
+          RECAP_SELFTEST="$OUT" RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.webm" "${LIMIT[@]}" "${APP[@]}" || true
           cat "$OUT/report.json"
           PY=$(command -v python3 || command -v python)
           "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all', len(r['steps']), 'steps passed'); sys.exit(1 if bad or not r['steps'] else 0)" "$OUT/report.json"

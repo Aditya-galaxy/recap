@@ -1,0 +1,139 @@
+// recap.kronagent.dev: the public front door for Recap. Serves the landing page and collects
+// email signups into Firestore. Runs on Cloud Run (scales to zero); no framework, one dependency.
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { FieldValue, Firestore } from "@google-cloud/firestore";
+
+const PORT = Number(process.env.PORT ?? 8080);
+const COLLECTION = process.env.SIGNUP_COLLECTION ?? "signups";
+// A dedicated Firestore database, so signups are isolated from other apps in the project.
+const DATABASE = process.env.FIRESTORE_DATABASE ?? "recap";
+const PUBLIC = path.join(path.dirname(fileURLToPath(import.meta.url)), "public");
+
+// Uses the Cloud Run service account; locally, Application Default Credentials (or set DRY_RUN=1).
+const db = process.env.DRY_RUN ? null : new Firestore({ databaseId: DATABASE, ignoreUndefinedProperties: true });
+
+const TYPES = {
+  ".html": "text/html; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".png": "image/png",
+  ".svg": "image/svg+xml",
+  ".ico": "image/x-icon",
+  ".txt": "text/plain; charset=utf-8",
+};
+
+const SECURITY_HEADERS = {
+  "Content-Security-Policy":
+    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  "Strict-Transport-Security": "max-age=31536000",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+};
+
+const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
+
+// Per-instance fixed-window limiter; good enough to stop casual abuse of a signup form.
+const hits = new Map();
+function limited(ip, limit = 5, windowMs = 10 * 60_000) {
+  const now = Date.now();
+  const h = hits.get(ip);
+  if (!h || h.reset < now) {
+    hits.set(ip, { n: 1, reset: now + windowMs });
+    if (hits.size > 5000) for (const [k, v] of hits) if (v.reset < now) hits.delete(k);
+    return false;
+  }
+  return ++h.n > limit;
+}
+
+function send(res, status, body, headers = {}) {
+  res.writeHead(status, { ...SECURITY_HEADERS, ...headers });
+  res.end(body);
+}
+const json = (res, status, obj) => send(res, status, JSON.stringify(obj), { "Content-Type": "application/json", "Cache-Control": "no-store" });
+
+async function readBody(req, max = 4096) {
+  let size = 0;
+  const chunks = [];
+  for await (const c of req) {
+    size += c.length;
+    if (size > max) throw new Error("too large");
+    chunks.push(c);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
+async function subscribe(req, res) {
+  const ip = (req.headers["x-forwarded-for"] ?? "").toString().split(",")[0].trim() || req.socket.remoteAddress || "?";
+  if (limited(ip)) return json(res, 429, { error: "Too many attempts. Try again in a few minutes." });
+
+  let body;
+  try {
+    body = JSON.parse(await readBody(req));
+  } catch {
+    return json(res, 400, { error: "Bad request." });
+  }
+  // Honeypot: real people never see or fill this field.
+  if (body.website) return json(res, 200, { ok: true });
+
+  const email = String(body.email ?? "").trim().toLowerCase();
+  if (email.length > 254 || !EMAIL_RE.test(email)) return json(res, 400, { error: "Enter a valid email address." });
+
+  const doc = {
+    email,
+    interest: ["desktop", "hosted", "selfhost"].includes(body.interest) ? body.interest : "desktop",
+    source: String(body.source ?? "").slice(0, 80) || undefined,
+    referrer: String(req.headers.referer ?? "").slice(0, 300) || undefined,
+    userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300) || undefined,
+    lastSeenAt: FieldValue.serverTimestamp(),
+    signups: FieldValue.increment(1),
+  };
+  try {
+    if (db) {
+      // One document per address (keyed by its hash), so repeat signups just update it.
+      const ref = db.collection(COLLECTION).doc(createHash("sha256").update(email).digest("hex"));
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        tx.set(ref, snap.exists ? doc : { ...doc, createdAt: FieldValue.serverTimestamp() }, { merge: true });
+      });
+    } else {
+      console.log("[dry-run] signup", email, doc.interest);
+    }
+  } catch (err) {
+    console.error("signup failed", err);
+    return json(res, 500, { error: "Something went wrong. Please try again." });
+  }
+  // Same answer whether or not the address was already on the list.
+  return json(res, 200, { ok: true });
+}
+
+async function serveStatic(req, res, pathname) {
+  const file = pathname === "/" ? "index.html" : pathname.slice(1);
+  const full = path.join(PUBLIC, path.normalize(file));
+  if (!full.startsWith(PUBLIC + path.sep)) return send(res, 404, "Not found");
+  try {
+    const data = await readFile(full);
+    const ext = path.extname(full);
+    const cache = ext === ".html" ? "public, max-age=300" : "public, max-age=86400";
+    send(res, 200, req.method === "HEAD" ? undefined : data, { "Content-Type": TYPES[ext] ?? "application/octet-stream", "Cache-Control": cache });
+  } catch {
+    send(res, 404, "Not found", { "Content-Type": "text/plain" });
+  }
+}
+
+createServer(async (req, res) => {
+  const { pathname } = new URL(req.url ?? "/", "http://x");
+  try {
+    if (pathname === "/api/subscribe" && req.method === "POST") return await subscribe(req, res);
+    if (pathname === "/api/health") return json(res, 200, { ok: true });
+    if (req.method === "GET" || req.method === "HEAD") return await serveStatic(req, res, pathname);
+    send(res, 405, "Method not allowed");
+  } catch (err) {
+    console.error(err);
+    if (!res.headersSent) send(res, 500, "Server error");
+  }
+}).listen(PORT, () => console.log(`recap-site listening on :${PORT}`));

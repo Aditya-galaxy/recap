@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recap: record it once, skip the meeting</title>
+  <meta name="description" content="Recap is a free, open-source Loom alternative that runs on your own computer. Record your screen and camera, get a transcript, and cut the ums and dead air in one click." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Recap: record it once, skip the meeting" />
+  <meta property="og:description" content="Free, open-source, local-first screen recorder with transcripts and one-click filler-word removal." />
+  <meta property="og:url" content="https://recap.kronagent.dev/" />
+  <meta property="og:image" content="https://recap.kronagent.dev/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="/icon.png" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="wrap top">
+    <a class="logo" href="/"><span class="muted">~/</span>recap<span class="cursor"></span></a>
+    <nav><a href="https://github.com/Aditya-galaxy/recap">github</a></nav>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <p class="label">open-source async video</p>
+      <h1>Record it once. Share it.<br /><span class="muted">Skip the meeting.</span></h1>
+      <p class="lede">
+        Recap records your screen and camera, transcribes it on your own computer, and cuts the
+        “um”s and dead air in one click. Free, private, no account, no upload limits.
+      </p>
+
+      <form id="signup" class="signup" novalidate>
+        <label class="sr" for="email">email</label>
+        <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
+        <!-- honeypot: hidden from people, irresistible to bots -->
+        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <button type="submit" class="btn primary">get early access</button>
+      </form>
+      <fieldset class="interest" id="interest">
+        <legend class="label">i'm most interested in</legend>
+        <label><input type="radio" name="interest" value="desktop" checked /> the desktop app</label>
+        <label><input type="radio" name="interest" value="hosted" /> a hosted version for my team</label>
+        <label><input type="radio" name="interest" value="selfhost" /> self-hosting it</label>
+      </fieldset>
+      <p class="fine" id="status" role="status">One email when the desktop app ships, and the occasional update. Unsubscribe anytime.</p>
+    </section>
+
+    <section class="grid">
+      <div><p class="label">record</p><p>Screen + a camera bubble you can drag anywhere. Mac, Windows, Linux, or the browser. Global hotkey to start and stop.</p></div>
+      <div><p class="label">transcribe</p><p>Word-level transcript and captions from whisper.cpp, running locally. Click any word to jump there.</p></div>
+      <div><p class="label">clean up</p><p>Remove filler words and shorten long pauses. See the time saved, preview, then export the clean cut.</p></div>
+      <div><p class="label">own it</p><p>Everything stays on your machine. Unlimited videos. MIT licensed. Optional self-hosted server for share links.</p></div>
+    </section>
+
+    <section class="compare">
+      <p class="label">why not just use loom?</p>
+      <table>
+        <tr><th></th><th>Loom</th><th>Recap</th></tr>
+        <tr><td>Price</td><td>$15–20 per user / month</td><td>Free, open source</td></tr>
+        <tr><td>Free-tier limits</td><td>25 videos, 5 min each</td><td>None</td></tr>
+        <tr><td>Where videos live</td><td>Loom's cloud</td><td>Your computer or your server</td></tr>
+        <tr><td>Filler-word removal</td><td>Paid AI plan</td><td>Included, runs locally</td></tr>
+      </table>
+    </section>
+
+    <section class="selfhost">
+      <p class="label">available today: self-host it</p>
+      <p>Run the Recap server for your team with Docker. Share links, accounts, transcripts and clean-up included.</p>
+      <pre><code>curl -O https://raw.githubusercontent.com/Aditya-galaxy/recap/main/docker-compose.yml
+docker compose up -d   # → http://localhost:3217</code></pre>
+      <p><a href="https://github.com/Aditya-galaxy/recap#quick-start">setup guide →</a></p>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <span>MIT licensed · whisper.cpp + ffmpeg · <a href="https://github.com/Aditya-galaxy/recap">source</a></span>
+    <span>We only use your email to tell you about Recap.</span>
+  </footer>
+  <script src="/app.js"></script>
+</body>
+</html>

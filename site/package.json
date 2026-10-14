@@ -1,0 +1,11 @@
+{
+  "name": "recap-site",
+  "private": true,
+  "version": "1.0.0",
+  "description": "recap.kronagent.dev: landing page, downloads and email signups",
+  "type": "module",
+  "main": "server.js",
+  "engines": { "node": ">=22" },
+  "scripts": { "start": "node server.js" },
+  "dependencies": { "@google-cloud/firestore": "^7.11.0" }
+}

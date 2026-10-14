@@ -13,6 +13,8 @@ Transcription runs on your own machine with whisper.cpp. No account, no cloud, n
 - **Clean up:** cut filler words (um/uh; optionally comma-delimited "like," / "you know,") and shorten long
   pauses. You see the time saved and can preview the result before rendering. The original is kept.
 
+Website and early access: **https://recap.kronagent.dev**
+
 Original implementation: no code from Loom; the name is only used to describe the category.
 
 ## Quick start

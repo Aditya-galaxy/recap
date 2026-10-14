@@ -4,7 +4,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-export default function AuthForm({ mode, firstUser = false, needsSetupCode = false }: { mode: "login" | "signup"; firstUser?: boolean; needsSetupCode?: boolean }) {
+export default function AuthForm({
+  mode,
+  firstUser = false,
+  needsSetupCode = false,
+  legal = false,
+}: {
+  mode: "login" | "signup";
+  firstUser?: boolean;
+  needsSetupCode?: boolean;
+  /** Recap Cloud: show that signing up means accepting the terms. */
+  legal?: boolean;
+}) {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState("");
@@ -97,6 +108,12 @@ export default function AuthForm({ mode, firstUser = false, needsSetupCode = fal
         <button className="btn-primary w-full py-2.5" disabled={busy}>
           {busy ? "…" : mode === "login" ? "sign in" : "create account"}
         </button>
+        {legal && (
+          <p className="text-center text-[11px] text-muted">
+            by signing up you agree to the <Link href="/terms" className="underline">terms</Link> and{" "}
+            <Link href="/privacy" className="underline">privacy policy</Link>
+          </p>
+        )}
       </form>
       {!firstUser && (
         <p className="mt-4 text-center text-[12px] text-muted">

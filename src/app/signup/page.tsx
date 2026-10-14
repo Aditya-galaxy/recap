@@ -28,5 +28,5 @@ async function Gate() {
     );
   }
   const first = userCount() === 0;
-  return <AuthForm mode="signup" firstUser={first} needsSetupCode={first && !!config.setupCode} />;
+  return <AuthForm mode="signup" firstUser={first} needsSetupCode={first && !!config.setupCode} legal={config.cloud && !first} />;
 }

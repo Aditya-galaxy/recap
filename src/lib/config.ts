@@ -43,6 +43,9 @@ export const config = {
   resendApiKey: process.env.RESEND_API_KEY || null,
   // A domain verified in Resend (kronagent.com). Override with EMAIL_FROM.
   emailFrom: process.env.EMAIL_FROM ?? "Recap <recap@kronagent.com>",
+  /** Shown on the Terms and Privacy pages as the way to reach the operator. */
+  contactEmail: process.env.CONTACT_EMAIL || null,
+  legalUpdated: process.env.LEGAL_UPDATED ?? "2026-10-14",
   /** Absolute base URL for share links and link previews, e.g. https://recap.example.com. Optional. */
   publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, "") || null,
   /** Force the Secure flag on cookies. Defaults to on when PUBLIC_URL is https. */

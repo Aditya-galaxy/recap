@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import Watch from "@/components/Watch";
-import { currentUser } from "@/lib/auth";
+import { currentUser, isLocalMode } from "@/lib/auth";
 import { fmtTime } from "@/lib/format";
 import { canView, isOwner, readMeta, readTranscript } from "@/lib/store";
 import { baseUrl } from "@/lib/url";
@@ -50,5 +50,5 @@ async function WatchLoader({ params }: { params: PageProps<"/v/[id]">["params"] 
   // Private videos 404 for everyone but the owner, so their existence isn't revealed.
   if (!meta || !canView(meta, user)) notFound();
   const transcript = meta.status === "ready" ? await readTranscript(id) : null;
-  return <Watch initialMeta={meta} initialTranscript={transcript} owner={isOwner(meta, user)} shareUrl={`${await baseUrl()}/v/${id}`} />;
+  return <Watch initialMeta={meta} initialTranscript={transcript} owner={isOwner(meta, user)} shareUrl={`${await baseUrl()}/v/${id}`} local={isLocalMode()} />;
 }

@@ -14,9 +14,12 @@ export class PermanentError extends Error {}
 // Priming the decoder with disfluencies stops Whisper from silently "cleaning up" ums and uhs.
 const WHISPER_PROMPT = "Um, so, uh, I was like, you know, thinking. Hmm.";
 
+// Bundled binaries in the desktop app; PATH lookups on servers.
+const BIN: Record<string, string> = { ffmpeg: config.ffmpegBin, ffprobe: config.ffprobeBin };
+
 function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const p = spawn(BIN[cmd] ?? cmd, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
     let stdout = "";
     let stderr = "";
     p.stdout.on("data", (d) => (stdout += d));

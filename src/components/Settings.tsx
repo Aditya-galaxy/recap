@@ -5,7 +5,19 @@ import { useState } from "react";
 import type { ApiToken, User } from "@/lib/auth";
 import { fmtDate } from "@/lib/format";
 
-export default function Settings({ user, tokens: initial, server, signupOpen }: { user: User; tokens: ApiToken[]; server: string; signupOpen: boolean }) {
+export default function Settings({
+  user,
+  tokens: initial,
+  server,
+  signupOpen,
+  local,
+}: {
+  user: User;
+  tokens: ApiToken[];
+  server: string;
+  signupOpen: boolean;
+  local: { dataDir: string; model: string } | null;
+}) {
   const router = useRouter();
   const [tokens, setTokens] = useState(initial);
   const [fresh, setFresh] = useState<string | null>(null);
@@ -50,6 +62,34 @@ export default function Settings({ user, tokens: initial, server, signupOpen }: 
   }
 
   const input = "w-full rounded-sm border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
+
+  if (local) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">
+        <div className="border-b border-border pb-3">
+          <h1 className="text-lg font-medium">settings</h1>
+        </div>
+        <section className="space-y-3">
+          <h2 className="label">running locally</h2>
+          <div className="card space-y-3 p-4 text-[13px]">
+            <p>Recordings, transcripts and clean-ups stay on this computer. Nothing is uploaded anywhere.</p>
+            <p className="text-muted">library: <code className="text-text">{local.dataDir}</code></p>
+            <p className="text-muted">transcription model: <code className="text-text">{local.model.split(/[\\/]/).pop()}</code></p>
+          </div>
+        </section>
+        <section className="space-y-3">
+          <h2 className="label">sharing</h2>
+          <div className="card space-y-2 p-4 text-[13px]">
+            <p>Open a video and use <span className="text-text">export</span> to save the original or cleaned MP4, then send it any way you like.</p>
+            <p className="text-muted">
+              Want share links instead? Run the optional Recap server (one <code>docker compose up</code>) and point the
+              recorder&apos;s <span className="text-text">server</span> setting at it.
+            </p>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">

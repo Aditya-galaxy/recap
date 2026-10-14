@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import AuthForm from "@/components/AuthForm";
-import { currentUser, signupOpen, userCount } from "@/lib/auth";
+import { isLocalMode, currentUser, signupOpen, userCount } from "@/lib/auth";
 import { config } from "@/lib/config";
 
 export const metadata = { title: "Sign up · Recap" };
@@ -17,6 +17,7 @@ export default function SignupPage() {
 
 async function Gate() {
   await connection();
+  if (isLocalMode()) redirect("/");
   if (await currentUser()) redirect("/");
   if (!signupOpen()) {
     return (

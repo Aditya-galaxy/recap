@@ -94,6 +94,8 @@ export async function endSession() {
  * (desktop apps). Null when anonymous.
  */
 export async function currentUser(): Promise<User | null> {
+  // Local mode: src/proxy.ts has already checked the per-launch secret on every request.
+  if (config.localToken) return localUser();
   const auth = (await headers()).get("authorization");
   if (auth?.startsWith("Bearer ")) {
     const hash = sha256(auth.slice(7).trim());
@@ -110,6 +112,23 @@ export async function currentUser(): Promise<User | null> {
     .get(sha256(token), Date.now()) as UserRow | undefined;
   return row ? toUser(row) : null;
 }
+
+const LOCAL_EMAIL = "you@recap.local";
+
+/** The single owner of everything in local mode (created on first use). */
+function localUser(): User {
+  let row = db.prepare("SELECT * FROM users WHERE email = ?").get(LOCAL_EMAIL) as UserRow | undefined;
+  if (!row) {
+    const id = randomId();
+    // Unusable password: local mode never signs in with one.
+    db.prepare("INSERT INTO users (id, email, name, password_hash, is_admin, created_at) VALUES (?, ?, 'You', '!', 1, ?)").run(id, LOCAL_EMAIL, now());
+    db.prepare("UPDATE videos SET owner_id = ? WHERE owner_id IS NULL").run(id);
+    row = db.prepare("SELECT * FROM users WHERE id = ?").get(id) as UserRow;
+  }
+  return toUser(row);
+}
+
+export const isLocalMode = () => !!config.localToken;
 
 export const unauthorized = () => Response.json({ error: "Sign in required." }, { status: 401 });
 

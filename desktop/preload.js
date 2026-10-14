@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld("recap", {
   hasToken: () => ipcRenderer.invoke("token:has"),
   setToken: (token) => ipcRenderer.invoke("token:set", token),
   checkConnection: (server) => ipcRenderer.invoke("connection:check", server),
+  openLibrary: (pathname) => ipcRenderer.send("library", pathname),
+  retryModel: () => ipcRenderer.send("model:retry"),
   on: (channel, fn) => {
     if (!["state", "begin", "control", "hotkey"].includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => fn(data));

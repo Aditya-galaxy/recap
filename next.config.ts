@@ -6,6 +6,8 @@ const nextConfig: NextConfig = {
   // DATA_DIR and the Whisper model default to folders inside the project, so the tracer would copy
   // recordings and the model into the build. They're runtime data, never code.
   outputFileTracingExcludes: { "/*": ["data/**", "models/**", "desktop/**", "mac/**"] },
+  // Separate output folder for desktop-engine builds so they don't clobber a running dev server.
+  distDir: process.env.RECAP_DIST_DIR || ".next",
   poweredByHeader: false,
   cacheComponents: true,
   partialPrefetching: true,

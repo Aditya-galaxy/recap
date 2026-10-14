@@ -13,11 +13,13 @@ export default function Watch({
   initialTranscript,
   owner,
   shareUrl,
+  local = false,
 }: {
   initialMeta: VideoMeta;
   initialTranscript: Transcript | null;
   owner: boolean;
   shareUrl: string;
+  local?: boolean;
 }) {
   const router = useRouter();
   const [meta, setMeta] = useState(initialMeta);
@@ -191,11 +193,11 @@ export default function Watch({
             {fmtDate(meta.createdAt)}
             {meta.duration ? ` · ${fmtTime(onClean ? meta.clean.duration : meta.duration)}` : ""}
             {onClean && meta.clean.duration ? ` (was ${fmtTime(meta.duration)})` : ""}
-            {owner ? ` · ${meta.views} view${meta.views === 1 ? "" : "s"}` : ""}
+            {owner && !local ? ` · ${meta.views} view${meta.views === 1 ? "" : "s"}` : ""}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {owner && (
+          {owner && !local && (
             <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]" title="Who can watch">
               {(["unlisted", "private"] as const).map((v) => (
                 <button
@@ -209,10 +211,10 @@ export default function Watch({
               ))}
             </div>
           )}
-          <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>
+          {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>}
           {ready && (
-            <a className="btn-ghost" href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
-              download
+            <a className={local ? "btn-primary" : "btn-ghost"} href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
+              {local ? `export ${version === "clean" ? "cleaned " : ""}mp4` : "download"}
             </a>
           )}
           {owner && <button className="btn-danger" onClick={remove}>delete</button>}

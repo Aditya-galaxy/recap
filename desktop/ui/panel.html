@@ -55,6 +55,7 @@
     <div class="seg" id="bubbleSize"><button data-v="s">s</button><button data-v="m">m</button><button data-v="l">l</button></div>
   </div>
 
+  <div class="status" id="engineStatus" hidden><span id="engineText"></span><div class="bar"><div id="modelProgress"></div></div><button class="btn" id="retryModel" style="margin-top:8px" hidden>retry download</button></div>
   <div class="error" id="error" hidden></div>
   <div class="status" id="status" hidden><span id="statusText"></span><div class="bar"><div id="progress"></div></div></div>
 
@@ -66,15 +67,16 @@
   </div>
 
   <div class="field" id="serverField" hidden>
-    <label class="field"><span class="label">server</span><input type="text" id="server" /></label>
-    <label class="field"><span class="label">api token</span><input type="password" id="token" placeholder="rcp_…  (Settings → create token)" autocomplete="off" /></label>
+    <label class="field"><span class="label">save recordings to</span><input type="text" id="server" placeholder="this computer (leave empty)" /></label>
+    <p class="muted" style="margin:-4px 0 0;font-size:10px">empty = local library. Or a Recap server URL to get share links.</p>
+    <label class="field" id="tokenField"><span class="label">api token</span><input type="password" id="token" placeholder="rcp_…  (Settings → create token)" autocomplete="off" /></label>
     <div class="row"><button class="btn" id="check">check connection</button><span class="muted" id="connStatus" style="font-size:10px;text-align:right"></span></div>
   </div>
 
   <footer>
     <button class="btn" id="library">library</button>
     <button class="btn" id="folder">folder</button>
-    <button class="btn" id="toggleServer">server</button>
+    <button class="btn" id="toggleServer">storage</button>
   </footer>
 
   <script src="panel.js"></script>

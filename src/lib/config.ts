@@ -12,6 +12,13 @@ export const config = {
   /** Everything persistent lives here: the SQLite database and video files. Mount this as a volume. */
   dataDir: process.env.DATA_DIR ?? inRoot("data"),
   whisperBin: process.env.WHISPER_BIN ?? "whisper-cli",
+  ffmpegBin: process.env.FFMPEG_BIN ?? "ffmpeg",
+  ffprobeBin: process.env.FFPROBE_BIN ?? "ffprobe",
+  /**
+   * Local mode: the desktop app runs this server on 127.0.0.1 for one person and passes a random
+   * per-launch secret. No accounts; every request must carry the secret (see src/proxy.ts).
+   */
+  localToken: process.env.RECAP_LOCAL_TOKEN || null,
   whisperModel: process.env.WHISPER_MODEL ?? inRoot("models", "ggml-base.en.bin"),
   /** After the first (admin) account exists, can anyone else sign up? */
   allowSignup: bool(process.env.ALLOW_SIGNUP, true),

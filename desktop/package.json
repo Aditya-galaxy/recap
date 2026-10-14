@@ -11,14 +11,17 @@
     "start": "electron .",
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
-    "dist:mac": "electron-builder --mac"
+    "dist:mac": "electron-builder --mac",
+    "engine": "node scripts/prepare-engine.mjs"
   },
   "build": {
     "appId": "dev.recap.desktop",
     "productName": "Recap",
     "files": [
       "main.js",
+      "engine.js",
       "preload.js",
+      "library-preload.js",
       "ui/**",
       "build/tray*.png"
     ],
@@ -47,9 +50,38 @@
       "maintainer": "Aditya <noreply@github.com>"
     },
     "mac": {
-      "target": "dmg",
-      "icon": "build/icon.png"
-    }
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "identity": "-",
+      "category": "public.app-category.productivity",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Recap shows your camera in a floating bubble that's recorded with your screen.",
+        "NSMicrophoneUsageDescription": "Recap records your voice with your screen."
+      }
+    },
+    "extraResources": [
+      {
+        "from": "engine",
+        "to": "engine",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "bin",
+        "to": "bin",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
   },
   "devDependencies": {
     "electron": "^44.7.2",

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { connection } from "next/server";
+import RecordButton from "@/components/RecordButton";
 import { currentUser } from "@/lib/auth";
 
 export default async function Nav() {
@@ -16,9 +17,7 @@ export default async function Nav() {
     <nav className="flex items-center gap-2">
       <Link href="/" className="btn-ghost hidden sm:inline-flex">library</Link>
       <Link href="/settings" className="btn-ghost" title={user.email}>settings</Link>
-      <Link href="/record" className="btn-primary">
-        <span className="h-1.5 w-1.5 rounded-full bg-current" /> record
-      </Link>
+      <RecordButton />
     </nav>
   );
 }

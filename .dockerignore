@@ -10,3 +10,4 @@ docs
 *.md
 .claude
 .env*
+.next-engine

@@ -2,11 +2,14 @@
 // (backgroundThrottling is off), so the recorder lives here rather than in a hidden extra window.
 const $ = (id) => document.getElementById(id);
 
-const DEFAULTS = { mode: "screenCam", cameraId: "", micId: "", micOn: true, systemAudio: true, bubbleSize: "m", displayId: "", server: "http://localhost:3217" };
+// server "" = record into the local library (the default); a URL = upload to a self-hosted Recap server.
+const DEFAULTS = { mode: "screenCam", cameraId: "", micId: "", micOn: true, systemAudio: true, bubbleSize: "m", displayId: "", server: "" };
 let settings = { ...DEFAULTS };
 try {
   settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem("settings") || "{}") };
 } catch {}
+// v0.2 defaulted to a server on localhost; v0.3 has the engine built in.
+if (settings.server === "http://localhost:3217") settings.server = "";
 const save = () => {
   try { localStorage.setItem("settings", JSON.stringify(settings)); } catch {}
 };
@@ -48,8 +51,10 @@ bindSelect("camera", "cameraId");
 bindSelect("mic", "micId");
 $("server").value = settings.server;
 $("server").addEventListener("change", (e) => {
-  settings.server = e.target.value.trim() || DEFAULTS.server;
+  settings.server = e.target.value.trim();
   save();
+  render();
+  checkConnection();
 });
 
 function fillSelect(sel, options, current) {
@@ -98,8 +103,24 @@ function render() {
   $("sysAudioRow").hidden = settings.mode === "cam" || platform !== "win32";
   $("sysAudioNote").hidden = settings.mode === "cam" || platform !== "linux";
 
+  const local = !settings.server;
+  $("tokenField").hidden = local;
+  const eng = state.engine;
+  let engineMsg = "";
+  if (local && eng) {
+    if (eng.state === "error") engineMsg = eng.error;
+    else if (eng.state !== "ready") engineMsg = "$ starting local engine…";
+    else if (eng.model?.state === "downloading") engineMsg = `$ downloading transcription model ${Math.round(eng.model.progress * 100)}% (first run only)`;
+    else if (eng.model?.state === "error") engineMsg = eng.model.error;
+  }
+  $("engineStatus").hidden = !engineMsg;
+  $("engineText").textContent = engineMsg;
+  $("modelProgress").style.width = `${((eng?.model?.state === "downloading" && eng.model.progress) || 0) * 100}%`;
+  $("retryModel").hidden = eng?.model?.state !== "error";
+  const engineBlocked = local && (!eng || eng.state !== "ready" || eng.model?.state === "downloading");
+
   const busy = !["idle", "error"].includes(state.phase);
-  $("start").disabled = busy;
+  $("start").disabled = busy || engineBlocked;
   $("error").hidden = state.phase !== "error";
   if (state.phase === "error") {
     $("error").innerHTML = "";
@@ -126,7 +147,8 @@ function render() {
 $("start").onclick = () => startRecording();
 $("copy").onclick = () => window.recap.copy(state.lastLink);
 $("openLink").onclick = () => window.recap.open(state.lastLink);
-$("library").onclick = () => window.recap.open(settings.server);
+$("library").onclick = () => (settings.server ? window.recap.open(settings.server) : window.recap.openLibrary("/"));
+$("retryModel").onclick = () => window.recap.retryModel();
 $("folder").onclick = () => window.recap.open("folder");
 $("toggleServer").onclick = () => ($("serverField").hidden = !$("serverField").hidden);
 $("token").addEventListener("change", async (e) => {
@@ -142,9 +164,8 @@ async function checkConnection() {
   $("connStatus").textContent = r.message;
 }
 window.recap.hasToken().then((has) => {
-  if (has) {
-    $("token").placeholder = "saved (encrypted). paste to replace";
-  } else {
+  if (has) $("token").placeholder = "saved (encrypted). paste to replace";
+  if (settings.server && !has) {
     $("serverField").hidden = false;
     $("connStatus").textContent = "not connected";
   }

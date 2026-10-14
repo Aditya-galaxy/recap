@@ -143,6 +143,11 @@ const MIGRATIONS = [
   CREATE INDEX reports_open ON reports(resolved_at, video_id);
   CREATE UNIQUE INDEX reports_once ON reports(video_id, reporter) WHERE resolved_at IS NULL;
   `,
+  // v4: desktop app: where a local video was shared on Recap Cloud
+  `
+  ALTER TABLE videos ADD COLUMN cloud_url TEXT;
+  ALTER TABLE videos ADD COLUMN cloud_version TEXT;
+  `,
 ];
 
 function open() {

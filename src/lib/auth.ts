@@ -285,3 +285,10 @@ export function listApiTokens(userId: string): ApiToken[] {
 export function revokeApiToken(userId: string, id: string) {
   return db.prepare("DELETE FROM api_tokens WHERE id = ? AND user_id = ?").run(id, userId).changes > 0;
 }
+
+/** Revokes the API token this request was made with (the desktop app disconnecting itself). */
+export async function revokeCurrentToken() {
+  const auth = (await headers()).get("authorization");
+  if (!auth?.startsWith("Bearer ")) return false;
+  return db.prepare("DELETE FROM api_tokens WHERE token_hash = ?").run(sha256(auth.slice(7).trim())).changes > 0;
+}

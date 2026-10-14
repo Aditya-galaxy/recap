@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CloudLinkCard } from "@/components/CloudShare";
 import type { ApiToken, User } from "@/lib/auth";
 import { fmtDate } from "@/lib/format";
 
@@ -78,20 +79,18 @@ export default function Settings({
         <section className="space-y-3">
           <h2 className="label">running locally</h2>
           <div className="card space-y-3 p-4 text-[13px]">
-            <p>Recordings, transcripts and clean-ups stay on this computer. Nothing is uploaded anywhere.</p>
+            <p>Recordings, transcripts and clean-ups stay on this computer. Nothing is uploaded unless you share a video.</p>
             <p className="text-muted">library: <code className="text-text">{local.dataDir}</code></p>
             <p className="text-muted">transcription model: <code className="text-text">{local.model.split(/[\\/]/).pop()}</code></p>
           </div>
         </section>
         <section className="space-y-3">
           <h2 className="label">sharing</h2>
-          <div className="card space-y-2 p-4 text-[13px]">
-            <p>Open a video and use <span className="text-text">export</span> to save the original or cleaned MP4, then send it any way you like.</p>
-            <p className="text-muted">
-              Want share links instead? Run the optional Recap server (one <code>docker compose up</code>) and point the
-              recorder&apos;s <span className="text-text">server</span> setting at it.
-            </p>
-          </div>
+          <CloudLinkCard />
+          <p className="text-[12px] text-muted">
+            Or use <span className="text-text">export</span> on any video to save the MP4 and send it yourself. Running your own server works too:
+            one <code>docker compose up</code>, then point the recorder&apos;s <span className="text-text">server</span> setting at it.
+          </p>
         </section>
       </div>
     );

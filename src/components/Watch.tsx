@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
+import { ShareToCloud } from "@/components/CloudShare";
 import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
@@ -219,7 +220,7 @@ export default function Watch({
             {owner && !local ? ` · ${meta.views} view${meta.views === 1 ? "" : "s"}` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-start justify-end gap-2">
           {owner && !local && (
             <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]" title="Who can watch">
               {(["unlisted", "private"] as const).map((v) => (
@@ -235,6 +236,7 @@ export default function Watch({
             </div>
           )}
           {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>}
+          {local && ready && <ShareToCloud videoId={id} version={version} canClean={meta.clean.status === "ready"} />}
           {ready && (
             <a className={local ? "btn-primary" : "btn-ghost"} href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
               {local ? `export ${version === "clean" ? "cleaned " : ""}mp4` : "download"}

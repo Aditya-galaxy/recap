@@ -27,6 +27,13 @@ export const config = {
   feedbackUrl: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",
   maxUploadBytes: Number(process.env.MAX_UPLOAD_MB ?? 4096) * 1024 * 1024,
   /**
+   * Run whisper on the server for uploads that arrive without a transcript. Small servers (e.g. a free-tier
+   * VM) turn this off: the desktop app transcribes on the user's machine and uploads the transcript with the video.
+   */
+  serverTranscribe: bool(process.env.SERVER_TRANSCRIBE, true),
+  /** The Recap Cloud server the desktop app connects to for share links. */
+  cloudUrl: (process.env.RECAP_CLOUD_URL ?? "https://app.recap.kronagent.dev").replace(/\/+$/, ""),
+  /**
    * Recap Cloud mode (the hosted service): email verification is required, accounts get a plan
    * (founding / standard) with storage quotas, and the first FOUNDER_LIMIT verified accounts are founders.
    * Self-hosted servers leave this off and behave as before.

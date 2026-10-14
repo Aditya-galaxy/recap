@@ -15,6 +15,8 @@ export const config = {
   whisperModel: process.env.WHISPER_MODEL ?? inRoot("models", "ggml-base.en.bin"),
   /** After the first (admin) account exists, can anyone else sign up? */
   allowSignup: bool(process.env.ALLOW_SIGNUP, true),
+  /** If set, creating the first (admin) account requires this code, so a fresh public server can't be claimed by someone else. */
+  setupCode: process.env.SETUP_CODE || null,
   maxUploadBytes: Number(process.env.MAX_UPLOAD_MB ?? 4096) * 1024 * 1024,
   /** Absolute base URL for share links and link previews, e.g. https://recap.example.com. Optional. */
   publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, "") || null,

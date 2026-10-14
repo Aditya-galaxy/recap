@@ -33,6 +33,7 @@ container downloads the Whisper model (~140 MB) into the data volume.
 | --- | --- | --- |
 | `PUBLIC_URL` | (unset) | The address people open share links on, e.g. `https://recap.example.com`. Enables secure cookies for https. |
 | `ALLOW_SIGNUP` | `true` | Set `false` once your team has accounts. Admins can still add users under Settings. |
+| `SETUP_CODE` | (unset) | If set, creating the first (admin) account requires this code. Use it on public servers. |
 | `MAX_UPLOAD_MB` | `4096` | Per-upload size cap. |
 | `WHISPER_MODEL_NAME` | `base.en` | `small.en` is more accurate; `base` / `small` handle other languages. |
 

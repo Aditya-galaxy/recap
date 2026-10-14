@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-export default function AuthForm({ mode, firstUser = false }: { mode: "login" | "signup"; firstUser?: boolean }) {
+export default function AuthForm({ mode, firstUser = false, needsSetupCode = false }: { mode: "login" | "signup"; firstUser?: boolean; needsSetupCode?: boolean }) {
   const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState("");
@@ -40,6 +40,13 @@ export default function AuthForm({ mode, firstUser = false }: { mode: "login" | 
         </p>
       )}
       <form onSubmit={submit} className="card mt-6 space-y-4 p-5">
+        {needsSetupCode && (
+          <label className="block">
+            <span className="label mb-1.5 block">setup code</span>
+            <input name="setupCode" required autoComplete="off" className={input} />
+            <span className="mt-1 block text-[11px] text-muted">the SETUP_CODE this server was started with</span>
+          </label>
+        )}
         {mode === "signup" && (
           <label className="block">
             <span className="label mb-1.5 block">name</span>

@@ -49,13 +49,13 @@ jobs:
           ffmpeg -loglevel error -f lavfi -i testsrc2=size=640x360:rate=30 -f lavfi -i "sine=f=300:d=6" -t 6 -c:v libvpx -c:a libopus sample.webm
           docker run -d --name recap -p 3000:3000 -e ALLOW_SIGNUP=false recap:test
           for i in $(seq 1 90); do curl -fsS localhost:3000/api/health && break || sleep 3; done
-          echo; curl -fsS localhost:3000/api/health | grep '"ok":true'
+          echo; curl -fsS -o health.json localhost:3000/api/health && grep -q '"ok":true' health.json
           curl -fsS -c jar -H 'Content-Type: application/json' -d '{"email":"ci@example.com","password":"ci password 123"}' localhost:3000/api/auth/signup
           test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '{"email":"x@example.com","password":"ci password 123"}' localhost:3000/api/auth/signup)" = 403
           ID=$(curl -fsS -b jar -H 'x-title: CI%20smoke' --data-binary @sample.webm localhost:3000/api/videos | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
           for i in $(seq 1 60); do S=$(curl -fsS -b jar localhost:3000/api/videos/$ID | python3 -c "import sys,json;print(json.load(sys.stdin)['meta']['status'])"); [ "$S" = ready ] && break; [ "$S" = error ] && exit 1; sleep 2; done
           test "$S" = ready
-          curl -fsS localhost:3000/v/$ID | grep -q 'og:title'
+          curl -fsS -o page.html localhost:3000/v/$ID && grep -q 'og:title' page.html
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/videos)" = 401
           docker exec recap test ! -e /app/data
           echo "smoke test passed"

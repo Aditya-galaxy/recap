@@ -3,6 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import AuthForm from "@/components/AuthForm";
 import { currentUser, signupOpen, userCount } from "@/lib/auth";
+import { config } from "@/lib/config";
 
 export const metadata = { title: "Sign up · Recap" };
 
@@ -25,5 +26,6 @@ async function Gate() {
       </div>
     );
   }
-  return <AuthForm mode="signup" firstUser={userCount() === 0} />;
+  const first = userCount() === 0;
+  return <AuthForm mode="signup" firstUser={first} needsSetupCode={first && !!config.setupCode} />;
 }

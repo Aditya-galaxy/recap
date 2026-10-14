@@ -1,4 +1,6 @@
-import { createUser, signupOpen, startSession } from "@/lib/auth";
+import { timingSafeEqual } from "node:crypto";
+import { createUser, signupOpen, startSession, userCount } from "@/lib/auth";
+import { config } from "@/lib/config";
 import { clientIp, rateLimit } from "@/lib/ratelimit";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -9,6 +11,13 @@ export async function POST(req: Request) {
   if (!signupOpen()) return Response.json({ error: "Sign-ups are closed on this server. Ask the admin for an account." }, { status: 403 });
 
   const b = await req.json().catch(() => ({}));
+  if (config.setupCode && userCount() === 0) {
+    const given = Buffer.from(String(b.setupCode ?? ""));
+    const want = Buffer.from(config.setupCode);
+    if (given.length !== want.length || !timingSafeEqual(given, want)) {
+      return Response.json({ error: "Wrong setup code. It's the SETUP_CODE the server was started with." }, { status: 403 });
+    }
+  }
   const email = String(b.email ?? "").trim();
   const password = String(b.password ?? "");
   if (!EMAIL_RE.test(email)) return Response.json({ error: "Enter a valid email." }, { status: 400 });

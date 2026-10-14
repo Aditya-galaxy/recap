@@ -1,7 +1,7 @@
 {
   "name": "recap-desktop",
   "productName": "Recap",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Recap screen recorder for Windows and Linux",
   "author": "Aditya",
   "homepage": "https://github.com/Aditya-galaxy/recap",
@@ -12,7 +12,8 @@
     "dist:win": "electron-builder --win",
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
-    "engine": "node scripts/prepare-engine.mjs"
+    "engine": "node scripts/prepare-engine.mjs",
+    "bins": "node scripts/fetch-ffmpeg.mjs && node scripts/build-whisper.mjs"
   },
   "build": {
     "appId": "dev.recap.desktop",
@@ -31,14 +32,15 @@
     },
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        "nsis"
       ],
-      "icon": "build/icon.png"
+      "icon": "build/icon.png",
+      "artifactName": "Recap-windows-x64-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "Recap-windows-x64-setup.${ext}"
     },
     "linux": {
       "target": [
@@ -47,7 +49,8 @@
       ],
       "icon": "build/icon.png",
       "category": "AudioVideo",
-      "maintainer": "Aditya <noreply@github.com>"
+      "maintainer": "Aditya <noreply@github.com>",
+      "artifactName": "Recap-linux-${arch}.${ext}"
     },
     "mac": {
       "target": [
@@ -63,8 +66,12 @@
       "category": "public.app-category.productivity",
       "extendInfo": {
         "NSCameraUsageDescription": "Recap shows your camera in a floating bubble that's recorded with your screen.",
-        "NSMicrophoneUsageDescription": "Recap records your voice with your screen."
-      }
+        "NSMicrophoneUsageDescription": "Recap records your voice with your screen.",
+        "LSMinimumSystemVersion": "13.0"
+      },
+      "minimumSystemVersion": "13.0",
+      "hardenedRuntime": false,
+      "artifactName": "Recap-mac-${arch}.${ext}"
     },
     "extraResources": [
       {
@@ -80,8 +87,13 @@
         "filter": [
           "**/*"
         ]
+      },
+      {
+        "from": "THIRD_PARTY.md",
+        "to": "THIRD_PARTY.md"
       }
-    ]
+    ],
+    "afterPack": "scripts/after-pack.cjs"
   },
   "devDependencies": {
     "electron": "^44.7.2",

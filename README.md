@@ -4,8 +4,9 @@
 share link with a transcript and captions, and remove the "um"s and dead air in one click.
 Transcription runs on your own machine with whisper.cpp. No account, no cloud, no API keys.
 
-> **Status: early release.** Accounts, private/unlisted videos, API tokens for the desktop apps, a crash-safe
-> job queue and a Docker image are in. See [docs/ROADMAP.md](docs/ROADMAP.md) for what's next. Issues and PRs welcome.
+> **Status: early release (v0.3).** The desktop app now runs everything on your own computer: recording,
+> transcription and clean-up, with no server or account needed. The self-hosted server is still there for teams
+> that want share links. See [docs/ROADMAP.md](docs/ROADMAP.md). Issues and PRs welcome.
 
 - **Record:** screen + draggable camera bubble, mic and system audio, pause/resume.
   Use the web app in Chrome, or the native apps for macOS, Windows and Linux (global hotkey ⌥⌘R / Ctrl+Alt+R).
@@ -19,9 +20,28 @@ Original implementation: no code from Loom; the name is only used to describe th
 
 ## Quick start
 
-### 1. Run the server
+### Desktop app (recommended)
 
-**Docker (recommended).** Any Linux box, VPS, NAS or Mac with Docker:
+Download from **https://recap.kronagent.dev**, or straight from [Releases](https://github.com/Aditya-galaxy/recap/releases/latest):
+
+| OS | File | First launch |
+| --- | --- | --- |
+| macOS 13+ (Apple silicon) | `Recap-mac-arm64.dmg` | Not notarized yet: drag Recap to Applications, then run `xattr -dr com.apple.quarantine /Applications/Recap.app` (or System Settings → Privacy & Security → "Open Anyway"). Allow Screen Recording, camera and microphone when asked. |
+| Windows 10/11 (x64) | `Recap-windows-x64-setup.exe` | Not code-signed yet: on the SmartScreen prompt choose "More info" → "Run anyway". |
+| Linux (x64) | `Recap-linux-x86_64.AppImage` or `Recap-linux-amd64.deb` | `chmod +x Recap-linux-x86_64.AppImage && ./Recap-linux-x86_64.AppImage` |
+
+On first launch it downloads the transcription model (~140 MB, once). Everything else is in the installer:
+the Recap engine, ffmpeg and whisper.cpp. Your library lives in `Videos/Recap/library` (`Movies` on macOS).
+**Nothing is uploaded anywhere.**
+
+- Record with the **record** button or **Ctrl+Alt+R** / **⌥⌘R** from any app: screen + a floating camera bubble.
+- When you stop, the video opens in your library with a transcript; **clean up** cuts fillers and pauses.
+- Share with **export mp4**, or point the recorder's **storage** setting at a Recap server to get links.
+
+### Self-hosted server (for share links)
+
+A shared server gives your team accounts, unlisted/private **share links** viewers can open without an account,
+link previews and view counts. **Docker** on any Linux box, VPS, NAS or Mac:
 
 ```bash
 curl -O https://raw.githubusercontent.com/Aditya-galaxy/recap/main/docker-compose.yml
@@ -38,57 +58,42 @@ container downloads the Whisper model (~140 MB) into the data volume.
 | `SETUP_CODE` | (unset) | If set, creating the first (admin) account requires this code. Use it on public servers. |
 | `MAX_UPLOAD_MB` | `4096` | Per-upload size cap. |
 | `WHISPER_MODEL_NAME` | `base.en` | `small.en` is more accurate; `base` / `small` handle other languages. |
+| `FEEDBACK_URL` | recap.kronagent.dev | Where the in-app feedback box sends messages. Set it empty to remove the box. |
 
-**Putting it on the internet:** run it behind a reverse proxy with HTTPS (Caddy, Traefik, nginx, Cloudflare Tunnel)
-and set `PUBLIC_URL`. For example, with Caddy: `recap.example.com { reverse_proxy localhost:3217 }`.
+Put it behind HTTPS (Caddy, Traefik, nginx, Cloudflare Tunnel) and set `PUBLIC_URL`. Everything (database,
+videos, model) is in the `recap-data` volume, so back that up. [deploy/gcp](deploy/gcp) has a Google Cloud VM recipe.
 
-**Cloud recipe:** [deploy/gcp](deploy/gcp) sets up a Google Cloud VM with HTTPS, swap, log rotation and
-daily disk snapshots in a few `gcloud` commands (~$18/month).
-
-**Backups:** everything (database, videos, model) is in the `recap-data` volume. Back that up.
+To record into a server from the desktop app: Settings → **create token** on the server, then paste the server URL
+and token into the app's **storage** section. The browser recorder (Chrome/Edge) works too: sign in → **record**.
 
 <details>
-<summary>Without Docker (macOS / Linux, for development)</summary>
+<summary>Run from source (development)</summary>
 
 ```bash
 brew install ffmpeg whisper-cpp        # Linux: ffmpeg from your package manager + build whisper.cpp
 git clone https://github.com/Aditya-galaxy/recap && cd recap
 mkdir -p models && curl -L -o models/ggml-base.en.bin \
   https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-npm install
-npm run dev -- -p 3217                 # or: npm run build && npm start -- -p 3217
+npm install && npm run dev -- -p 3217
+
+cd desktop && npm install && npm run engine && npm start     # desktop app against the local engine
 ```
-
-Data goes to `./data` (override with `DATA_DIR`); point to whisper with `WHISPER_BIN` / `WHISPER_MODEL`.
 </details>
-
-### 2. Record
-
-- **Browser:** sign in and press **record** (Chrome or Edge).
-- **Desktop apps:** download from [Releases](https://github.com/Aditya-galaxy/recap/releases/latest). In the
-  server's **Settings → connect the desktop apps**, create an API token, then paste the server URL and token
-  into the app's **server** section and press **check connection**.
-
-| OS | File | First launch |
-| --- | --- | --- |
-| macOS 15+ | `Recap-macOS.zip` | Not notarized: move it to Applications, run `xattr -dr com.apple.quarantine /Applications/Recap.app`, then grant Screen Recording and reopen. |
-| Windows 10/11 | `Recap.Setup.<version>.exe` (installer) or `Recap.<version>.exe` (portable) | Not code-signed: on the SmartScreen prompt choose "More info" → "Run anyway". |
-| Linux | `.AppImage` or `.deb` | `chmod +x Recap-*.AppImage && ./Recap-*.AppImage` |
 
 ### Sharing and privacy
 
-- Videos are **unlisted** by default: anyone with the link can watch without an account, and pages are never indexed.
-  Switch a video to **private** to make it visible only to you.
-- Unlisted links show a title and thumbnail preview in Slack, X, iMessage and so on. Private ones show nothing.
-- Owners see view counts. Viewers can watch, read the transcript and download; only owners can edit or delete.
+- On a server, videos are **unlisted** by default: anyone with the link can watch without an account, and pages are
+  never indexed. Switch a video to **private** to make it visible only to you.
+- In the desktop app, nothing leaves your computer unless you export it or choose a server.
+- The **feedback** box sends only what you type (plus app version) to recap.kronagent.dev. Never video or transcripts.
 
 ## Known limitations
 
-- Password-only sign-in (no SSO or password reset email yet; an admin can create a new account).
-- Apps are unsigned or ad-hoc signed (see the first-launch notes above).
-- Linux: no system audio (mic only). The control bar is visible in recordings because Linux has no way to exclude a window from capture.
-- The macOS app records whole displays, not single windows.
-- English transcription by default (`base.en`). Use a multilingual Whisper model for other languages.
+- Installers aren't code-signed/notarized yet (see first-launch steps above).
+- macOS desktop app: Apple silicon only; records your microphone but not system audio yet.
+- Linux: mic only; the recording control bar is visible in recordings.
+- Server: password sign-in only (no SSO or password-reset email yet).
+- Default model is English (`base.en`).
 
 ## How it works
 
@@ -104,42 +109,16 @@ Notes:
 - whisper.cpp runs with `-nfa`. Its default flash attention skews token timestamps around pauses badly.
 - Whisper is primed with a prompt full of disfluencies; otherwise it drops "um" and "uh" from the transcript.
 
-## Mac app (`mac/`)
+## Desktop app internals (`desktop/`)
 
-A native menu-bar recorder (Swift, ScreenCaptureKit, macOS 15+). It uploads to the same server.
+Electron app that runs the same Recap server in **local mode** (`RECAP_LOCAL_TOKEN`): bound to 127.0.0.1, no
+accounts, and every request must carry a per-launch secret (`src/proxy.ts`), so other websites and local programs
+can't reach it. `npm run bins` fetches a pinned, checksum-verified static ffmpeg and builds whisper.cpp;
+`npm run engine` builds the server; CI (`.github/workflows/desktop.yml`) does both on each OS and runs a packaged
+self-test on Linux. See [desktop/THIRD_PARTY.md](desktop/THIRD_PARTY.md) for bundled components and licenses.
 
-```bash
-cd mac && ./build.sh            # → mac/build/Recap.app
-./build.sh --install            # also copies to /Applications
-```
-
-- The camera bubble is a real floating window. Drag it anywhere and it's captured where it sits.
-- The control bar (timer, pause, stop, discard) floats too, but is excluded from the recording.
-- ⌥⌘R starts or stops from any app. System audio and mic are recorded as separate tracks and mixed server-side.
-- Every recording is also saved to `~/Movies/Recap`. If an upload fails, use "retry upload" in the menu.
-- The server URL (default `http://localhost:3217`) can be changed under "server" in the menu.
-- The app is ad-hoc signed, so after a rebuild macOS may ask you to re-enable Screen Recording for it.
-
-## Windows & Linux app (`desktop/`)
-
-An Electron tray app with the same flow as the Mac app: a floating camera bubble, a control bar,
-**Ctrl+Alt+R** to start or stop, and upload to the server with the share link opened and copied.
-Recordings are also saved to `Videos/Recap`.
-
-```bash
-cd desktop && npm install && npm start      # run from source (works on macOS too)
-npx electron-builder --win                  # build on Windows → NSIS installer + portable .exe
-npx electron-builder --linux                # build on Linux   → AppImage + .deb
-```
-
-GitHub Actions (`.github/workflows/desktop.yml`) builds Windows, Linux and macOS on native runners
-for every push to `desktop/` or `mac/`. Pushing a `v*` tag attaches them to a GitHub Release.
-
-| | Windows | Linux |
-| --- | --- | --- |
-| System audio | ✓ (loopback) | ✗ (mic only) |
-| Control bar hidden from recording | ✓ (Win10 2004+) | ✗ (visible in the video) |
-| Wayland | n/a | screen capture through the PipeWire portal; always-on-top depends on the compositor |
+`mac/` contains an experimental native Swift recorder (ScreenCaptureKit, records system audio) that uploads to a
+Recap server. It isn't part of the release builds.
 
 ## License
 

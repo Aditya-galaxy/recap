@@ -69,3 +69,7 @@ nav a + a { margin-left: 6px; }
 .fb textarea:focus, .fb input[type="email"]:focus { border-color: var(--strong); }
 .fb-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .fb-row input { flex: 1 1 240px; }
+
+.download { margin: 8px 0 0; }
+.btn.big { display: inline-block; text-decoration: none; padding: 14px 22px; font-size: 15px; }
+.dl-others a { color: var(--text); }

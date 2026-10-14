@@ -100,7 +100,6 @@ class Engine extends EventEmitter {
         RECAP_LOCAL_TOKEN: this.token,
         RECAP_VERSION: app.getVersion(),
         FFMPEG_BIN: bin("ffmpeg"),
-        FFPROBE_BIN: bin("ffprobe"),
         WHISPER_BIN: bin("whisper-cli"),
         WHISPER_MODEL: this.modelPath,
       },

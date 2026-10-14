@@ -1,3 +1,21 @@
+// Point the main download button at this visitor's OS.
+(() => {
+  const btn = document.getElementById("dl-primary");
+  const base = "https://github.com/Aditya-galaxy/recap/releases/latest/download/";
+  const ua = navigator.userAgent;
+  const platform = navigator.userAgentData?.platform ?? navigator.platform ?? "";
+  if (/Mac/i.test(platform) || /Macintosh/.test(ua)) {
+    btn.href = base + "Recap-mac-arm64.dmg";
+    btn.textContent = "download for macOS";
+  } else if (/Win/i.test(platform) || /Windows/.test(ua)) {
+    btn.href = base + "Recap-windows-x64-setup.exe";
+    btn.textContent = "download for Windows";
+  } else if (/Linux/i.test(platform) && !/Android/i.test(ua)) {
+    btn.href = base + "Recap-linux-x86_64.AppImage";
+    btn.textContent = "download for Linux";
+  }
+})();
+
 const form = document.getElementById("signup");
 const status = document.getElementById("status");
 const button = form.querySelector("button");
@@ -28,7 +46,7 @@ form.addEventListener("submit", async (e) => {
     if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
     form.reset();
     status.classList.add("ok");
-    status.textContent = "✓ You're on the list. We'll email you when the desktop app is ready.";
+    status.textContent = "✓ You're on the list. We'll email you about new releases.";
   } catch (err) {
     status.textContent = err.message;
   } finally {

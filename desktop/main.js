@@ -321,7 +321,7 @@ async function upload(file) {
     const { id } = await res.json();
     if (local) {
       // The engine keeps its own processed copy; the raw recording is no longer needed.
-      fs.rm(file, { force: true }, () => {});
+      await fs.promises.rm(file, { force: true });
       setPhase("idle", { lastLink: "", lastFile: "", progress: 0 });
       openLibrary(`/v/${id}`);
       return;

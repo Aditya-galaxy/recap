@@ -13,7 +13,6 @@ export const config = {
   dataDir: process.env.DATA_DIR ?? inRoot("data"),
   whisperBin: process.env.WHISPER_BIN ?? "whisper-cli",
   ffmpegBin: process.env.FFMPEG_BIN ?? "ffmpeg",
-  ffprobeBin: process.env.FFPROBE_BIN ?? "ffprobe",
   /**
    * Local mode: the desktop app runs this server on 127.0.0.1 for one person and passes a random
    * per-launch secret. No accounts; every request must carry the secret (see src/proxy.ts).

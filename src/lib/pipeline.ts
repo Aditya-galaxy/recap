@@ -15,7 +15,7 @@ export class PermanentError extends Error {}
 const WHISPER_PROMPT = "Um, so, uh, I was like, you know, thinking. Hmm.";
 
 // Bundled binaries in the desktop app; PATH lookups on servers.
-const BIN: Record<string, string> = { ffmpeg: config.ffmpegBin, ffprobe: config.ffprobeBin };
+const BIN: Record<string, string> = { ffmpeg: config.ffmpegBin };
 
 function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -31,24 +31,34 @@ function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: str
   });
 }
 
-async function probe(p: string) {
-  const { stdout } = await run("ffprobe", [
-    "-v", "error", "-select_streams", "v:0",
-    "-show_entries", "stream=width,height:format=duration", "-of", "json", p,
-  ]);
-  const j = JSON.parse(stdout);
-  return {
-    duration: Number(j.format?.duration ?? 0),
-    width: j.streams?.[0]?.width as number | undefined,
-    height: j.streams?.[0]?.height as number | undefined,
-  };
+/**
+ * Stream and duration info from `ffmpeg -i`, so ffprobe doesn't need to ship with the desktop app.
+ * ffmpeg exits non-zero here ("no output file"); the header it prints on stderr is what we read.
+ */
+function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number }> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(BIN.ffmpeg, ["-hide_banner", "-i", p], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    let err = "";
+    proc.stderr.on("data", (d) => (err += d));
+    proc.on("error", reject);
+    proc.on("close", () => {
+      const streams = err.split("\n").filter((l) => /^\s*Stream #\d+:\d+/.test(l));
+      const videoLines = streams.filter((l) => /: Video: /.test(l) && !/attached pic/.test(l));
+      const size = videoLines[0]?.match(/, (\d{2,5})x(\d{2,5})[\s,]/);
+      const d = err.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
+      resolve({
+        duration: d ? Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) : 0,
+        width: size ? Number(size[1]) : undefined,
+        height: size ? Number(size[2]) : undefined,
+        video: videoLines.length,
+        audio: streams.filter((l) => /: Audio: /.test(l)).length,
+      });
+    });
+  });
 }
 
-async function audioStreamCount(p: string) {
-  const { stdout } = await run("ffprobe", ["-v", "error", "-select_streams", "a", "-show_entries", "stream=index", "-of", "csv=p=0", p]);
-  return stdout.trim().split("\n").filter(Boolean).length;
-}
-
+const probe = (p: string) => inspect(p);
+const audioStreamCount = async (p: string) => (await inspect(p)).audio;
 const hasAudio = async (p: string) => (await audioStreamCount(p)) > 0;
 
 async function detectSilences(wav: string, duration: number): Promise<Range[]> {
@@ -117,8 +127,8 @@ export async function processVideo(id: string) {
     if (!(await exists(mp4))) throw new PermanentError("Upload is missing.");
   } else {
     await stage("Checking upload");
-    const { stdout } = await run("ffprobe", ["-v", "error", "-select_streams", "v", "-show_entries", "stream=codec_type", "-of", "csv=p=0", src]).catch(() => ({ stdout: "" }));
-    if (!stdout.includes("video")) throw new PermanentError("That file isn't a video Recap can read.");
+    const info0 = await inspect(src).catch(() => ({ video: 0 }));
+    if (!info0.video) throw new PermanentError("That file isn't a video Recap can read.");
 
     await stage("Encoding video");
     // MediaRecorder output is variable-frame-rate and lacks a seek index; normalize to CFR H.264.

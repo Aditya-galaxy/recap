@@ -16,6 +16,12 @@ browser, and send a link a colleague can watch without signing in.
 
 ## Phases
 
+### v0.3: Local-first desktop *(done)*
+- [x] The desktop app bundles the Recap engine, ffmpeg and whisper.cpp; no server or account needed.
+- [x] Local mode: engine on 127.0.0.1 behind a per-launch secret; library window; first-run model download.
+- [x] Pinned, checksum-verified binaries; per-OS CI builds with a packaged self-test.
+- [x] Website with downloads, early-access signups and a feedback box (recap.kronagent.dev).
+
 ### Phase 1: Production foundation *(done in v0.2)*
 - [x] **Database**: SQLite through Node's built-in `node:sqlite` (zero native dependencies, one file to back up).
       Users, sessions, API tokens, videos, jobs, views. Imports the existing JSON-stored videos.

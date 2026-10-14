@@ -29,20 +29,33 @@
         “um”s and dead air in one click. Free, private, no account, no upload limits.
       </p>
 
+      <div class="download" id="download">
+        <a class="btn primary big" id="dl-primary" href="https://github.com/Aditya-galaxy/recap/releases/latest">download for your computer</a>
+        <p class="fine dl-others">
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-mac-arm64.dmg">macOS (Apple silicon)</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">Windows</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-x86_64.AppImage">Linux AppImage</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-amd64.deb">.deb</a>
+          <br />free · open source · early release, so builds aren't code-signed yet (<a href="https://github.com/Aditya-galaxy/recap#2-record">first-launch steps</a>)
+        </p>
+      </div>
+
+      <p class="label" style="margin-top:36px">get updates</p>
+
       <form id="signup" class="signup" novalidate>
         <label class="sr" for="email">email</label>
         <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
         <!-- honeypot: hidden from people, irresistible to bots -->
         <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
-        <button type="submit" class="btn primary">get early access</button>
+        <button type="submit" class="btn">notify me</button>
       </form>
       <fieldset class="interest" id="interest">
         <legend class="label">i'm most interested in</legend>
-        <label><input type="radio" name="interest" value="desktop" checked /> the desktop app</label>
+        <label><input type="radio" name="interest" value="desktop" checked /> new releases</label>
         <label><input type="radio" name="interest" value="hosted" /> a hosted version for my team</label>
         <label><input type="radio" name="interest" value="selfhost" /> self-hosting it</label>
       </fieldset>
-      <p class="fine" id="status" role="status">One email when the desktop app ships, and the occasional update. Unsubscribe anytime.</p>
+      <p class="fine" id="status" role="status">Occasional emails about new releases. Unsubscribe anytime.</p>
     </section>
 
     <section class="grid">

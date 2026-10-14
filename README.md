@@ -40,6 +40,9 @@ container downloads the Whisper model (~140 MB) into the data volume.
 **Putting it on the internet:** run it behind a reverse proxy with HTTPS (Caddy, Traefik, nginx, Cloudflare Tunnel)
 and set `PUBLIC_URL`. For example, with Caddy: `recap.example.com { reverse_proxy localhost:3217 }`.
 
+**Cloud recipe:** [deploy/gcp](deploy/gcp) sets up a Google Cloud VM with HTTPS, swap, log rotation and
+daily disk snapshots in a few `gcloud` commands (~$18/month).
+
 **Backups:** everything (database, videos, model) is in the `recap-data` volume. Back that up.
 
 <details>

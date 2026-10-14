@@ -16,6 +16,14 @@ browser, and send a link a colleague can watch without signing in.
 
 ## Phases
 
+### v0.4: Recap Cloud *(done)*
+- [x] Hosted mode (`CLOUD_MODE`): open sign-up with email confirmation (Resend), password reset.
+- [x] Founding plan: the first 100 confirmed accounts are free for life (fair-use storage); live, real count.
+- [x] Timestamped comments, emoji reactions, viewer insights (who watched, how far), email notifications.
+- [x] Abuse reports with an admin review queue and takedowns; Terms and Privacy pages.
+- [x] Desktop app connects with a code (device flow) and shares videos with the transcript it already made,
+      so the cloud runs on a free-tier VM without whisper (`SERVER_TRANSCRIBE=false`).
+
 ### v0.3: Local-first desktop *(done)*
 - [x] The desktop app bundles the Recap engine, ffmpeg and whisper.cpp; no server or account needed.
 - [x] Local mode: engine on 127.0.0.1 behind a per-launch secret; library window; first-run model download.
@@ -49,9 +57,10 @@ browser, and send a link a colleague can watch without signing in.
 - S3/R2 storage driver for larger deployments; scheduled backups of `data/`.
 - Resumable uploads (tus) for long recordings on flaky networks.
 - Optional AI summaries, titles and chapters (bring your own Claude API key).
-- Comments and reactions; workspaces/teams; SSO.
+- Workspaces/teams; SSO; paid plan once founding spots are gone (no billing until it's announced).
+- Trim start/end in the app.
 - Signed + notarized desktop builds (needs paid Apple/Microsoft certificates).
 
 ## Non-goals (for now)
-- A hosted SaaS. Recap is self-hosted first.
+- Cloud-only features. Everything in Recap Cloud also works self-hosted.
 - A video editor beyond trimming fillers and pauses.

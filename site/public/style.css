@@ -73,3 +73,9 @@ nav a + a { margin-left: 6px; }
 .download { margin: 8px 0 0; }
 .btn.big { display: inline-block; text-decoration: none; padding: 14px 22px; font-size: 15px; }
 .dl-others a { color: var(--text); }
+
+.founding { margin-top: 36px; padding: 18px; border: 1px solid var(--strong); border-radius: 3px; }
+.founding-line { font-size: 18px; margin: 8px 0 10px; }
+.founding .bar { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin-bottom: 14px; }
+.founding .bar div { height: 100%; width: 0; background: var(--text); transition: width .6s; }
+.founding .fine { margin-top: 10px; }

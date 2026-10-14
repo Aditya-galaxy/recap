@@ -16,6 +16,25 @@
   }
 })();
 
+// Recap Cloud founding spots: real numbers from the cloud server. Stays hidden if it can't be reached.
+(async () => {
+  const CLOUD = "https://app.recap.kronagent.dev";
+  try {
+    const r = await fetch(CLOUD + "/api/public/stats", { signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return;
+    const { limit, left } = await r.json();
+    if (!Number.isInteger(limit) || !Number.isInteger(left)) return;
+    document.getElementById("founding-limit").textContent = limit;
+    document.getElementById("founding-left").textContent = left > 0 ? `${left} of ${limit}` : "All";
+    document.getElementById("founding-text").textContent = left > 0 ? "founding spots left" : `${limit} founding spots are taken`;
+    document.getElementById("founding-bar").style.width = `${Math.round(((limit - left) / limit) * 100)}%`;
+    if (left === 0) document.getElementById("founding-cta").textContent = "sign up for Recap Cloud";
+    document.getElementById("founding").hidden = false;
+  } catch {
+    /* cloud unreachable: keep the section hidden */
+  }
+})();
+
 const form = document.getElementById("signup");
 const status = document.getElementById("status");
 const button = form.querySelector("button");

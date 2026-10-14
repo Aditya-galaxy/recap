@@ -2,15 +2,17 @@
 
 **A self-hosted, local-first alternative to Loom.** Record your screen with a camera bubble, get a
 share link with a transcript and captions, and remove the "um"s and dead air in one click.
-Transcription runs on your own machine with whisper.cpp. No account, no cloud, no API keys.
+Transcription runs on your own machine with whisper.cpp. No account, no API keys.
 
-> **Status: early release (v0.3).** The desktop app now runs everything on your own computer: recording,
-> transcription and clean-up, with no server or account needed. The self-hosted server is still there for teams
-> that want share links. See [docs/ROADMAP.md](docs/ROADMAP.md). Issues and PRs welcome.
+> **Status: early release (v0.4).** The desktop app runs everything on your own computer: recording,
+> transcription and clean-up, with no account needed. For share links, connect a free **Recap Cloud** account
+> (the first 100 confirmed accounts are free for life) or run your own server. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Issues and PRs welcome.
 
 - **Record:** screen + draggable camera bubble, mic and system audio, pause/resume.
   Use the web app in Chrome, or the native apps for macOS, Windows and Linux (global hotkey ⌥⌘R / Ctrl+Alt+R).
-- **Share:** each video gets a page at `/v/<id>` with a seekable player, captions and a click-to-seek transcript.
+- **Share:** each video gets a page at `/v/<id>` with a seekable player, captions, a click-to-seek transcript,
+  timestamped comments, emoji reactions, and (for the owner) who watched and how far.
 - **Clean up:** cut filler words (um/uh; optionally comma-delimited "like," / "you know,") and shorten long
   pauses. You see the time saved and can preview the result before rendering. The original is kept.
 
@@ -32,11 +34,12 @@ Download from **https://recap.kronagent.dev**, or straight from [Releases](https
 
 On first launch it downloads the transcription model (~140 MB, once). Everything else is in the installer:
 the Recap engine, ffmpeg and whisper.cpp. Your library lives in `Videos/Recap/library` (`Movies` on macOS).
-**Nothing is uploaded anywhere.**
+**Nothing is uploaded unless you share a video.**
 
 - Record with the **record** button or **Ctrl+Alt+R** / **⌥⌘R** from any app: screen + a floating camera bubble.
 - When you stop, the video opens in your library with a transcript; **clean up** cuts fillers and pauses.
-- Share with **export mp4**, or point the recorder's **storage** setting at a Recap server to get links.
+- Share with **share link**: connect Recap Cloud once (settings → connect, approve the code in your browser) and
+  each video uploads with the transcript made on your computer. Or **export mp4** and send it yourself.
 
 ### Self-hosted server (for share links)
 
@@ -84,7 +87,9 @@ cd desktop && npm install && npm run engine && npm start     # desktop app again
 
 - On a server, videos are **unlisted** by default: anyone with the link can watch without an account, and pages are
   never indexed. Switch a video to **private** to make it visible only to you.
-- In the desktop app, nothing leaves your computer unless you export it or choose a server.
+- In the desktop app, nothing leaves your computer unless you export it, share it to Recap Cloud, or choose a server.
+- Recap Cloud: [terms](https://app.recap.kronagent.dev/terms) · [privacy](https://app.recap.kronagent.dev/privacy).
+  Anyone can report a shared video; admins review reports at `/admin`.
 - The **feedback** box sends only what you type (plus app version) to recap.kronagent.dev. Never video or transcripts.
 
 ## Performance
@@ -97,7 +102,8 @@ and the app cold-starts in about 1 s. Full numbers and methodology: [docs/PERFOR
 - Installers aren't code-signed/notarized yet (see first-launch steps above).
 - macOS desktop app: Apple silicon only; records your microphone but not system audio yet.
 - Linux: mic only; the recording control bar is visible in recordings.
-- Server: password sign-in only (no SSO or password-reset email yet).
+- Server: password sign-in only (no SSO). Password-reset and confirmation emails need `RESEND_API_KEY`
+  (otherwise they're written to the server log).
 - Default model is English (`base.en`).
 
 ## How it works

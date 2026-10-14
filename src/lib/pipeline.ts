@@ -145,7 +145,9 @@ export async function processVideo(id: string) {
   if (!haveSrc && !(await exists(mp4))) throw new PermanentError("Upload is missing.");
   const srcInfo = haveSrc ? await inspect(src).catch(() => null) : null;
   if (haveSrc && !srcInfo?.video) throw new PermanentError("That file isn't a video Recap can read.");
-  await updateMeta(id, (m) => { m.status = "processing"; m.stage = srcInfo?.audio === 0 ? "Processing video" : "Processing + transcribing"; });
+  const provided = file(id, "transcript.provided.json");
+  const transcribing = srcInfo?.audio !== 0 && config.serverTranscribe && !(await exists(provided));
+  await updateMeta(id, (m) => { m.status = "processing"; m.stage = transcribing ? "Processing + transcribing" : "Processing video"; });
 
   // The Mac app records system audio and mic as separate tracks; mix them instead of keeping one.
   const audioMap = (n: number) =>
@@ -181,6 +183,9 @@ export async function processVideo(id: string) {
   };
 
   const audioTrack = async (): Promise<Transcript> => {
+    // Made on the uploader's machine (desktop app) and validated on upload: nothing to transcribe here.
+    if (await exists(provided)) return JSON.parse(await fs.readFile(provided, "utf8"));
+    if (!config.serverTranscribe) return { words: [], silences: [] };
     const from = haveSrc ? src : mp4;
     const n = haveSrc ? (srcInfo?.audio ?? 0) : (await inspect(mp4)).audio;
     if (!n) return { words: [], silences: [] };
@@ -200,6 +205,7 @@ export async function processVideo(id: string) {
 
   await fs.writeFile(file(id, "transcript.json"), JSON.stringify(audio.value));
   await fs.rm(src, { force: true });
+  await fs.rm(provided, { force: true });
   const total = (performance.now() - started) / 1000;
   const media = (await readMeta(id))?.duration ?? 0;
   console.log(

@@ -1,14 +1,25 @@
 import { currentUser } from "@/lib/auth";
-import { rateLimit, clientIp } from "@/lib/ratelimit";
+import { rateLimit } from "@/lib/ratelimit";
+import { notifyFirstView, recordView, viewerKey } from "@/lib/social";
 import { canView, countView, isOwner, readMeta } from "@/lib/store";
 
-/** Called once when a viewer starts playback. Owners watching their own video don't count. */
-export async function POST(_req: Request, ctx: RouteContext<"/api/videos/[id]/view">) {
+/**
+ * Sent by the player when playback starts and periodically while watching, with how far the viewer
+ * got (0..1). The owner's own viewing never counts.
+ */
+export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/view">) {
   const { id } = await ctx.params;
   const user = await currentUser();
   const meta = await readMeta(id);
   if (!meta || !canView(meta, user)) return Response.json({ error: "not found" }, { status: 404 });
-  // At most one counted view per viewer per video every 30 minutes.
-  if (!isOwner(meta, user) && !rateLimit(`view:${id}:${user?.id ?? await clientIp()}`, 1, 30 * 60_000)) countView(id);
+  if (isOwner(meta, user)) return new Response(null, { status: 204 });
+  const viewer = await viewerKey(user);
+  if (rateLimit(`viewping:${id}:${viewer}`, 120, 60 * 60_000)) return new Response(null, { status: 204 });
+  const b = await req.json().catch(() => ({}));
+  const isNew = recordView(id, viewer, user?.id ?? null, Number(b.progress) || 0);
+  if (isNew) {
+    countView(id);
+    await notifyFirstView(id, user);
+  }
   return new Response(null, { status: 204 });
 }

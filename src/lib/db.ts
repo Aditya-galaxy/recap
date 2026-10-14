@@ -64,6 +64,90 @@ const MIGRATIONS = [
   );
   CREATE INDEX jobs_pending ON jobs(status, run_after);
   `,
+  // v2: Recap Cloud — verified accounts, founding plan, comments, reactions, viewer insights, device sign-in.
+  `
+  ALTER TABLE users ADD COLUMN email_verified_at TEXT;
+  ALTER TABLE users ADD COLUMN plan TEXT NOT NULL DEFAULT 'standard';
+  ALTER TABLE users ADD COLUMN founder_number INTEGER;
+  ALTER TABLE users ADD COLUMN notify_comments INTEGER NOT NULL DEFAULT 1;
+  ALTER TABLE users ADD COLUMN notify_views INTEGER NOT NULL DEFAULT 1;
+  CREATE UNIQUE INDEX users_founder ON users(founder_number) WHERE founder_number IS NOT NULL;
+  -- Accounts created before verification existed (self-hosted servers) count as verified.
+  UPDATE users SET email_verified_at = created_at;
+
+  CREATE TABLE email_tokens (
+    token_hash TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose TEXT NOT NULL CHECK (purpose IN ('verify', 'reset')),
+    expires_at INTEGER NOT NULL,
+    used_at TEXT,
+    created_at TEXT NOT NULL
+  );
+
+  ALTER TABLE videos ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0;
+  ALTER TABLE videos ADD COLUMN first_view_notified INTEGER NOT NULL DEFAULT 0;
+
+  CREATE TABLE comments (
+    id TEXT PRIMARY KEY,
+    video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    t REAL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX comments_video ON comments(video_id, created_at);
+
+  CREATE TABLE reactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    viewer TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    t REAL,
+    created_at TEXT NOT NULL
+  );
+  CREATE INDEX reactions_video ON reactions(video_id);
+
+  CREATE TABLE view_sessions (
+    video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    viewer TEXT NOT NULL,
+    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
+    progress REAL NOT NULL DEFAULT 0,
+    first_at TEXT NOT NULL,
+    last_at TEXT NOT NULL,
+    PRIMARY KEY (video_id, viewer)
+  );
+
+  CREATE TABLE device_codes (
+    device_hash TEXT PRIMARY KEY,
+    user_code TEXT NOT NULL UNIQUE,
+    user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    token TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    client TEXT NOT NULL DEFAULT '',
+    expires_at INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+  );
+
+  CREATE TABLE reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    video_id TEXT NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
+    reason TEXT NOT NULL,
+    reporter TEXT NOT NULL,
+    created_at TEXT NOT NULL
+  );
+  `,
+  // v3: moderation queue
+  `
+  ALTER TABLE reports ADD COLUMN resolved_at TEXT;
+  ALTER TABLE reports ADD COLUMN resolution TEXT;
+  CREATE INDEX reports_open ON reports(resolved_at, video_id);
+  CREATE UNIQUE INDEX reports_once ON reports(video_id, reporter) WHERE resolved_at IS NULL;
+  `,
+  // v4: desktop app: where a local video was shared on Recap Cloud
+  `
+  ALTER TABLE videos ADD COLUMN cloud_url TEXT;
+  ALTER TABLE videos ADD COLUMN cloud_version TEXT;
+  `,
 ];
 
 function open() {

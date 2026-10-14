@@ -1,5 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { createUser, signupOpen, startSession, userCount } from "@/lib/auth";
+import { sendVerification } from "@/lib/account-mail";
 import { config } from "@/lib/config";
 import { clientIp, rateLimit } from "@/lib/ratelimit";
 
@@ -27,7 +28,16 @@ export async function POST(req: Request) {
   try {
     const user = await createUser(email, password, String(b.name ?? "").slice(0, 80));
     await startSession(user.id);
-    return Response.json(user, { status: 201 });
+    // Double opt-in: unverified accounts can sign in but can't upload until they confirm.
+    if (!user.emailVerified) {
+      try {
+        await sendVerification(user);
+      } catch (err) {
+        console.error("[signup] verification email failed:", (err as Error).message);
+        return Response.json({ ...user, verificationSent: false }, { status: 201 });
+      }
+    }
+    return Response.json({ ...user, verificationSent: !user.emailVerified }, { status: 201 });
   } catch (err) {
     if (String((err as Error).message).includes("UNIQUE")) return Response.json({ error: "That email already has an account." }, { status: 409 });
     throw err;

@@ -26,6 +26,33 @@ export const config = {
   /** Where the in-app feedback box sends messages. Set FEEDBACK_URL="" to hide the box. */
   feedbackUrl: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",
   maxUploadBytes: Number(process.env.MAX_UPLOAD_MB ?? 4096) * 1024 * 1024,
+  /**
+   * Run whisper on the server for uploads that arrive without a transcript. Small servers (e.g. a free-tier
+   * VM) turn this off: the desktop app transcribes on the user's machine and uploads the transcript with the video.
+   */
+  serverTranscribe: bool(process.env.SERVER_TRANSCRIBE, true),
+  /** The Recap Cloud server the desktop app connects to for share links. */
+  cloudUrl: (process.env.RECAP_CLOUD_URL ?? "https://app.recap.kronagent.dev").replace(/\/+$/, ""),
+  /**
+   * Recap Cloud mode (the hosted service): email verification is required, accounts get a plan
+   * (founding / standard) with storage quotas, and the first FOUNDER_LIMIT verified accounts are founders.
+   * Self-hosted servers leave this off and behave as before.
+   */
+  cloud: bool(process.env.CLOUD_MODE, false),
+  founderLimit: Number(process.env.FOUNDER_LIMIT ?? 100),
+  quotaBytes: {
+    founder: Number(process.env.FOUNDER_QUOTA_GB ?? 25) * 1024 ** 3,
+    standard: Number(process.env.STANDARD_QUOTA_GB ?? 2) * 1024 ** 3,
+  } as Record<string, number>,
+  /** Price shown for the paid plan once founding spots are gone (display only until billing ships). */
+  paidPriceLabel: process.env.PAID_PRICE_LABEL ?? "$8/month",
+  /** Transactional email (verification, password reset, notifications) via Resend. Unset = log to console. */
+  resendApiKey: process.env.RESEND_API_KEY || null,
+  // A domain verified in Resend (kronagent.com). Override with EMAIL_FROM.
+  emailFrom: process.env.EMAIL_FROM ?? "Recap <recap@kronagent.com>",
+  /** Shown on the Terms and Privacy pages as the way to reach the operator. */
+  contactEmail: process.env.CONTACT_EMAIL || null,
+  legalUpdated: process.env.LEGAL_UPDATED ?? "2026-10-14",
   /** Absolute base URL for share links and link previews, e.g. https://recap.example.com. Optional. */
   publicUrl: process.env.PUBLIC_URL?.replace(/\/+$/, "") || null,
   /** Force the Secure flag on cookies. Defaults to on when PUBLIC_URL is https. */

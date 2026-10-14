@@ -19,6 +19,8 @@ export interface VideoMeta {
   visibility: Visibility;
   views: number;
   createdAt: string;
+  /** Taken down by an admin after a report. Only the owner (and admins) can still open it. */
+  disabled?: boolean;
   status: VideoStatus;
   stage?: string;
   error?: string;

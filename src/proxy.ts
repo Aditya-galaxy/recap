@@ -34,7 +34,7 @@ export function proxy(req: NextRequest) {
   }
 
   // There are no accounts in local mode.
-  if (/^\/api\/(auth|users|tokens)(\/|$)/.test(req.nextUrl.pathname)) return new NextResponse("Not found", { status: 404 });
+  if (/^\/api\/(auth|users|tokens|admin|device)(\/|$)/.test(req.nextUrl.pathname)) return new NextResponse("Not found", { status: 404 });
 
   const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/, "") ?? "";
   if (same(req.cookies.get(COOKIE)?.value ?? "", TOKEN) || same(bearer, TOKEN)) return NextResponse.next();

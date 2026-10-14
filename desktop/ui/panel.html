@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' blob: mediastream:" />
+  <title>Recap</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding: 16px; display: flex; flex-direction: column; gap: 14px; min-height: 100vh; }
+    header { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; }
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .error { border: 1px solid var(--strong); border-radius: 3px; padding: 8px; font-size: 11px; line-height: 1.5; }
+    .start { width: 100%; padding: 10px; display: flex; gap: 8px; justify-content: center; align-items: center; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .status { border: 1px dashed var(--border); border-radius: 3px; padding: 10px; }
+    .bar { height: 1px; background: var(--border); margin-top: 8px; }
+    .bar > div { height: 100%; background: var(--strong); width: 0; }
+    .last { display: flex; gap: 6px; align-items: center; }
+    .last code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    footer { margin-top: auto; display: flex; gap: 6px; border-top: 1px solid var(--border); padding-top: 12px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <span><span class="muted">~/</span>recap<span class="cursor"></span></span>
+    <span class="label" id="hotkey"></span>
+  </header>
+
+  <div class="seg" id="mode">
+    <button data-v="screenCam">screen+cam</button>
+    <button data-v="screen">screen</button>
+    <button data-v="cam">cam</button>
+  </div>
+
+  <label class="field"><span class="label">title</span><input type="text" id="title" placeholder="untitled recording" /></label>
+
+  <label class="field" id="displayField"><span class="label">display</span><select id="display"></select></label>
+  <label class="field" id="cameraField"><span class="label">camera</span><select id="camera"></select></label>
+
+  <div class="field">
+    <div class="row"><span class="label">microphone</span><button class="switch" id="micOn" role="switch"></button></div>
+    <select id="mic"></select>
+  </div>
+
+  <div class="row" id="sysAudioRow">
+    <span class="label">system audio</span>
+    <button class="switch" id="systemAudio" role="switch"></button>
+  </div>
+  <p class="muted" id="sysAudioNote" style="margin:-6px 0 0;font-size:10px" hidden>system audio capture isn't supported on linux; mic only.</p>
+
+  <div class="field" id="bubbleField">
+    <span class="label">bubble</span>
+    <div class="seg" id="bubbleSize"><button data-v="s">s</button><button data-v="m">m</button><button data-v="l">l</button></div>
+  </div>
+
+  <div class="error" id="error" hidden></div>
+  <div class="status" id="status" hidden><span id="statusText"></span><div class="bar"><div id="progress"></div></div></div>
+
+  <button class="btn primary start" id="start"><span class="dot"></span>start recording</button>
+
+  <div class="field" id="lastField" hidden>
+    <span class="label">last recording</span>
+    <div class="last"><code id="lastLink"></code><button class="btn" id="copy">copy</button><button class="btn" id="openLink">open</button></div>
+  </div>
+
+  <label class="field" id="serverField" hidden><span class="label">server</span><input type="text" id="server" /></label>
+
+  <footer>
+    <button class="btn" id="library">library</button>
+    <button class="btn" id="folder">folder</button>
+    <button class="btn" id="toggleServer">server</button>
+  </footer>
+
+  <script src="panel.js"></script>
+</body>
+</html>

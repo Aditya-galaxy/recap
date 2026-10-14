@@ -1,0 +1,18 @@
+const { contextBridge, ipcRenderer } = require("electron");
+
+contextBridge.exposeInMainWorld("recap", {
+  displays: () => ipcRenderer.invoke("displays"),
+  start: (opts) => ipcRenderer.send("start", opts),
+  discard: () => ipcRenderer.send("discard"),
+  control: (action) => ipcRenderer.send("control", action),
+  retryUpload: () => ipcRenderer.send("retry-upload"),
+  recorder: (ev) => ipcRenderer.send("recorder", ev),
+  chunk: (buf) => ipcRenderer.send("chunk", buf),
+  open: (what) => ipcRenderer.send("open", what),
+  copy: (text) => ipcRenderer.send("copy", text),
+  requestState: () => ipcRenderer.send("state?"),
+  on: (channel, fn) => {
+    if (!["state", "begin", "control", "hotkey"].includes(channel)) return;
+    ipcRenderer.on(channel, (_e, data) => fn(data));
+  },
+});

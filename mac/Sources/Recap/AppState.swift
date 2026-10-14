@@ -137,11 +137,12 @@ final class AppState: ObservableObject {
 
         do {
             if mode.usesCamera {
-                try camera.start(cameraID: cameraID.isEmpty ? nil : cameraID,
-                                 micID: mode == .cam && micOn ? micID : nil)
+                try camera.configure(cameraID: cameraID.isEmpty ? nil : cameraID,
+                                     micID: mode == .cam && micOn ? micID : nil)
                 let b = BubblePanel(session: camera.session, size: mode == .cam ? .l : bubbleSize, on: screen)
                 b.orderFrontRegardless()
                 bubble = b
+                await camera.run()
             }
             let bar = ControlBarPanel(state: self, on: screen)
             bar.orderFrontRegardless()
@@ -219,7 +220,7 @@ final class AppState: ObservableObject {
                 segments = try await screenRecorder?.stop() ?? []
             }
             hidePanels()
-            camera.stop()
+            await camera.stop()
             screenRecorder = nil
 
             let out = Media.libraryDir.appendingPathComponent(Media.newFileName())
@@ -282,7 +283,7 @@ final class AppState: ObservableObject {
         await screenRecorder?.cancel()
         screenRecorder = nil
         if mode == .cam { _ = try? await camera.stopRecording() }
-        camera.stop()
+        await camera.stop()
         hidePanels()
         cleanupWorkDir()
     }

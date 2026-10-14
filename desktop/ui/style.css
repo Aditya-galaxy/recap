@@ -1,0 +1,59 @@
+:root {
+  --bg: #fafafa;
+  --surface: #ffffff;
+  --border: #e4e4e4;
+  --strong: #0a0a0a;
+  --text: #0a0a0a;
+  --muted: #737373;
+  --inv-bg: #0a0a0a;
+  --inv-text: #fafafa;
+  color-scheme: light;
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace;
+  font-size: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #000000;
+    --surface: #0a0a0a;
+    --border: #262626;
+    --strong: #ededed;
+    --text: #ededed;
+    --muted: #8a8a8a;
+    --inv-bg: #ededed;
+    --inv-text: #000000;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+button, input, select { font: inherit; color: inherit; }
+
+.label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+.muted { color: var(--muted); }
+
+.btn {
+  border: 1px solid var(--border); background: var(--surface); border-radius: 3px;
+  padding: 5px 9px; cursor: pointer; text-transform: lowercase;
+}
+.btn:hover { border-color: var(--strong); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn.primary { background: var(--inv-bg); color: var(--inv-text); border-color: var(--inv-bg); }
+.btn.primary:hover { background: transparent; color: var(--text); }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 3px; }
+.seg button { border: 0; background: transparent; padding: 5px 0; border-radius: 2px; cursor: pointer; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--inv-bg); color: var(--inv-text); }
+
+input[type="text"], select {
+  width: 100%; padding: 6px 8px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 3px; outline: none;
+}
+input[type="text"]:focus, select:focus { border-color: var(--strong); }
+
+.switch { position: relative; width: 30px; height: 16px; border: 1px solid var(--border); border-radius: 3px; background: transparent; cursor: pointer; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 10px; height: 10px; border-radius: 1px; background: var(--muted); transition: left 0.12s; }
+.switch[aria-checked="true"] { background: var(--inv-bg); border-color: var(--inv-bg); }
+.switch[aria-checked="true"]::after { left: 16px; background: var(--inv-text); }
+
+.cursor { display: inline-block; width: 7px; height: 13px; background: currentColor; vertical-align: -2px; margin-left: 2px; animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }

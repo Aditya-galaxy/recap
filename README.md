@@ -50,3 +50,24 @@ cd mac && ./build.sh            # → mac/build/Recap.app
 - Every recording is also saved to `~/Movies/Recap`. If an upload fails, use "retry upload" in the menu.
 - The server URL (default `http://localhost:3217`) can be changed under "server" in the menu.
 - The app is ad-hoc signed, so after a rebuild macOS may ask you to re-enable Screen Recording for it.
+
+## Windows & Linux app (`desktop/`)
+
+An Electron tray app with the same flow as the Mac app: a floating camera bubble, a control bar,
+**Ctrl+Alt+R** to start or stop, and upload to the server with the share link opened and copied.
+Recordings are also saved to `Videos/Recap`.
+
+```bash
+cd desktop && npm install && npm start      # run from source (works on macOS too)
+npx electron-builder --win                  # build on Windows → NSIS installer + portable .exe
+npx electron-builder --linux                # build on Linux   → AppImage + .deb
+```
+
+GitHub Actions (`.github/workflows/desktop.yml`) builds Windows, Linux and macOS on native runners
+for every push to `desktop/` or `mac/`. Pushing a `v*` tag attaches them to a GitHub Release.
+
+| | Windows | Linux |
+| --- | --- | --- |
+| System audio | ✓ (loopback) | ✗ (mic only) |
+| Control bar hidden from recording | ✓ (Win10 2004+) | ✗ (visible in the video) |
+| Wayland | n/a | screen capture through the PipeWire portal; always-on-top depends on the compositor |

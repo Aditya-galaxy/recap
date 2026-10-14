@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; media-src mediastream:" />
+  <style>
+    html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+    /* The whole bubble is a drag handle. */
+    .bubble {
+      position: absolute; inset: 4px; border-radius: 50%; overflow: hidden;
+      border: 3px solid #fff; background: #111; -webkit-app-region: drag; cursor: grab;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+  </style>
+</head>
+<body>
+  <div class="bubble"><video autoplay muted playsinline></video></div>
+  <script>
+    const cam = new URLSearchParams(location.search).get("cam");
+    navigator.mediaDevices
+      .getUserMedia({ video: { deviceId: cam ? { exact: cam } : undefined, width: { ideal: 640 }, height: { ideal: 640 } } })
+      .then((s) => {
+        document.querySelector("video").srcObject = s;
+        window.addEventListener("beforeunload", () => s.getTracks().forEach((t) => t.stop()));
+      })
+      .catch(() => {});
+  </script>
+</body>
+</html>

@@ -10,7 +10,9 @@ final class CameraController: NSObject {
     private var finishing: CheckedContinuation<URL, Error>?
     private(set) var running = false
 
-    func start(cameraID: String?, micID: String?) throws {
+    /// Configure inputs/outputs. Call `run()` only after anything else that touches the session
+    /// (like attaching a preview layer) is done: mutating it while it starts running aborts.
+    func configure(cameraID: String?, micID: String?) throws {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
         session.inputs.forEach(session.removeInput)
@@ -29,17 +31,32 @@ final class CameraController: NSObject {
             if session.canAddInput(micInput) { session.addInput(micInput) }
         }
         if session.canAddOutput(movieOutput) { session.addOutput(movieOutput) }
+    }
 
+    /// Starts the session and returns once frames are flowing.
+    func run() async {
         let s = session
-        queue.async { s.startRunning() }
+        let q = queue
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            q.async {
+                s.startRunning()
+                c.resume()
+            }
+        }
         running = true
     }
 
-    func stop() {
+    func stop() async {
         guard running else { return }
         running = false
         let s = session
-        queue.async { s.stopRunning() }
+        let q = queue
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            q.async {
+                s.stopRunning()
+                c.resume()
+            }
+        }
     }
 
     func startRecording(to url: URL) {

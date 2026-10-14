@@ -53,6 +53,7 @@ $("server").value = settings.server;
 $("server").addEventListener("change", (e) => {
   settings.server = e.target.value.trim();
   save();
+  window.recap.setStorage(settings.server);
   render();
   checkConnection();
 });
@@ -141,6 +142,8 @@ function render() {
   $("statusText").textContent = state.phase === "uploading" ? `$ uploading ${Math.round(state.progress * 100)}%` : "$ saving…";
   $("progress").style.width = `${(state.progress || 0) * 100}%`;
   $("lastField").hidden = !state.lastLink;
+  $("update").hidden = !state.update;
+  if (state.update) $("updateText").textContent = `Recap ${state.update.version} is available.`;
   $("lastLink").textContent = state.lastLink || "";
 }
 
@@ -150,6 +153,7 @@ $("openLink").onclick = () => window.recap.open(state.lastLink);
 $("library").onclick = () => (settings.server ? window.recap.open(settings.server) : window.recap.openLibrary("/"));
 $("retryModel").onclick = () => window.recap.retryModel();
 $("folder").onclick = () => window.recap.open("folder");
+$("updateLink").onclick = () => state.update && window.recap.open(state.update.url);
 $("toggleServer").onclick = () => ($("serverField").hidden = !$("serverField").hidden);
 $("token").addEventListener("change", async (e) => {
   await window.recap.setToken(e.target.value);
@@ -173,7 +177,24 @@ window.recap.hasToken().then((has) => {
 
 function startRecording() {
   if (!["idle", "error"].includes(state.phase)) return;
-  window.recap.start({ ...settings, title: $("title").value });
+  const opts = { ...settings, title: $("title").value };
+  // No camera connected: screen+cam degrades to screen-only; camera-only can't start.
+  if (opts.mode !== "screen" && $("camera").options.length === 0) {
+    if (opts.mode === "cam") {
+      state = { ...state, phase: "error", error: "No camera found. Connect one, or choose screen." };
+      return render();
+    }
+    opts.mode = "screen";
+  }
+  window.recap.start(opts);
+}
+
+function captureError(err) {
+  const what = err.what ?? "screen or camera";
+  if (err.name === "NotAllowedError") return `Recap isn't allowed to use the ${what}. Check your system's privacy settings, then try again.`;
+  if (err.name === "NotFoundError" || err.name === "OverconstrainedError") return `No ${what} found. Check it's connected${err.what === "microphone" ? ", or turn the microphone off" : ""}.`;
+  if (err.name === "NotReadableError") return `The ${what} is busy in another app (a video call?). Close it and try again.`;
+  return `Couldn't start recording (${err.message || err.name}).`;
 }
 
 window.recap.on("state", (s) => {
@@ -214,7 +235,7 @@ window.recap.on("begin", async (o) => {
     let video;
     if (o.mode === "cam") {
       video = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: o.cameraId ? { exact: o.cameraId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: { deviceId: o.cameraId ? { ideal: o.cameraId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } },
       });
     } else {
       // Electron's desktop-capture constraints: no picker, no user-gesture requirement.
@@ -228,9 +249,16 @@ window.recap.on("begin", async (o) => {
     const audioSources = [];
     if (video.getAudioTracks().length) audioSources.push(video);
     if (o.micOn) {
-      const mic = await navigator.mediaDevices.getUserMedia({
-        audio: { deviceId: o.micId ? { exact: o.micId } : undefined, echoCancellation: true, noiseSuppression: true },
-      });
+      let mic;
+      try {
+        mic = await navigator.mediaDevices.getUserMedia({
+          audio: { deviceId: o.micId ? { ideal: o.micId } : undefined, echoCancellation: true, noiseSuppression: true },
+        });
+      } catch (err) {
+        // Recording silently without the voice would be worse than not starting.
+        err.what = "microphone";
+        throw err;
+      }
       streams.push(mic);
       audioSources.push(mic);
     }
@@ -270,7 +298,7 @@ window.recap.on("begin", async (o) => {
     window.recap.recorder({ type: "started" });
   } catch (err) {
     cleanup();
-    window.recap.recorder({ type: "error", message: `Couldn't start capture: ${err.message || err.name}` });
+    window.recap.recorder({ type: "error", message: captureError(err) });
   }
 });
 
@@ -297,5 +325,6 @@ window.recap.on("control", (action) => {
 });
 
 render();
+window.recap.setStorage(settings.server);
 loadDevices().then(render);
 window.recap.requestState();

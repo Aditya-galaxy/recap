@@ -26,10 +26,15 @@ export function proxy(req: NextRequest) {
   if (req.nextUrl.pathname === "/__local") {
     if (!same(req.nextUrl.searchParams.get("token") ?? "", TOKEN)) return new NextResponse("Forbidden", { status: 403 });
     const next = req.nextUrl.searchParams.get("next") ?? "/";
-    const res = NextResponse.redirect(new URL(next.startsWith("/") && !next.startsWith("//") ? next : "/", req.url));
+    // Only plain same-site paths: "//host", "/\host" and control characters can all leave the site.
+    const safe = /^\/(?![/\\])[^\\\s\x00-\x1f]*$/.test(next) ? next : "/";
+    const res = NextResponse.redirect(new URL(safe, req.url));
     res.cookies.set(COOKIE, TOKEN, { httpOnly: true, sameSite: "strict", path: "/" });
     return res;
   }
+
+  // There are no accounts in local mode.
+  if (/^\/api\/(auth|users|tokens)(\/|$)/.test(req.nextUrl.pathname)) return new NextResponse("Not found", { status: 404 });
 
   const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/, "") ?? "";
   if (same(req.cookies.get(COOKIE)?.value ?? "", TOKEN) || same(bearer, TOKEN)) return NextResponse.next();

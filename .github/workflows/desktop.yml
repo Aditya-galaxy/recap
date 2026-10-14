@@ -57,19 +57,35 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npx electron-builder ${{ matrix.args }} --publish never
 
-      - name: Smoke test the packaged app (Linux, headless)
-        if: matrix.name == 'linux'
+      # The full self-test (security, record→library→transcribe, clean cut, export, recovery, delete)
+      # against the packaged app on every OS. The sample video is made with the bundled ffmpeg.
+      - name: Self-test the packaged app
         shell: bash
         working-directory: desktop
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb ffmpeg >/dev/null
-          ffmpeg -loglevel error -f lavfi -i testsrc2=size=640x360:rate=30 -f lavfi -i "sine=f=300:d=6" -t 6 -c:v libvpx -c:a libopus /tmp/sample.webm
-          mkdir -p /tmp/selftest
-          # The app prefers its bundled ffmpeg/whisper-cli (resources/bin) over anything on PATH.
-          RECAP_SELFTEST=/tmp/selftest RECAP_SELFTEST_FILE=/tmp/sample.webm \
-            timeout 600 xvfb-run -a dist/linux-unpacked/recap-desktop --no-sandbox || true
-          cat /tmp/selftest/report.json
-          python3 -c "import json,sys; r=json.load(open('/tmp/selftest/report.json')); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all steps passed'); sys.exit(1 if bad else 0)"
+          set -u
+          FF=bin/ffmpeg; [ -f bin/ffmpeg.exe ] && FF=bin/ffmpeg.exe
+          OUT="$RUNNER_TEMP/selftest"; mkdir -p "$OUT"
+          "$FF" -loglevel error -f lavfi -i testsrc2=size=1280x720:rate=30 -f lavfi -i "sine=f=300:d=8" -t 8 -c:v libvpx -b:v 1M -c:a libopus "$RUNNER_TEMP/sample.webm"
+          case "${{ matrix.name }}" in
+            linux)
+              sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
+              APP=(xvfb-run -a dist/linux-unpacked/recap-desktop --no-sandbox) ;;
+            macos) APP=("dist/mac-arm64/Recap.app/Contents/MacOS/Recap") ;;
+            windows) APP=("dist/win-unpacked/Recap.exe") ;;
+          esac
+          RECAP_SELFTEST="$OUT" RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.webm" timeout 900 "${APP[@]}" || true
+          cat "$OUT/report.json"
+          PY=$(command -v python3 || command -v python)
+          "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all', len(r['steps']), 'steps passed'); sys.exit(1 if bad or not r['steps'] else 0)" "$OUT/report.json"
+
+      - name: Upload self-test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: selftest-${{ matrix.name }}
+          path: ${{ runner.temp }}/selftest/*.png
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         with:

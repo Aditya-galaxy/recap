@@ -26,7 +26,8 @@ export default function AuthForm({ mode, firstUser = false, needsSetupCode = fal
       return;
     }
     const next = params.get("next");
-    router.replace(next?.startsWith("/") && !next.startsWith("//") ? next : "/");
+    // Only plain same-site paths ("//host", "/\\host" and control characters can leave the site).
+    router.replace(next && /^\/(?![/\\])[^\\\s\x00-\x1f]*$/.test(next) ? next : "/");
     router.refresh();
   }
 

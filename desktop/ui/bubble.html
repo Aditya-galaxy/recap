@@ -19,7 +19,7 @@
   <script>
     const cam = new URLSearchParams(location.search).get("cam");
     navigator.mediaDevices
-      .getUserMedia({ video: { deviceId: cam ? { exact: cam } : undefined, width: { ideal: 640 }, height: { ideal: 640 } } })
+      .getUserMedia({ video: { deviceId: cam ? { ideal: cam } : undefined, width: { ideal: 640 }, height: { ideal: 640 } } })
       .then((s) => {
         document.querySelector("video").srcObject = s;
         window.addEventListener("beforeunload", () => s.getTracks().forEach((t) => t.stop()));

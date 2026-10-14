@@ -6,7 +6,7 @@
 //   panel  – recorder settings + start; also hosts the MediaRecorder (kept alive while hidden)
 //   bubble – circular camera window, always on top, captured with the screen on purpose
 //   bar    – timer / pause / stop / discard, always on top, excluded from capture where the OS allows
-const { app, BrowserWindow, Tray, Menu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage, dialog, Notification } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Readable } = require("node:stream");
@@ -35,6 +35,9 @@ const session = {
   file: null, // { path, stream }
   opts: null,
   runId: 0,
+  update: null, // { version, url } when a newer release exists
+  quitAfterSave: false,
+  localStorage: true, // the recorder's storage setting (panel reports it)
 };
 
 function broadcast() {
@@ -49,6 +52,7 @@ function broadcast() {
     hotkey: HOTKEY.replace("CommandOrControl", process.platform === "darwin" ? "⌘" : "Ctrl"),
     platform: process.platform,
     engine: engine.status(),
+    update: session.update,
   };
   for (const w of [panel, bar, bubble]) if (w && !w.isDestroyed()) w.webContents.send("state", s);
   tray?.setToolTip(s.phase === "recording" ? `Recap: recording ${fmt(s.elapsed)}` : "Recap");
@@ -59,10 +63,15 @@ const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(
 function setPhase(phase, extra = {}) {
   Object.assign(session, { phase }, extra);
   broadcast();
+  if (session.quitAfterSave && (phase === "idle" || phase === "error")) {
+    session.quitAfterSave = false;
+    quitting = true;
+    setTimeout(() => app.quit(), 300);
+  }
 }
 
 const libraryDir = () => {
-  const d = path.join(app.getPath("videos"), "Recap");
+  const d = process.env.RECAP_SELFTEST ? path.join(process.env.RECAP_SELFTEST, "raw") : path.join(app.getPath("videos"), "Recap");
   fs.mkdirSync(d, { recursive: true });
   return d;
 };
@@ -238,9 +247,12 @@ async function start(opts) {
     panel?.show();
     return setPhase("error", { error: "Not connected. Open “server” and paste an API token from Settings on your Recap server." });
   }
-  if (process.platform === "darwin" && opts.mode !== "cam" && systemPreferences.getMediaAccessStatus("screen") !== "granted") {
-    // Triggers the macOS prompt; on Windows/Linux there is no such gate.
-    await desktopCapturer.getSources({ types: ["screen"] }).catch(() => {});
+  if (process.platform === "darwin") {
+    const blocked = await macPermissionProblem(opts);
+    if (blocked) {
+      panel?.show();
+      return setPhase("error", { error: blocked });
+    }
   }
   const run = ++session.runId;
   session.opts = opts;
@@ -256,7 +268,18 @@ async function start(opts) {
   }
 
   const file = path.join(libraryDir(), `Recap ${new Date().toISOString().replace(/[:T]/g, "-").slice(0, 19)}.webm`);
-  session.file = { path: file, stream: fs.createWriteStream(file) };
+  const stream = fs.createWriteStream(file);
+  // A failed write (disk full, folder removed) must stop the recording cleanly, not crash the app.
+  stream.on("error", (err) => {
+    if (session.file?.stream !== stream) return;
+    session.runId++;
+    session.file = null;
+    panel?.webContents.send("control", "discard");
+    closeOverlays();
+    setPhase("error", { error: `Couldn't save the recording (${err.code ?? err.message}). Is the disk full? Free some space and try again.` });
+    panel?.show();
+  });
+  session.file = { path: file, stream };
 
   panel.hide();
   if (opts.mode !== "screen") createBubble(opts);
@@ -294,7 +317,7 @@ async function finish() {
   await upload(f.path);
 }
 
-async function upload(file) {
+async function upload(file, { quiet = false } = {}) {
   const local = isLocal(session.opts);
   const server = local ? engine.url : String(session.opts.server).trim().replace(/\/+$/, "");
   const token = local ? engine.token : readToken();
@@ -323,7 +346,7 @@ async function upload(file) {
       // The engine keeps its own processed copy; the raw recording is no longer needed.
       await fs.promises.rm(file, { force: true });
       setPhase("idle", { lastLink: "", lastFile: "", progress: 0 });
-      openLibrary(`/v/${id}`);
+      if (!quiet) openLibrary(`/v/${id}`);
       return;
     }
     const link = `${server}/v/${id}`;
@@ -331,10 +354,93 @@ async function upload(file) {
     shell.openExternal(link);
     setPhase("idle", { lastLink: link, progress: 0 });
   } catch (err) {
+    if (quiet) return setPhase("idle", { progress: 0 }); // recovery: keep the file, try again next launch
     const where = local ? "the local library" : "the server";
     setPhase("error", { error: `Couldn't add the video to ${where} (${err.cause?.code ?? err.message}). The recording is saved in ${libraryDir()}. Use “retry upload”.` });
   }
   panel?.show();
+}
+
+function buildTrayMenu() {
+  if (!tray) return;
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      ...(session.update ? [{ label: `Update available: ${session.update.version}…`, click: () => shell.openExternal(session.update.url) }, { type: "separator" }] : []),
+      { label: "Open library", click: () => openLibrary() },
+      { label: "New recording…", click: () => panel.show() },
+      { label: `Start / stop recording (${HOTKEY.replace("CommandOrControl", process.platform === "darwin" ? "⌘" : "Ctrl")})`, click: toggle },
+      { label: "Open recordings folder", click: () => shell.openPath(libraryDir()) },
+      { type: "separator" },
+      { label: "Quit", click: () => app.quit() },
+    ]),
+  );
+}
+
+// macOS: without Screen Recording permission the capture is silently black, so check up front.
+async function macPermissionProblem(opts) {
+  const settings = (pane) => shell.openExternal(`x-apple.systempreferences:com.apple.preference.security?${pane}`);
+  if (opts.mode !== "cam" && systemPreferences.getMediaAccessStatus("screen") !== "granted") {
+    await desktopCapturer.getSources({ types: ["screen"] }).catch(() => {}); // shows the system prompt once
+    if (systemPreferences.getMediaAccessStatus("screen") !== "granted") {
+      settings("Privacy_ScreenCapture");
+      return "Recap needs Screen Recording permission. Turn on Recap in System Settings → Privacy & Security → Screen & System Audio Recording, then quit and reopen Recap.";
+    }
+  }
+  if (opts.mode !== "screen" && !(await systemPreferences.askForMediaAccess("camera"))) {
+    settings("Privacy_Camera");
+    return "Recap needs camera access. Turn on Recap in System Settings → Privacy & Security → Camera (or switch to screen-only).";
+  }
+  if (opts.micOn && !(await systemPreferences.askForMediaAccess("microphone"))) {
+    settings("Privacy_Microphone");
+    return "Recap needs microphone access. Turn on Recap in System Settings → Privacy & Security → Microphone (or turn the microphone off).";
+  }
+  return null;
+}
+
+// Raw recordings left behind by a crash, a quit mid-recording or a failed import are added to the
+// local library on the next launch instead of being forgotten.
+async function recoverLeftovers() {
+  if (!session.localStorage || engine.state !== "ready" || session.phase !== "idle") return;
+  let files = [];
+  try {
+    files = fs.readdirSync(libraryDir()).filter((f) => f.endsWith(".webm") && f !== path.basename(session.file?.path ?? ""));
+  } catch {
+    return;
+  }
+  for (const f of files) {
+    const p = path.join(libraryDir(), f);
+    if (fs.statSync(p).size < 4096) {
+      fs.rmSync(p, { force: true }); // nothing usable was recorded
+      continue;
+    }
+    session.opts = { server: "", title: `Recovered recording (${f.replace(/^Recap |\.webm$/g, "")})` };
+    await upload(p, { quiet: true });
+  }
+}
+
+// Tell people when a newer release exists (no auto-install: builds aren't signed yet).
+async function checkForUpdate() {
+  try {
+    const res = await fetch("https://api.github.com/repos/Aditya-galaxy/recap/releases/latest", { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) return;
+    const { tag_name: tag, html_url: url } = await res.json();
+    const newer = (a, b) => {
+      const pa = a.replace(/^v/, "").split(".").map(Number);
+      const pb = b.replace(/^v/, "").split(".").map(Number);
+      for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+      return false;
+    };
+    if (tag && newer(tag, app.getVersion())) {
+      session.update = { version: tag.replace(/^v/, ""), url: "https://recap.kronagent.dev" };
+      broadcast();
+      buildTrayMenu();
+      if (Notification.isSupported()) {
+        const n = new Notification({ title: `Recap ${session.update.version} is available`, body: "Click to download the new version." });
+        n.on("click", () => shell.openExternal(session.update.url));
+        n.show();
+      }
+    }
+  } catch {}
 }
 
 function toggle() {
@@ -387,6 +493,10 @@ ipcMain.handle("token:set", (_e, token) => writeToken(token));
 ipcMain.handle("connection:check", (_e, server) => checkConnection(server));
 ipcMain.on("library", (_e, pathname) => openLibrary(typeof pathname === "string" && pathname.startsWith("/") ? pathname : "/"));
 ipcMain.on("model:retry", () => engine.ensureModel());
+// The panel reports where recordings go, so recovery only imports into the local library.
+ipcMain.on("storage", (_e, server) => {
+  session.localStorage = !String(server ?? "").trim();
+});
 // From the library window's record button.
 ipcMain.on("record-request", () => {
   panel?.show();
@@ -406,23 +516,16 @@ app.whenReady().then(() => {
   engine.on("status", broadcast);
   engine.ensureModel();
   engine.start().then(() => {
-    if (engine.state === "ready" && !process.env.RECAP_SNAPSHOT) openLibrary();
+    if (engine.state === "ready" && !process.env.RECAP_SNAPSHOT && !process.env.RECAP_SELFTEST) openLibrary();
     else if (engine.state !== "ready") panel.show();
+    if (!process.env.RECAP_SELFTEST) setTimeout(recoverLeftovers, 2000);
   });
+  if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT) setTimeout(checkForUpdate, 5000);
 
   const trayIcon = nativeImage.createFromPath(path.join(__dirname, "build", process.platform === "darwin" ? "trayTemplate.png" : "tray.png"));
   tray = new Tray(trayIcon);
   tray.setToolTip("Recap");
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      { label: "Open library", click: () => openLibrary() },
-      { label: "New recording…", click: () => panel.show() },
-      { label: `Start / stop recording (${HOTKEY.replace("CommandOrControl", "Ctrl")})`, click: toggle },
-      { label: "Open recordings folder", click: () => shell.openPath(libraryDir()) },
-      { type: "separator" },
-      { label: "Quit", click: () => { quitting = true; app.quit(); } },
-    ]),
-  );
+  buildTrayMenu();
   tray.on("click", () => (panel.isVisible() ? panel.hide() : panel.show()));
 
   if (!globalShortcut.register(HOTKEY, toggle)) console.warn(`could not register ${HOTKEY}`);
@@ -435,48 +538,91 @@ app.whenReady().then(() => {
 
 async function selftest(dir, sample) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const report = { steps: [] };
-  const step = (name, ok, extra = {}) => report.steps.push({ name, ok, ...extra });
+  const report = { platform: `${process.platform}-${process.arch}`, version: app.getVersion(), steps: [] };
+  const step = (name, ok, extra = {}) => report.steps.push({ name, ok: !!ok, ...extra });
+  const shot = async (name) => {
+    try {
+      fs.writeFileSync(path.join(dir, name), (await library.webContents.capturePage()).toPNG());
+    } catch {}
+  };
   try {
-    for (let i = 0; i < 200 && engine.state !== "ready"; i++) await wait(100);
-    step("engine ready", engine.state === "ready", { url: engine.url, error: engine.error });
-    for (let i = 0; i < 600 && engine.model.state !== "ready"; i++) await wait(100);
-    step("model ready", engine.model.state === "ready");
+    for (let i = 0; i < 300 && engine.state !== "ready"; i++) await wait(100);
+    step("engine ready", engine.state === "ready", { error: engine.error || undefined });
+    for (let i = 0; i < 1200 && engine.model.state !== "ready"; i++) await wait(100);
+    step("model ready", engine.model.state === "ready", { error: engine.model.error || undefined });
     const auth = { Authorization: `Bearer ${engine.token}` };
-    step("rejects requests without the launch secret", (await fetch(`${engine.url}/api/videos`)).status === 401);
-    step("health", (await (await fetch(`${engine.url}/api/health`, { headers: auth })).json()).ok === true);
+    const api = (p, init = {}) => fetch(`${engine.url}${p}`, { ...init, headers: { ...auth, ...(init.headers ?? {}) } });
 
-    // Same path as a real recording: the raw file goes through upload() into the local library.
+    // Security boundaries.
+    step("rejects requests without the launch secret", (await fetch(`${engine.url}/api/videos`)).status === 401);
+    step("rejects a wrong secret", (await fetch(`${engine.url}/api/videos`, { headers: { Authorization: "Bearer x" } })).status === 401);
+    step("no account endpoints in local mode", (await api("/api/auth/signup", { method: "POST", body: "{}" })).status === 404);
+    const redirect = await fetch(`${engine.url}/__local?token=${engine.token}&next=${encodeURIComponent("/\\evil.example")}`, { redirect: "manual" });
+    step("bootstrap can't redirect off-site", !(redirect.headers.get("location") ?? "").includes("evil"));
+    step("health", (await (await api("/api/health")).json()).ok === true);
+
+    // The real recording path: raw file → upload() → local library → processing.
     const raw = path.join(libraryDir(), "selftest.webm");
     fs.copyFileSync(sample, raw);
-    session.opts = { server: "", title: "Self test" };
+    session.opts = { server: "", title: "Self test ✓ ünïcode" };
     await upload(raw);
-    step("upload into local library", session.phase === "idle", { error: session.error });
+    step("upload into local library", session.phase === "idle", { error: session.error || undefined });
     step("raw recording cleaned up", !fs.existsSync(raw));
-
-    const list = await (await fetch(`${engine.url}/api/videos`, { headers: auth })).json();
-    const video = list.find((v) => v.title === "Self test");
-    let meta;
-    for (let i = 0; i < 120; i++) {
-      meta = (await (await fetch(`${engine.url}/api/videos/${video.id}`, { headers: auth })).json()).meta;
-      if (meta.status === "ready" || meta.status === "error") break;
-      await wait(1000);
-    }
-    const detail = await (await fetch(`${engine.url}/api/videos/${video.id}`, { headers: auth })).json();
-    step("processed", meta.status === "ready", { error: meta.error, words: detail.transcript?.words?.length });
+    const list = await (await api("/api/videos")).json();
+    const video = list.find((v) => v.title === "Self test ✓ ünïcode");
+    step("title preserved (unicode)", !!video);
+    const until = async (pred, secs) => {
+      let d;
+      for (let i = 0; i < secs; i++) {
+        d = await (await api(`/api/videos/${video.id}`)).json();
+        if (pred(d.meta)) break;
+        await wait(1000);
+      }
+      return d;
+    };
+    const detail = await until((m) => m.status === "ready" || m.status === "error", 300);
+    step("processed + transcribed", detail.meta.status === "ready" && detail.transcript?.words?.length > 0, { error: detail.meta.error, words: detail.transcript?.words?.length });
     report.transcript = detail.transcript?.words?.map((w) => w.text).join(" ");
+    step("thumbnail", (await api(`/api/videos/${video.id}/thumb`)).headers.get("content-type") === "image/jpeg");
+    const range = await api(`/api/videos/${video.id}/media`, { headers: { Range: "bytes=0-1023" } });
+    step("seekable video (HTTP range)", range.status === 206);
+    step("captions", (await (await api(`/api/videos/${video.id}/captions`)).text()).startsWith("WEBVTT"));
 
-    await wait(2500); // library window navigated to the video in upload()
-    fs.writeFileSync(path.join(dir, "library-video.png"), (await library.webContents.capturePage()).toPNG());
+    // Clean-up render (second ffmpeg pass with a filter-graph file; exercises paths with spaces on Windows).
+    const clean = await api(`/api/videos/${video.id}/clean`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fillers: true, silences: true, minSilence: 0.4 }) });
+    if (clean.status === 202) {
+      const after = await until((m) => m.clean.status === "ready" || m.clean.status === "error", 300);
+      step("clean cut rendered", after.meta.clean.status === "ready", { error: after.meta.clean.error });
+      step("clean cut playable", (await api(`/api/videos/${video.id}/media?v=clean`, { headers: { Range: "bytes=0-1023" } })).status === 206);
+    } else {
+      step("clean cut rendered", clean.status === 400, { note: "nothing to cut in this sample", status: clean.status });
+    }
+    const dl = await api(`/api/videos/${video.id}/media?download`, { method: "HEAD" });
+    step("export named after the title", /Self%20test/.test(dl.headers.get("content-disposition") ?? ""));
+
+    await wait(500);
+    openLibrary(`/v/${video.id}`);
+    await wait(3000);
+    await shot("library-video.png");
     openLibrary("/");
     await wait(2500);
-    fs.writeFileSync(path.join(dir, "library-home.png"), (await library.webContents.capturePage()).toPNG());
-    openLibrary("/settings");
-    await wait(2000);
-    fs.writeFileSync(path.join(dir, "library-settings.png"), (await library.webContents.capturePage()).toPNG());
+    await shot("library-home.png");
+
+    // Crash recovery: an orphaned raw recording is imported on the next start.
+    const orphan = path.join(libraryDir(), "Recap 2026-01-01-00-00-00.webm");
+    fs.copyFileSync(sample, orphan);
+    session.localStorage = true;
+    await recoverLeftovers();
+    const recovered = (await (await api("/api/videos")).json()).find((v) => v.title.startsWith("Recovered recording"));
+    step("orphaned recording recovered", !!recovered && !fs.existsSync(orphan));
+
+    // Deleting removes it everywhere.
+    for (const v of await (await api("/api/videos")).json()) await api(`/api/videos/${v.id}`, { method: "DELETE" });
+    step("delete", (await (await api("/api/videos")).json()).length === 0);
   } catch (err) {
     step("exception", false, { error: String(err?.stack ?? err) });
   }
+  report.passed = report.steps.every((s) => s.ok);
   fs.writeFileSync(path.join(dir, "report.json"), JSON.stringify(report, null, 2));
   quitting = true;
   app.quit();
@@ -504,9 +650,31 @@ async function snapshot(dir) {
   app.quit();
 }
 
-app.on("before-quit", () => {
+// Quitting mid-recording or mid-save would lose (or orphan) the video: ask first.
+app.on("before-quit", (e) => {
+  const busy = ["countdown", "recording", "paused", "finishing", "uploading"].includes(session.phase);
+  if (busy && !session.quitAfterSave && !process.env.RECAP_SELFTEST) {
+    e.preventDefault();
+    const choice = dialog.showMessageBoxSync({
+      type: "warning",
+      buttons: ["Stop, save and quit", "Keep recording", "Quit without saving"],
+      defaultId: 0,
+      cancelId: 1,
+      message: session.phase === "finishing" || session.phase === "uploading" ? "Recap is still saving your recording." : "Recap is recording.",
+      detail: "Quitting now would lose this recording.",
+    });
+    if (choice === 1) return;
+    if (choice === 0) {
+      session.quitAfterSave = true;
+      if (["recording", "paused"].includes(session.phase)) panel?.webContents.send("control", "stop");
+      else if (session.phase === "countdown") discard();
+      return; // quits when the save finishes (see setPhase)
+    }
+  }
   quitting = true;
   engine.stop();
 });
+
+app.on("activate", () => (engine.state === "ready" ? openLibrary() : panel?.show()));
 app.on("will-quit", () => globalShortcut.unregisterAll());
 app.on("window-all-closed", (e) => e.preventDefault());

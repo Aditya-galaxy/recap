@@ -35,6 +35,9 @@ const SECURITY_HEADERS = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
 };
 
+// Strip control characters (keeps newlines/tabs in messages) so stored text can't carry terminal escapes.
+const clean = (v, max) => String(v ?? "").replace(/[\x00-\x08\x0b-\x1f\x7f\u202a-\u202e\u2066-\u2069]/g, "").slice(0, max);
+
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
 
 // Per-instance fixed-window limiter; good enough to stop casual abuse of a signup form.
@@ -86,9 +89,9 @@ async function subscribe(req, res) {
   const doc = {
     email,
     interest: ["desktop", "hosted", "selfhost"].includes(body.interest) ? body.interest : "desktop",
-    source: String(body.source ?? "").slice(0, 80) || undefined,
-    referrer: String(req.headers.referer ?? "").slice(0, 300) || undefined,
-    userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300) || undefined,
+    source: clean(body.source, 80) || undefined,
+    referrer: clean(req.headers.referer, 300) || undefined,
+    userAgent: clean(req.headers["user-agent"], 300) || undefined,
     lastSeenAt: FieldValue.serverTimestamp(),
     signups: FieldValue.increment(1),
   };
@@ -134,12 +137,12 @@ async function feedback(req, res) {
   if (email && (email.length > 254 || !EMAIL_RE.test(email))) return reply(400, { error: "That email doesn't look right (it's optional)." });
 
   const doc = {
-    message: message.slice(0, 4000),
+    message: clean(message, 4000),
     kind: KINDS.includes(body.kind) ? body.kind : "other",
     email: email || undefined,
     where: ["site", "web", "desktop", "mac"].includes(body.where) ? body.where : "site",
-    version: String(body.version ?? "").slice(0, 40) || undefined,
-    page: String(body.page ?? "").slice(0, 200) || undefined,
+    version: clean(body.version, 40) || undefined,
+    page: clean(body.page, 200) || undefined,
     userAgent: String(req.headers["user-agent"] ?? "").slice(0, 300) || undefined,
     createdAt: FieldValue.serverTimestamp(),
   };

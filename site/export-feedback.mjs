@@ -4,7 +4,8 @@ import { execSync } from "node:child_process";
 
 const token = execSync("gcloud auth print-access-token", { encoding: "utf8" }).trim();
 const base = `https://firestore.googleapis.com/v1/projects/${process.env.PROJECT ?? "kronagent"}/databases/${process.env.FIRESTORE_DATABASE ?? "recap"}/documents/feedback`;
-const v = (f) => f?.stringValue ?? f?.timestampValue ?? "";
+// Printed to your terminal: drop control characters so a message can't inject escape sequences.
+const v = (f) => String(f?.stringValue ?? f?.timestampValue ?? "").replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "");
 
 const items = [];
 let pageToken = "";

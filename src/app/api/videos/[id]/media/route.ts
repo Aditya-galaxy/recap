@@ -24,7 +24,12 @@ export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/medi
     "Accept-Ranges": "bytes",
     "Cache-Control": "private, no-cache",
   };
-  if (url.searchParams.has("download")) headers["Content-Disposition"] = `attachment; filename="${id}${clean ? "-clean" : ""}.mp4"`;
+  if (url.searchParams.has("download")) {
+    // Name the export after the video ("Launch update (clean).mp4"), with an ASCII fallback for old clients.
+    const name = `${meta.title.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").trim().slice(0, 120) || id}${clean ? " (clean)" : ""}.mp4`;
+    const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
+    headers["Content-Disposition"] = `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
+  }
 
   const range = req.headers.get("range")?.match(/bytes=(\d*)-(\d*)/);
   if (!range) {

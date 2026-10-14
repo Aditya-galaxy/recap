@@ -1,7 +1,7 @@
 {
   "name": "recap-desktop",
   "productName": "Recap",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Recap screen recorder for Windows and Linux",
   "author": "Aditya",
   "homepage": "https://github.com/Aditya-galaxy/recap",
@@ -93,7 +93,15 @@
         "to": "THIRD_PARTY.md"
       }
     ],
-    "afterPack": "scripts/after-pack.cjs"
+    "afterPack": "scripts/after-pack.cjs",
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "enableCookieEncryption": true
+    }
   },
   "devDependencies": {
     "electron": "^44.7.2",

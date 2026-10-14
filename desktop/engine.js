@@ -50,6 +50,8 @@ class Engine extends EventEmitter {
   }
 
   get dataDir() {
+    // The self-test gets its own throwaway library; it must never touch a real one.
+    if (process.env.RECAP_SELFTEST) return path.join(process.env.RECAP_SELFTEST, "library");
     return path.join(app.getPath("videos"), "Recap", "library");
   }
 
@@ -102,6 +104,9 @@ class Engine extends EventEmitter {
         FFMPEG_BIN: bin("ffmpeg"),
         WHISPER_BIN: bin("whisper-cli"),
         WHISPER_MODEL: this.modelPath,
+        // Local library: no upload cap (a 2-hour 1080p recording is ~7 GB).
+        MAX_UPLOAD_MB: "1000000",
+        FEEDBACK_URL: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",
       },
     });
     this.proc.stdout?.pipe(log);

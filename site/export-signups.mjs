@@ -8,7 +8,12 @@ const token = execSync("gcloud auth print-access-token", { encoding: "utf8" }).t
 const base = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/${DATABASE}/documents/signups`;
 
 const val = (f) => f?.stringValue ?? f?.timestampValue ?? f?.integerValue ?? "";
-const csv = (s) => (/[",\n]/.test(s) ? `"${String(s).replaceAll('"', '""')}"` : s);
+// Neutralize spreadsheet formulas (=, +, -, @ …) and quote anything with separators.
+const csv = (v) => {
+  let s = String(v ?? "").replace(/[\x00-\x1f\x7f]/g, " ");
+  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+};
 
 const rows = [];
 let pageToken = "";

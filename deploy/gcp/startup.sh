@@ -1,7 +1,7 @@
 #!/bin/bash
 # Recap on a Compute Engine VM: Docker + Recap + Caddy (automatic HTTPS).
 # Runs on every boot; idempotent. Configuration comes from instance metadata:
-#   recap-domain       e.g. 35-200-238-141.sslip.io or recap.example.com
+#   recap-domain       e.g. recap.example.com; several, comma-separated, are all served (the first is canonical)
 #   recap-image        e.g. ghcr.io/aditya-galaxy/recap:v0.2.0
 #   recap-setup-code   one-time code required to create the first (admin) account
 set -euo pipefail
@@ -9,7 +9,9 @@ exec > >(tee -a /var/log/recap-startup.log) 2>&1
 echo "== recap startup $(date -Is)"
 
 meta() { curl -fsS -H "Metadata-Flavor: Google" "http://metadata.google.internal/computeMetadata/v1/instance/attributes/$1" || true; }
-DOMAIN=$(meta recap-domain)
+DOMAIN=$(meta recap-domain | tr -d ' ')
+PRIMARY=${DOMAIN%%,*}
+SITES=${DOMAIN//,/, }   # Caddy site-address list: "a.com, b.com"
 IMAGE=$(meta recap-image)
 SETUP_CODE=$(meta recap-setup-code)
 
@@ -34,6 +36,8 @@ mkdir -p /opt/recap && cd /opt/recap
 umask 077
 cat > .env <<EOF
 DOMAIN=${DOMAIN}
+PRIMARY=${PRIMARY}
+SITES=${SITES}
 IMAGE=${IMAGE}
 SETUP_CODE=${SETUP_CODE}
 EOF
@@ -57,7 +61,7 @@ services:
     image: ${IMAGE}
     restart: unless-stopped
     environment:
-      PUBLIC_URL: https://${DOMAIN}
+      PUBLIC_URL: https://${PRIMARY}
       ALLOW_SIGNUP: "false"
       SETUP_CODE: ${SETUP_CODE}
       MAX_UPLOAD_MB: "4096"
@@ -69,7 +73,7 @@ services:
     restart: unless-stopped
     ports: ["80:80", "443:443", "443:443/udp"]
     environment:
-      DOMAIN: ${DOMAIN}
+      DOMAIN: ${SITES}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
@@ -85,4 +89,4 @@ EOF
 until docker compose pull; do echo "image not available yet, retrying in 30s"; sleep 30; done
 docker compose up -d
 docker image prune -f
-echo "== recap up at https://${DOMAIN}"
+echo "== recap up at https://${PRIMARY}"

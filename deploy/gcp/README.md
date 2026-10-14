@@ -24,9 +24,10 @@ gcloud compute disks add-resource-policies recap-1 --project $P --zone $Z --reso
 Then open `https://<ip-with-dashes>.sslip.io` and create the admin account with the setup code
 (`gcloud compute instances describe recap-1 --zone $Z --format='value(metadata.items.recap-setup-code)'`).
 
-**Custom domain:** point an A record at the IP, then
-`gcloud compute instances add-metadata recap-1 --zone $Z --metadata recap-domain=recap.example.com`
-and reboot (or re-run the startup script).
+**Custom domain:** point an A record at the IP, then set the domain (several can be comma-separated; the
+first is the canonical share-link address) and restart:
+`gcloud compute instances add-metadata recap-1 --zone $Z --metadata recap-domain=recap.example.com,<ip-with-dashes>.sslip.io`
+then `gcloud compute instances stop recap-1 --zone $Z && gcloud compute instances start recap-1 --zone $Z`.
 
 **Upgrade:** set `recap-image` to the new tag and reboot, or SSH in and
 `cd /opt/recap && sudo docker compose pull && sudo docker compose up -d`.

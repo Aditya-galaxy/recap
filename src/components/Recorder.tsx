@@ -177,7 +177,7 @@ export default function Recorder() {
     try {
       if (mode !== "cam") {
         display = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: FPS, width: { ideal: MAX_WIDTH } },
+          video: { frameRate: FPS, width: { ideal: MAX_WIDTH }, height: { ideal: 1080 } },
           audio: true,
           // Chrome-specific hints: hide this tab from the picker, offer system/tab audio.
           selfBrowserSurface: "exclude",
@@ -210,10 +210,20 @@ export default function Recorder() {
 
     let W = 1280;
     let H = 720;
-    if (display) {
+    if (display && displayEl) {
+      // Size the canvas from real frames. Right after getDisplayMedia, Chrome's track settings can
+      // still report a placeholder (e.g. 640x360), which would lock the whole recording to it.
+      if (!displayEl.videoWidth) {
+        await new Promise<void>((resolve) => {
+          const done = () => resolve();
+          displayEl.addEventListener("resize", done, { once: true });
+          displayEl.addEventListener("loadedmetadata", done, { once: true });
+          setTimeout(done, 2000);
+        });
+      }
       const st = display.getVideoTracks()[0].getSettings();
-      const sw = st.width ?? 1920;
-      const sh = st.height ?? 1080;
+      const sw = displayEl.videoWidth || st.width || 1920;
+      const sh = displayEl.videoHeight || st.height || 1080;
       const scale = Math.min(1, MAX_WIDTH / sw);
       W = Math.round((sw * scale) / 2) * 2;
       H = Math.round((sh * scale) / 2) * 2;

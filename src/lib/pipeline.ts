@@ -76,7 +76,8 @@ async function transcribe(id: string, wav: string): Promise<Word[]> {
   for (const seg of j.transcription ?? []) {
     for (const tok of seg.tokens ?? []) {
       const text: string = tok.text ?? "";
-      if (/^\s*\[_[^\]]*\]$/.test(text) || !text) continue; // [_BEG_], [_TT_123] timing tokens
+      // Special tokens: [_BEG_], [_TT_123] timing markers and <|endoftext|>-style control tokens.
+      if (!text || /^\s*\[_[^\]]*\]$/.test(text) || /^\s*<\|[^|]*\|>\s*$/.test(text)) continue;
       const from = tok.offsets.from / 1000;
       const to = tok.offsets.to / 1000;
       if (/^\s/.test(text) || !cur) {

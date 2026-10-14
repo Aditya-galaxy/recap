@@ -91,7 +91,11 @@ export async function listVideos(ownerId: string): Promise<VideoMeta[]> {
 
 export async function readTranscript(id: string): Promise<Transcript | null> {
   try {
-    return JSON.parse(await fs.readFile(file(id, "transcript.json"), "utf8"));
+    const t: Transcript = JSON.parse(await fs.readFile(file(id, "transcript.json"), "utf8"));
+    // Transcripts made by v0.2.0 could carry Whisper control tokens like <|endoftext|>.
+    for (const w of t.words) w.text = w.text.replace(/<\|[^|]*\|>/g, "");
+    t.words = t.words.filter((w) => w.text.trim());
+    return t;
   } catch {
     return null;
   }

@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Recap
 
-## Getting Started
+A local-first, Loom-style screen recorder with AI clean-up. Original implementation; no code from Loom.
 
-First, run the development server:
+- **Record** screen, window or tab with a draggable webcam bubble, mic and tab audio, pause/resume.
+  "Pop out" floats the camera and controls above every app (Chrome Document Picture-in-Picture).
+- **Share** each video at `/v/<id>`, with a range-seekable player, captions, and a click-to-seek transcript.
+- **Clean up** filler words (um/uh, and optionally comma-delimited "like," / "you know,") and long pauses.
+  You get a live estimate and an in-player preview before rendering a cleaned cut. The original is kept.
+
+## Requirements
 
 ```bash
+brew install ffmpeg whisper-cpp
+mkdir -p models && curl -L -o models/ggml-base.en.bin \
+  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Override with `WHISPER_BIN` / `WHISPER_MODEL` (for example `ggml-small.en.bin` for better accuracy).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Step | Where |
+| --- | --- |
+| Canvas compositing (worker-timed so it keeps drawing in a background tab) → `MediaRecorder` → raw upload | `src/components/Recorder.tsx` |
+| Transcode to CFR H.264 → thumbnail → whisper.cpp token timestamps → ffmpeg `silencedetect` | `src/lib/pipeline.ts` |
+| Filler tagging, snapping words to silences, cut/keep ranges, timeline remapping | `src/lib/cuts.ts` |
+| WebVTT for the original and cleaned timelines | `src/lib/captions.ts` |
+| Storage: `data/videos/<id>/{meta.json, video.mp4, clean.mp4, transcript.json, thumb.jpg}` | `src/lib/store.ts` |
 
-## Learn More
+Notes:
+- whisper.cpp runs with `-nfa`. Its default flash attention skews token timestamps around pauses badly.
+- Whisper is primed with a prompt full of disfluencies; otherwise it drops "um" and "uh" from the transcript.
+- No auth. Anyone who can reach the server can view and delete videos. Add auth before exposing it.
 
-To learn more about Next.js, take a look at the following resources:
+## Mac app (`mac/`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+A native menu-bar recorder (Swift, ScreenCaptureKit, macOS 15+). It uploads to the same server.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+cd mac && ./build.sh            # → mac/build/Recap.app
+./build.sh --install            # also copies to /Applications
+```
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The camera bubble is a real floating window. Drag it anywhere and it's captured where it sits.
+- The control bar (timer, pause, stop, discard) floats too, but is excluded from the recording.
+- ⌥⌘R starts or stops from any app. System audio and mic are recorded as separate tracks and mixed server-side.
+- Every recording is also saved to `~/Movies/Recap`. If an upload fails, use "retry upload" in the menu.
+- The server URL (default `http://localhost:3217`) can be changed under "server" in the menu.
+- The app is ad-hoc signed, so after a rebuild macOS may ask you to re-enable Screen Recording for it.

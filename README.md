@@ -45,7 +45,7 @@ Download from [Releases](https://github.com/Aditya-galaxy/recap/releases/latest)
 | OS | File | First launch |
 | --- | --- | --- |
 | macOS 15+ | `Recap-macOS.zip` | The app isn't notarized: unzip, move it to Applications, then run `xattr -dr com.apple.quarantine /Applications/Recap.app`, or use System Settings → Privacy & Security → "Open Anyway". Grant Screen Recording, then reopen the app. |
-| Windows 10/11 | `Recap Setup 0.1.0.exe` or the portable `.exe` | It isn't code-signed: on the SmartScreen prompt choose "More info" → "Run anyway". |
+| Windows 10/11 | `Recap.Setup.0.1.0.exe` (installer) or `Recap.0.1.0.exe` (portable) | It isn't code-signed: on the SmartScreen prompt choose "More info" → "Run anyway". |
 | Linux | `.AppImage` or `.deb` | `chmod +x Recap-*.AppImage && ./Recap-*.AppImage` |
 
 All apps upload to `http://localhost:3217` by default. Change this under **server** in the app.

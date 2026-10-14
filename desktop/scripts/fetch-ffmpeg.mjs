@@ -39,8 +39,10 @@ if (got !== src.sha256) throw new Error(`checksum mismatch for ${src.url}\n  exp
 const tmp = mkdtempSync(path.join(os.tmpdir(), "recap-ffmpeg-"));
 const archive = path.join(tmp, path.basename(new URL(src.url).pathname));
 writeFileSync(archive, buf);
-// bsdtar (macOS, Windows 10+) and GNU tar both handle these archives.
-execFileSync("tar", ["-xf", archive, "-C", tmp], { stdio: "inherit" });
+// bsdtar (macOS, Windows 10+) and GNU tar both handle these archives. On Windows, name the system
+// bsdtar explicitly: under Git Bash, "tar" is GNU tar, which reads "C:" as a remote host and can't unzip.
+const tar = process.platform === "win32" ? path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe") : "tar";
+execFileSync(tar, ["-xf", archive, "-C", tmp], { stdio: "inherit" });
 
 const find = (dir) => {
   for (const e of readdirSync(dir, { withFileTypes: true })) {

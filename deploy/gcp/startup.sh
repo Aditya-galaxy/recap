@@ -4,6 +4,11 @@
 #   recap-domain       e.g. recap.example.com; several, comma-separated, are all served (the first is canonical)
 #   recap-image        e.g. ghcr.io/aditya-galaxy/recap:v0.2.0
 #   recap-setup-code   one-time code required to create the first (admin) account
+#   recap-mode         "cloud" runs Recap Cloud: open sign-up with email confirmation, founding plan, no server-side
+#                      whisper (the desktop app uploads transcripts). Optional extras for cloud mode:
+#   recap-contact      contact email shown on the Terms/Privacy pages
+#   recap-resend-secret  Secret Manager secret (in this project) holding the Resend API key; read at boot with the
+#                      VM's service account, so the key never sits in metadata
 set -euo pipefail
 exec > >(tee -a /var/log/recap-startup.log) 2>&1
 echo "== recap startup $(date -Is)"
@@ -14,8 +19,22 @@ PRIMARY=${DOMAIN%%,*}
 SITES=${DOMAIN//,/, }   # Caddy site-address list: "a.com, b.com"
 IMAGE=$(meta recap-image)
 SETUP_CODE=$(meta recap-setup-code)
+MODE=$(meta recap-mode)
+CONTACT=$(meta recap-contact)
+RESEND_SECRET=$(meta recap-resend-secret)
 
-# 2 GB swap: whisper + ffmpeg on a 2 GB VM can spike past RAM on long videos.
+secret() { # latest version of a Secret Manager secret in this project
+  local project token
+  project=$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/project/project-id)
+  token=$(curl -fsS -H "Metadata-Flavor: Google" http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token | sed -nE 's/.*"access_token":"([^"]+)".*/\1/p')
+  curl -fsS -H "Authorization: Bearer $token" "https://secretmanager.googleapis.com/v1/projects/$project/secrets/$1/versions/latest:access" |
+    sed -nE 's/.*"data": *"([^"]+)".*/\1/p' | base64 -d
+}
+RESEND_API_KEY=""
+if [ -n "$RESEND_SECRET" ]; then RESEND_API_KEY=$(secret "$RESEND_SECRET") || echo "warning: couldn't read secret $RESEND_SECRET; emails will only be logged"; fi
+if [ "$MODE" = cloud ]; then CLOUD=true; TRANSCRIBE=false; SIGNUP=true; else CLOUD=false; TRANSCRIBE=true; SIGNUP=false; fi
+
+# 2 GB swap: whisper + ffmpeg can spike past RAM on long videos (and an e2-micro only has 1 GB).
 if [ ! -f /swapfile ]; then
   fallocate -l 2G /swapfile && chmod 600 /swapfile && mkswap /swapfile && swapon /swapfile
   echo '/swapfile none swap sw 0 0' >> /etc/fstab
@@ -40,6 +59,11 @@ PRIMARY=${PRIMARY}
 SITES=${SITES}
 IMAGE=${IMAGE}
 SETUP_CODE=${SETUP_CODE}
+CLOUD=${CLOUD}
+TRANSCRIBE=${TRANSCRIBE}
+SIGNUP=${SIGNUP}
+CONTACT=${CONTACT}
+RESEND_API_KEY=${RESEND_API_KEY}
 EOF
 
 cat > Caddyfile <<'EOF'
@@ -62,10 +86,16 @@ services:
     restart: unless-stopped
     environment:
       PUBLIC_URL: https://${PRIMARY}
-      ALLOW_SIGNUP: "false"
+      ALLOW_SIGNUP: ${SIGNUP}
       SETUP_CODE: ${SETUP_CODE}
       MAX_UPLOAD_MB: "4096"
       WHISPER_MODEL_NAME: base.en
+      CLOUD_MODE: ${CLOUD}
+      SERVER_TRANSCRIBE: ${TRANSCRIBE}
+      CONTACT_EMAIL: ${CONTACT}
+      RESEND_API_KEY: ${RESEND_API_KEY}
+      # Caddy replaces client-sent X-Forwarded-For with the address it saw, so the last hop is the client.
+      TRUSTED_PROXY_HOPS: "1"
     volumes:
       - recap-data:/data
   caddy:

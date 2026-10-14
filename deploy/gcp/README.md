@@ -33,3 +33,30 @@ then `gcloud compute instances stop recap-1 --zone $Z && gcloud compute instance
 `cd /opt/recap && sudo docker compose pull && sudo docker compose up -d`.
 
 **Logs:** `sudo tail -f /var/log/recap-startup.log` and `cd /opt/recap && sudo docker compose logs -f`.
+
+## Recap Cloud on the free tier (e2-micro)
+
+Recap Cloud (open sign-up with email confirmation, founding plan, comments and insights) runs on Google's
+always-free `e2-micro` (us-west1, us-central1 or us-east1, 30 GB **standard** disk). The server doesn't run
+whisper there: the desktop app uploads each shared video with the transcript it made on the user's machine.
+Free tier covers the VM and disk; the external IP and outbound traffic past 1 GB/month are billed, so
+set a budget alert.
+
+```bash
+P=your-project; R=us-central1; Z=us-central1-a
+gcloud iam service-accounts create recap-vm --project $P --display-name "Recap VM"
+SA=recap-vm@$P.iam.gserviceaccount.com
+gcloud secrets add-iam-policy-binding recap-resend-api-key --project $P \
+  --member serviceAccount:$SA --role roles/secretmanager.secretAccessor
+gcloud compute addresses create recap-cloud-ip --project $P --region $R
+IP=$(gcloud compute addresses describe recap-cloud-ip --project $P --region $R --format='value(address)')
+gcloud compute instances create recap-cloud --project $P --zone $Z --machine-type e2-micro \
+  --image-family debian-12 --image-project debian-cloud --boot-disk-size 30GB --boot-disk-type pd-standard \
+  --address $IP --tags recap-web --labels app=recap --shielded-secure-boot \
+  --service-account $SA --scopes cloud-platform \
+  --metadata-from-file startup-script=startup.sh \
+  --metadata recap-mode=cloud,recap-domain=app.example.com,recap-image=ghcr.io/aditya-galaxy/recap:edge,recap-contact=you@example.com,recap-resend-secret=recap-resend-api-key,recap-setup-code=$(openssl rand -hex 8)
+```
+
+Point an A record for the domain at `$IP`; Caddy gets the certificate on first request. Create the operator
+(admin) account first with the setup code, then sign-up opens for everyone. Reported videos land at `/admin`.

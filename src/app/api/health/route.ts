@@ -14,7 +14,13 @@ export async function GET() {
   } catch {
     dbOk = false;
   }
-  if (!cached || Date.now() - cached.at > 60_000) cached = { at: Date.now(), tools: await toolchain() };
+  // Cache only a fully healthy toolchain: a missing model (e.g. still downloading on first launch)
+  // must show up as fixed the moment it lands, not a minute later.
+  if (!cached || Date.now() - cached.at > 60_000) {
+    const tools = await toolchain();
+    cached = tools.ffmpeg && tools.whisper && tools.model ? { at: Date.now(), tools } : null;
+    if (!cached) return Response.json({ ok: false, db: dbOk, ...tools, queue: dbOk ? queueDepth() : null, version: process.env.RECAP_VERSION ?? process.env.npm_package_version ?? null }, { status: 503 });
+  }
   const ok = dbOk && cached.tools.ffmpeg && cached.tools.whisper && cached.tools.model;
   return Response.json(
     { ok, db: dbOk, ...cached.tools, queue: dbOk ? queueDepth() : null, version: process.env.RECAP_VERSION ?? process.env.npm_package_version ?? null },

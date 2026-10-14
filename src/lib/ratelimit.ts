@@ -5,9 +5,17 @@ import { headers } from "next/headers";
 const g = globalThis as unknown as { __recapRate?: Map<string, { count: number; reset: number }> };
 const buckets = (g.__recapRate ??= new Map());
 
+/**
+ * The client's address for rate limiting. Proxies (Caddy, Cloud Run, nginx) append the address they saw
+ * as the LAST X-Forwarded-For entry; anything before it is client-supplied and spoofable (trusting the
+ * first entry let anyone bypass every limit). TRUSTED_PROXY_HOPS=N picks the Nth-from-last when several
+ * proxies are chained.
+ */
 export async function clientIp() {
   const h = await headers();
-  return h.get("x-forwarded-for")?.split(",")[0].trim() || h.get("x-real-ip") || "local";
+  const hops = (h.get("x-forwarded-for") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const n = Math.max(1, Number(process.env.TRUSTED_PROXY_HOPS) || 1);
+  return hops.at(-n) ?? hops[0] ?? h.get("x-real-ip") ?? "local";
 }
 
 /** Returns a 429 Response when `key` has exceeded `limit` hits per `windowMs`, else null. */

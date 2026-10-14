@@ -40,6 +40,13 @@ const clean = (v, max) => String(v ?? "").replace(/[\x00-\x08\x0b-\x1f\x7f\u202a
 
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,190}\.[^\s@]{2,63}$/;
 
+// The client's address as seen by Google's front end, which appends it as the LAST X-Forwarded-For entry.
+// Earlier entries are whatever the client sent, so trusting the first one let anyone dodge rate limits.
+const clientIp = (req) => {
+  const hops = String(req.headers["x-forwarded-for"] ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  return hops.at(-1) || req.socket.remoteAddress || "?";
+};
+
 // Per-instance fixed-window limiter; good enough to stop casual abuse of a signup form.
 const hits = new Map();
 function limited(ip, limit = 5, windowMs = 10 * 60_000) {
@@ -71,7 +78,7 @@ async function readBody(req, max = 4096) {
 }
 
 async function subscribe(req, res) {
-  const ip = (req.headers["x-forwarded-for"] ?? "").toString().split(",")[0].trim() || req.socket.remoteAddress || "?";
+  const ip = clientIp(req);
   if (limited(ip)) return json(res, 429, { error: "Too many attempts. Try again in a few minutes." });
 
   let body;
@@ -121,7 +128,7 @@ const KINDS = ["bug", "idea", "praise", "other"];
 
 async function feedback(req, res) {
   const reply = (status, obj) => send(res, status, JSON.stringify(obj), { "Content-Type": "application/json", "Cache-Control": "no-store", ...CORS });
-  const ip = (req.headers["x-forwarded-for"] ?? "").toString().split(",")[0].trim() || req.socket.remoteAddress || "?";
+  const ip = clientIp(req);
   if (limited(`fb:${ip}`, 8, 60 * 60_000)) return reply(429, { error: "Too much feedback from here for now. Try again later." });
 
   let body;

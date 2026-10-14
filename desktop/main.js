@@ -10,9 +10,12 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, desktopCapturer, screen, global
 const fs = require("node:fs");
 const path = require("node:path");
 const { Readable } = require("node:stream");
-const { engine } = require("./engine");
+const { engine, bin } = require("./engine");
 
 const HOTKEY = "CommandOrControl+Alt+R";
+// Startup milestones (ms since launch), reported by the self-test.
+const T0 = Date.now();
+const milestones = {};
 const isWin = process.platform === "win32";
 const isLinux = process.platform === "linux";
 
@@ -123,6 +126,7 @@ function openLibrary(pathname = "/") {
     webPreferences: { preload: path.join(__dirname, "library-preload.js"), contextIsolation: true, sandbox: true },
   });
   library.loadURL(url);
+  library.webContents.once("did-finish-load", () => (milestones.libraryLoaded ??= Date.now() - T0));
   // Links that leave the engine (e.g. GitHub) open in the user's browser.
   library.webContents.setWindowOpenHandler(({ url: target }) => {
     if (/^https?:\/\//.test(target) && !target.startsWith(engine.url)) shell.openExternal(target);
@@ -516,6 +520,7 @@ app.whenReady().then(() => {
   engine.on("status", broadcast);
   engine.ensureModel();
   engine.start().then(() => {
+    milestones.engineReady = Date.now() - T0;
     if (engine.state === "ready" && !process.env.RECAP_SNAPSHOT && !process.env.RECAP_SELFTEST) openLibrary();
     else if (engine.state !== "ready") panel.show();
     if (!process.env.RECAP_SELFTEST) setTimeout(recoverLeftovers, 2000);
@@ -548,6 +553,10 @@ async function selftest(dir, sample) {
   try {
     for (let i = 0; i < 300 && engine.state !== "ready"; i++) await wait(100);
     step("engine ready", engine.state === "ready", { error: engine.error || undefined });
+    // Like a normal launch: open the library as soon as the engine is up, to time a cold start.
+    openLibrary("/");
+    for (let i = 0; i < 200 && milestones.libraryLoaded === undefined; i++) await wait(50);
+    step("cold start: library loaded < 10 s", (milestones.libraryLoaded ?? Infinity) < 10_000, { ms: milestones.libraryLoaded });
     for (let i = 0; i < 1200 && engine.model.state !== "ready"; i++) await wait(100);
     step("model ready", engine.model.state === "ready", { error: engine.model.error || undefined });
     const auth = { Authorization: `Bearer ${engine.token}` };
@@ -581,6 +590,22 @@ async function selftest(dir, sample) {
       return d;
     };
     const detail = await until((m) => m.status === "ready" || m.status === "error", 300);
+    // Regression guard: v0.3.0/0.3.1 silently truncated uploads over 10 MB. The stored video must be as
+    // long as the recording that went in.
+    const srcDuration = await new Promise((resolve) => {
+      const p = require("node:child_process").spawn(bin("ffmpeg"), ["-hide_banner", "-i", sample]);
+      let err = "";
+      p.stderr.on("data", (d) => (err += d));
+      p.on("close", () => {
+        const m = err.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
+        resolve(m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0);
+      });
+    });
+    step("upload not truncated (duration matches source)", srcDuration > 0 && Math.abs((detail.meta.duration ?? 0) - srcDuration) < 1, {
+      source: srcDuration,
+      stored: detail.meta.duration,
+      bytes: fs.statSync(sample).size,
+    });
     step("processed + transcribed", detail.meta.status === "ready" && detail.transcript?.words?.length > 0, { error: detail.meta.error, words: detail.transcript?.words?.length });
     report.transcript = detail.transcript?.words?.map((w) => w.text).join(" ");
     step("thumbnail", (await api(`/api/videos/${video.id}/thumb`)).headers.get("content-type") === "image/jpeg");
@@ -595,7 +620,9 @@ async function selftest(dir, sample) {
       step("clean cut rendered", after.meta.clean.status === "ready", { error: after.meta.clean.error });
       step("clean cut playable", (await api(`/api/videos/${video.id}/media?v=clean`, { headers: { Range: "bytes=0-1023" } })).status === 206);
     } else {
-      step("clean cut rendered", clean.status === 400, { note: "nothing to cut in this sample", status: clean.status });
+      // With a speech sample (CI) there must be something to cut; a tone-only sample may legitimately have nothing.
+      const strict = process.env.RECAP_SELFTEST_EXPECT_CUTS === "1";
+      step("clean cut rendered", !strict && clean.status === 400, { note: "nothing to cut in this sample", status: clean.status });
     }
     const dl = await api(`/api/videos/${video.id}/media?download`, { method: "HEAD" });
     step("export named after the title", /Self%20test/.test(dl.headers.get("content-disposition") ?? ""));
@@ -622,6 +649,15 @@ async function selftest(dir, sample) {
   } catch (err) {
     step("exception", false, { error: String(err?.stack ?? err) });
   }
+  // Performance: cold start and memory (all Recap processes: main, windows, GPU, engine).
+  const mem = app.getAppMetrics().reduce((a, m) => a + (m.memory?.workingSetSize ?? 0), 0);
+  report.metrics = {
+    engineReadyMs: milestones.engineReady,
+    libraryLoadedMs: milestones.libraryLoaded,
+    memoryMB: Math.round(mem / 1024),
+    memoryByProcess: app.getAppMetrics().map((m) => `${m.type}${m.serviceName ? `:${m.serviceName}` : ""} ${Math.round((m.memory?.workingSetSize ?? 0) / 1024)}MB`),
+  };
+  step("cold start: engine ready < 10 s", (milestones.engineReady ?? Infinity) < 10_000, { ms: milestones.engineReady });
   report.passed = report.steps.every((s) => s.ok);
   fs.writeFileSync(path.join(dir, "report.json"), JSON.stringify(report, null, 2));
   quitting = true;

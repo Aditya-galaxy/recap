@@ -2,7 +2,7 @@ import "server-only";
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { config } from "./config";
-import { cutRanges, keepRanges, snapToSilences, tagFillers, total } from "./cuts";
+import { CUT_FPS, cutRanges, keepRanges, snapToSilences, tagFillers, total } from "./cuts";
 import { exists, file, readMeta, readTranscript, updateMeta } from "./store";
 import type { CleanOptions, Range, Transcript, Word } from "./types";
 
@@ -35,7 +35,7 @@ function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: str
  * Stream and duration info from `ffmpeg -i`, so ffprobe doesn't need to ship with the desktop app.
  * ffmpeg exits non-zero here ("no output file"); the header it prints on stderr is what we read.
  */
-function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number }> {
+function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number; vcodec?: string }> {
   return new Promise((resolve, reject) => {
     const proc = spawn(BIN.ffmpeg, ["-hide_banner", "-i", p], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let err = "";
@@ -47,6 +47,7 @@ function inspect(p: string): Promise<{ duration: number; width?: number; height?
       const size = videoLines[0]?.match(/, (\d{2,5})x(\d{2,5})[\s,]/);
       const d = err.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
       resolve({
+        vcodec: videoLines[0]?.match(/: Video: (\w+)/)?.[1],
         duration: d ? Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) : 0,
         width: size ? Number(size[1]) : undefined,
         height: size ? Number(size[2]) : undefined,
@@ -82,7 +83,9 @@ async function transcribe(id: string, wav: string): Promise<Word[]> {
   const outBase = file(id, "whisper");
   // -nfa: whisper.cpp enables flash attention by default, which badly skews token timestamps
   // around pauses. -ojf gives per-token offsets, which are tighter than its word-split mode.
-  await run(WHISPER_BIN, ["-m", WHISPER_MODEL, "-f", wav, "-ojf", "-of", outBase, "-np", "-nfa", "--prompt", WHISPER_PROMPT]);
+  // -bs 1 -bo 1 (greedy, with whisper's temperature fallback): 36% faster than the default 5-wide beam on a
+  // 10-minute benchmark, with no loss in word error rate or filler detection.
+  await run(WHISPER_BIN, ["-m", WHISPER_MODEL, "-f", wav, "-ojf", "-of", outBase, "-np", "-nfa", "-bs", "1", "-bo", "1", "--prompt", WHISPER_PROMPT]);
   const j = JSON.parse(await fs.readFile(outBase + ".json", "utf8"));
   const words: Word[] = [];
   let cur: Word | null = null;
@@ -115,61 +118,94 @@ async function transcribe(id: string, wav: string): Promise<Word[]> {
   return tagFillers(speech);
 }
 
-/** Transcode → thumbnail → transcribe → detect silences. Throws on failure; the job queue retries. */
+/**
+ * Upload → watchable video + transcript. Two independent tracks run in parallel:
+ *  - video: H.264 recordings (what the desktop and Mac apps produce) are remuxed in seconds; anything
+ *    else is re-encoded to CFR H.264. Then a thumbnail.
+ *  - audio: extract → whisper → pause detection.
+ * Throws on failure; the job queue retries.
+ */
 export async function processVideo(id: string) {
-  const stage = (s: string) => updateMeta(id, (m) => { m.status = "processing"; m.stage = s; });
-  const src = file(id, "original"); // webm from the browser/Electron, mp4/mov from the Mac app
+  const started = performance.now();
+  const timings: Record<string, number> = {};
+  const timed = async <T,>(name: string, fn: () => Promise<T>) => {
+    const t = performance.now();
+    try {
+      return await fn();
+    } finally {
+      timings[name] = performance.now() - t;
+    }
+  };
+  const src = file(id, "original"); // webm/mkv from the browser/desktop app, mp4/mov from the Mac app
   const mp4 = file(id, "video.mp4");
   const wav = file(id, "audio.wav");
 
-  if (!(await exists(src))) {
-    // A previous attempt finished encoding and removed the upload; only metadata steps remain.
-    if (!(await exists(mp4))) throw new PermanentError("Upload is missing.");
-  } else {
-    await stage("Checking upload");
-    const info0 = await inspect(src).catch(() => ({ video: 0 }));
-    if (!info0.video) throw new PermanentError("That file isn't a video Recap can read.");
+  const haveSrc = await exists(src);
+  // After a crash the upload may already have become video.mp4; carry on from there.
+  if (!haveSrc && !(await exists(mp4))) throw new PermanentError("Upload is missing.");
+  const srcInfo = haveSrc ? await inspect(src).catch(() => null) : null;
+  if (haveSrc && !srcInfo?.video) throw new PermanentError("That file isn't a video Recap can read.");
+  await updateMeta(id, (m) => { m.status = "processing"; m.stage = srcInfo?.audio === 0 ? "Processing video" : "Processing + transcribing"; });
 
-    await stage("Encoding video");
-    // MediaRecorder output is variable-frame-rate and lacks a seek index; normalize to CFR H.264.
-    // CRF 20 / faster: ~49 dB PSNR on scrolling 1080p UI text (vs 45 dB at CRF 23), leaving headroom for
-    // the clean cut's second encode, for ~33% more bytes.
-    // The Mac app records system audio and mic as separate tracks; ffmpeg would keep only one.
-    const nAudio = await audioStreamCount(src);
-    const audioArgs =
-      nAudio > 1
-        ? ["-filter_complex", `${Array.from({ length: nAudio }, (_, i) => `[0:a:${i}]`).join("")}amix=inputs=${nAudio}:normalize=0[a]`, "-map", "0:v:0", "-map", "[a]"]
-        : [];
-    const tmp = file(id, "video.tmp.mp4");
-    await run("ffmpeg", [
-      "-y", "-hide_banner", "-loglevel", "error", "-i", src,
-      "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-fps_mode", "cfr", "-r", "30", ...audioArgs,
-      "-c:v", "libx264", "-preset", "faster", "-crf", "20", "-pix_fmt", "yuv420p",
-      "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
-    ]);
-    await fs.rename(tmp, mp4);
-  }
-  const info = await probe(mp4);
-  await updateMeta(id, (m) => { m.duration = info.duration; m.width = info.width; m.height = info.height; });
+  // The Mac app records system audio and mic as separate tracks; mix them instead of keeping one.
+  const audioMap = (n: number) =>
+    n > 1
+      ? ["-filter_complex", `${Array.from({ length: n }, (_, i) => `[0:a:${i}]`).join("")}amix=inputs=${n}:normalize=0[a]`, "-map", "[a]"]
+      : n === 1 ? ["-map", "0:a:0"] : [];
 
-  await run("ffmpeg", [
-    "-y", "-hide_banner", "-loglevel", "error", "-ss", String(Math.min(1, info.duration / 2)), "-i", mp4,
-    "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", file(id, "thumb.jpg"),
-  ]);
+  const videoTrack = async () => {
+    if (haveSrc && srcInfo) {
+      const even = !!srcInfo.width && !!srcInfo.height && srcInfo.width % 2 === 0 && srcInfo.height % 2 === 0;
+      const remux = srcInfo.vcodec === "h264" && even;
+      // CRF 20 / faster: ~49 dB PSNR on scrolling 1080p UI text (vs 45 dB at CRF 23).
+      const videoArgs = remux
+        ? ["-c:v", "copy", "-video_track_timescale", "90000"]
+        : ["-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-fps_mode", "cfr", "-r", "30", "-c:v", "libx264", "-preset", "faster", "-crf", "20", "-pix_fmt", "yuv420p"];
+      const tmp = file(id, "video.tmp.mp4");
+      await timed(remux ? "remux" : "encode", () =>
+        run("ffmpeg", [
+          "-y", "-hide_banner", "-loglevel", "error", "-i", src, "-map", "0:v:0", ...audioMap(srcInfo.audio),
+          ...videoArgs, "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp,
+        ]),
+      );
+      await fs.rename(tmp, mp4);
+    }
+    const info = await probe(mp4);
+    await updateMeta(id, (m) => { m.duration = info.duration; m.width = info.width; m.height = info.height; });
+    await timed("thumbnail", () =>
+      run("ffmpeg", [
+        "-y", "-hide_banner", "-loglevel", "error", "-ss", String(Math.min(1, info.duration / 2)), "-i", mp4,
+        "-frames:v", "1", "-vf", "scale=640:-2", "-q:v", "4", file(id, "thumb.jpg"),
+      ]),
+    );
+  };
 
-  let transcript: Transcript = { words: [], silences: [] };
-  if (await hasAudio(mp4)) {
-    await run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", mp4, "-ar", "16000", "-ac", "1", wav]);
-    await stage("Transcribing");
-    const words = await transcribe(id, wav);
-    await stage("Finding pauses");
-    const silences = await detectSilences(wav, info.duration);
-    transcript = { words: snapToSilences(words, silences), silences };
+  const audioTrack = async (): Promise<Transcript> => {
+    const from = haveSrc ? src : mp4;
+    const n = haveSrc ? (srcInfo?.audio ?? 0) : (await inspect(mp4)).audio;
+    if (!n) return { words: [], silences: [] };
+    await timed("extract audio", () => run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", from, ...audioMap(n), "-ar", "16000", "-ac", "1", wav]));
+    const words = await timed("transcribe", () => transcribe(id, wav));
+    const length = (await inspect(wav)).duration;
+    const silences = await timed("pauses", () => detectSilences(wav, length));
     await fs.rm(wav, { force: true });
     await fs.rm(file(id, "whisper.json"), { force: true });
-  }
-  await fs.writeFile(file(id, "transcript.json"), JSON.stringify(transcript));
+    return { words: snapToSilences(words, silences), silences };
+  };
+
+  // allSettled, so a failure on one track never leaves the other's ffmpeg/whisper running unobserved.
+  const [video, audio] = await Promise.allSettled([videoTrack(), audioTrack()]);
+  if (video.status === "rejected") throw video.reason;
+  if (audio.status === "rejected") throw audio.reason;
+
+  await fs.writeFile(file(id, "transcript.json"), JSON.stringify(audio.value));
   await fs.rm(src, { force: true });
+  const total = (performance.now() - started) / 1000;
+  const media = (await readMeta(id))?.duration ?? 0;
+  console.log(
+    `[pipeline] ${id} ${media.toFixed(0)}s video ready in ${total.toFixed(1)}s (${media ? (total / media).toFixed(3) : "?"}x realtime): ` +
+      Object.entries(timings).map(([n, ms]) => `${n} ${(ms / 1000).toFixed(1)}s`).join(", "),
+  );
   await updateMeta(id, (m) => { m.status = "ready"; delete m.stage; delete m.error; });
 }
 
@@ -189,10 +225,26 @@ export async function renderClean(id: string, opts: CleanOptions) {
   const t = await readTranscript(id);
   if (!meta?.duration || !t) throw new PermanentError("Video isn't ready yet.");
   const keep = keepRanges(cutRanges(t, opts, meta.duration), meta.duration);
-  const sel = keep.map((k) => `between(t,${k.start.toFixed(3)},${k.end.toFixed(3)})`).join("+");
+  // Each kept span is a half-open [start, end) test. They're combined as a balanced tree: a flat
+  // "a+b+c+…" chain nests as deep as the number of cuts and ffmpeg's expression parser runs out of
+  // memory around ~180 of them (it failed on a 10-minute recording).
+  const tree = (terms: string[]): string => {
+    if (terms.length === 1) return terms[0];
+    const mid = terms.length >> 1;
+    return `(${tree(terms.slice(0, mid))}+${tree(terms.slice(mid))})`;
+  };
+  // Video frames sit exactly on k/CUT_FPS after fps=…; compare against half-frame offsets so float
+  // rounding can't add or drop a frame at a boundary. Audio uses the exact boundaries.
+  const half = 0.5 / CUT_FPS;
+  const vsel = tree(keep.map((k) => `gte(t,${(k.start - half).toFixed(6)})*lt(t,${(k.end - half).toFixed(6)})`));
+  const asel = tree(keep.map((k) => `gte(t,${k.start.toFixed(6)})*lt(t,${k.end.toFixed(6)})`));
   const audio = await hasAudio(file(id, "video.mp4"));
-  const graph = [`[0:v]select='${sel}',setpts=N/FRAME_RATE/TB[v]`];
-  if (audio) graph.push(`[0:a]aselect='${sel}',asetpts=N/SR/TB[a]`);
+  // fps first: remuxed hardware-encoder video is variable frame rate, and setpts=N/FRAME_RATE assumes CFR.
+  const graph = [`[0:v]fps=${CUT_FPS},select='${vsel}',setpts=N/FRAME_RATE/TB[v]`];
+  // aselect keeps or drops whole audio frames. Re-chunk into 1 ms frames first so every cut is within
+  // 1 ms of the video's. Measured on a 10-minute, 180-cut render: 64 ms of drift with the default ~21 ms
+  // frames, 13 ms with 1 ms frames (+5 s render time).
+  if (audio) graph.push(`[0:a]aresample=48000,asetnsamples=n=48:p=0,aselect='${asel}',asetpts=N/SR/TB[a]`);
   const graphFile = file(id, "clean.filter");
   await fs.writeFile(graphFile, graph.join(";"));
   const tmp = file(id, "clean.tmp.mp4");

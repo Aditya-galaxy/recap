@@ -5,30 +5,48 @@ import { fmtDate, fmtTime } from "@/lib/format";
 import { currentUser, userCount } from "@/lib/auth";
 import { listVideos } from "@/lib/store";
 
-export default function Library() {
+const PAGE = 48;
+
+export default function Library({ searchParams }: PageProps<"/">) {
   return (
     <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-muted">loading…</div>}>
-      <VideoGrid />
+      <VideoGrid searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function VideoGrid() {
+async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
   await connection(); // the library changes on every upload
   const user = await currentUser();
   if (!user) return <Landing fresh={userCount() === 0} />;
-  const videos = await listVideos(user.id);
+  const sp = await searchParams;
+  const q = (Array.isArray(sp.q) ? sp.q[0] : sp.q ?? "").slice(0, 100);
+  const page = Math.max(1, Number(Array.isArray(sp.page) ? sp.page[0] : sp.page) || 1);
+  // Paged so a library with thousands of recordings stays a small, fast page.
+  const { videos, total } = await listVideos(user.id, { q, limit: PAGE, offset: (page - 1) * PAGE });
+  const pages = Math.max(1, Math.ceil(total / PAGE));
+  const href = (p: number) => `/?${new URLSearchParams({ ...(q ? { q } : {}), ...(p > 1 ? { page: String(p) } : {}) })}`;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6 flex items-baseline justify-between gap-4 border-b border-border pb-3">
         <h1 className="text-lg font-medium">
-          videos <span className="text-muted">[{videos.length}]</span>
+          videos <span className="text-muted">[{total}]</span>
         </h1>
-        <span className="label">sorted by newest</span>
+        <form action="/" className="flex items-center gap-2">
+          <input
+            name="q"
+            defaultValue={q}
+            placeholder="search titles"
+            aria-label="Search videos by title"
+            className="w-44 rounded-sm border border-border bg-surface px-2.5 py-1.5 text-[12px] outline-none focus:border-border-strong sm:w-60"
+          />
+        </form>
       </div>
 
-      {videos.length === 0 ? (
+      {videos.length === 0 && q ? (
+        <p className="text-[13px] text-muted">No videos match “{q}”. <Link href="/" className="underline">Clear search</Link></p>
+      ) : videos.length === 0 ? (
         <div className="card px-6 py-16">
           <pre className="text-[13px] leading-6 text-muted">
 {`$ recap ls
@@ -49,7 +67,7 @@ $ recap record --screen --cam`}
                 <div className="relative aspect-video border-b border-border bg-surface-2">
                   {v.status === "ready" || v.duration ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={`/api/videos/${v.id}/thumb`} alt="" className="h-full w-full object-cover grayscale transition group-hover:grayscale-0" />
+                    <img src={`/api/videos/${v.id}/thumb`} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover grayscale transition group-hover:grayscale-0" />
                   ) : null}
                   {v.status !== "ready" && (
                     <span className="absolute left-2 top-2 rounded-sm bg-black px-1.5 py-0.5 text-[11px] text-white">
@@ -73,6 +91,14 @@ $ recap record --screen --cam`}
             </li>
           ))}
         </ul>
+      )}
+
+      {pages > 1 && (
+        <nav className="mt-8 flex items-center justify-between text-[12px]" aria-label="Pages">
+          {page > 1 ? <Link className="btn-ghost" href={href(page - 1)}>← newer</Link> : <span />}
+          <span className="text-muted">page {page} of {pages}</span>
+          {page < pages ? <Link className="btn-ghost" href={href(page + 1)}>older →</Link> : <span />}
+        </nav>
       )}
     </div>
   );

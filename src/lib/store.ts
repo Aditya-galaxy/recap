@@ -85,8 +85,17 @@ export async function createVideo(title: string, ownerId: string): Promise<Video
   return (await readMeta(id))!;
 }
 
-export async function listVideos(ownerId: string): Promise<VideoMeta[]> {
-  return (db.prepare("SELECT * FROM videos WHERE owner_id = ? ORDER BY created_at DESC").all(ownerId) as Row[]).map(toMeta);
+/** One page of a user's library, newest first, optionally filtered by a title search. */
+export async function listVideos(
+  ownerId: string,
+  { q = "", limit = 48, offset = 0 }: { q?: string; limit?: number; offset?: number } = {},
+): Promise<{ videos: VideoMeta[]; total: number }> {
+  const like = `%${q.trim().replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+  const where = q.trim() ? "WHERE owner_id = ? AND title LIKE ? ESCAPE '\\'" : "WHERE owner_id = ?";
+  const args = q.trim() ? [ownerId, like] : [ownerId];
+  const total = (db.prepare(`SELECT count(*) AS n FROM videos ${where}`).get(...args) as { n: number }).n;
+  const rows = db.prepare(`SELECT * FROM videos ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...args, limit, offset) as Row[];
+  return { videos: rows.map(toMeta), total };
 }
 
 export async function readTranscript(id: string): Promise<Transcript | null> {

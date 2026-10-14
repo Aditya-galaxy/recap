@@ -36,7 +36,8 @@ function makeTicker(onTick: () => void) {
 }
 
 function pickMime() {
-  const types = ["video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
+  // Hardware H.264 first (much lighter on CPU, and the server remuxes it instead of re-encoding).
+  const types = ["video/webm;codecs=h264,opus", "video/mp4;codecs=avc1,mp4a.40.2", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm", "video/mp4"];
   return types.find((t) => MediaRecorder.isTypeSupported(t)) ?? "";
 }
 

@@ -40,3 +40,10 @@ export function proxy(req: NextRequest) {
   if (same(req.cookies.get(COOKIE)?.value ?? "", TOKEN) || same(bearer, TOKEN)) return NextResponse.next();
   return new NextResponse("Unauthorized", { status: 401 });
 }
+
+// Uploads (POST /api/videos) must stream straight to disk. Running proxy on them makes Next.js buffer the
+// body in memory, capped at 10 MB, which silently truncated recordings. That route is excluded here and
+// does the same local-mode checks itself (see localAuthorized() in src/lib/auth.ts).
+export const config = {
+  matcher: ["/((?!api/videos$).*)"],
+};

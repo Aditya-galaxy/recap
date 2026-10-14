@@ -87,6 +87,11 @@ cd desktop && npm install && npm run engine && npm start     # desktop app again
 - In the desktop app, nothing leaves your computer unless you export it or choose a server.
 - The **feedback** box sends only what you type (plus app version) to recap.kronagent.dev. Never video or transcripts.
 
+## Performance
+
+A 60-minute recording is watchable with a transcript in about 90 s, clean cuts stay within 5 ms of A/V sync,
+and the app cold-starts in about 1 s. Full numbers and methodology: [docs/PERFORMANCE.md](docs/PERFORMANCE.md).
+
 ## Known limitations
 
 - Installers aren't code-signed/notarized yet (see first-launch steps above).

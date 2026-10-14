@@ -8,10 +8,14 @@ import { enqueue } from "@/lib/jobs";
 import { rateLimit } from "@/lib/ratelimit";
 import { createVideo, deleteVideo, file, listVideos, setSize } from "@/lib/store";
 
-export async function GET() {
+export async function GET(req: Request) {
   const user = await currentUser();
   if (!user) return unauthorized();
-  return Response.json(await listVideos(user.id));
+  const u = new URL(req.url);
+  const limit = Math.min(500, Math.max(1, Number(u.searchParams.get("limit")) || 100));
+  const offset = Math.max(0, Number(u.searchParams.get("offset")) || 0);
+  const { videos, total } = await listVideos(user.id, { q: u.searchParams.get("q") ?? "", limit, offset });
+  return Response.json(videos, { headers: { "X-Total-Count": String(total) } });
 }
 
 class TooLarge extends Error {}

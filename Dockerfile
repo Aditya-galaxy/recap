@@ -26,11 +26,31 @@ ENV NEXT_TELEMETRY_DISABLED=1 RECAP_STANDALONE=1
 RUN npm run build \
  && test ! -e .next/standalone/data && test ! -e .next/standalone/models
 
+# ---- ffmpeg ---------------------------------------------------------------------------
+# Debian bookworm ships ffmpeg 5.1, which lacks options the pipeline needs (-/filter_complex is 7.0+).
+# Use the same pinned, checksum-verified static build as the desktop app.
+FROM debian:bookworm-slim AS ffmpeg
+ARG TARGETARCH
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils && rm -rf /var/lib/apt/lists/*
+RUN set -eu; \
+    base=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-13-13-05; \
+    case "$TARGETARCH" in \
+      amd64) f=ffmpeg-n8.1.3-18-g46d899d7a0-linux64-gpl-8.1.tar.xz;    sum=b3506f47a71a2f8cff8c0775112bf02a8a49035e3994232aa5f218058328e0e7 ;; \
+      arm64) f=ffmpeg-n8.1.3-18-g46d899d7a0-linuxarm64-gpl-8.1.tar.xz; sum=bb5477906594f7b02f84fedaa2dc3d503bb14166fc4acb2f3175be0488967e43 ;; \
+      *) echo "unsupported arch $TARGETARCH"; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/ff.tar.xz "$base/$f"; \
+    echo "$sum  /tmp/ff.tar.xz" | sha256sum -c -; \
+    tar -xJf /tmp/ff.tar.xz -C /tmp; \
+    cp /tmp/ffmpeg-*/bin/ffmpeg /usr/local/bin/ffmpeg; \
+    /usr/local/bin/ffmpeg -hide_banner -version | head -1
+
 # ---- runtime ---------------------------------------------------------------------------
 FROM node:${NODE_VERSION}-bookworm-slim
 ARG RECAP_VERSION=dev
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libgomp1 curl ca-certificates tini \
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl ca-certificates tini \
  && rm -rf /var/lib/apt/lists/*
+COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=whisper /src/build/bin/whisper-cli /usr/local/bin/whisper-cli
 
 WORKDIR /app

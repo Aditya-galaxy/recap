@@ -66,7 +66,19 @@ jobs:
           set -u
           FF=bin/ffmpeg; [ -f bin/ffmpeg.exe ] && FF=bin/ffmpeg.exe
           OUT="$RUNNER_TEMP/selftest"; mkdir -p "$OUT"
-          "$FF" -loglevel error -f lavfi -i testsrc2=size=1280x720:rate=30 -f lavfi -i "sine=f=300:d=8" -t 8 -c:v libvpx -b:v 1M -c:a libopus "$RUNNER_TEMP/sample.webm"
+          # A realistic sample: synthesized speech with fillers and pauses (so transcription and the clean cut
+          # have real work), 30 s of 1080p H.264 at ~4 Mbps (~15 MB, well over the 10 MB that once truncated uploads).
+          TEXT="Hi team, um, quick update on the launch. So, uh, the recorder works now. And, like, you can share a link. Um, let me know what you think."
+          SPEECH="$RUNNER_TEMP/speech.wav"
+          case "${{ matrix.name }}" in
+            macos) say -o "$RUNNER_TEMP/speech.aiff" "$TEXT" && "$FF" -y -loglevel error -i "$RUNNER_TEMP/speech.aiff" "$SPEECH" ;;
+            linux) sudo apt-get update -qq && sudo apt-get install -y -qq espeak-ng >/dev/null && espeak-ng -w "$SPEECH" "$TEXT" ;;
+            windows) powershell -NoProfile -Command "Add-Type -AssemblyName System.Speech; \$s = New-Object System.Speech.Synthesis.SpeechSynthesizer; \$s.SetOutputToWaveFile('$(cygpath -w "$SPEECH")'); \$s.Speak('$TEXT'); \$s.Dispose()" ;;
+          esac
+          "$FF" -y -loglevel error -f lavfi -i testsrc2=size=1920x1080:rate=30 -stream_loop -1 -i "$SPEECH" -af "apad=pad_dur=2" -t 30 \
+            -c:v libx264 -preset veryfast -b:v 4M -c:a libopus "$RUNNER_TEMP/sample.mkv"
+          ls -l "$RUNNER_TEMP/sample.mkv"
+          export RECAP_SELFTEST_EXPECT_CUTS=1
           case "${{ matrix.name }}" in
             linux)
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
@@ -76,7 +88,7 @@ jobs:
           esac
           # macOS has no `timeout`; perl's alarm does the same job there.
           if command -v timeout >/dev/null; then LIMIT=(timeout 900); else LIMIT=(perl -e 'alarm shift; exec @ARGV' 900); fi
-          RECAP_SELFTEST="$OUT" RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.webm" "${LIMIT[@]}" "${APP[@]}" || true
+          RECAP_SELFTEST="$OUT" RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.mkv" "${LIMIT[@]}" "${APP[@]}" || true
           cat "$OUT/report.json"
           PY=$(command -v python3 || command -v python)
           "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all', len(r['steps']), 'steps passed'); sys.exit(1 if bad or not r['steps'] else 0)" "$OUT/report.json"

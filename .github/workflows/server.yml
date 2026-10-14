@@ -46,7 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg >/dev/null
-          ffmpeg -loglevel error -f lavfi -i testsrc2=size=640x360:rate=30 -f lavfi -i "sine=f=300:d=6" -t 6 -c:v libvpx -c:a libopus sample.webm
+          ffmpeg -loglevel error -f lavfi -i testsrc2=size=640x360:rate=30 -f lavfi -i "sine=f=300:d=3,apad=pad_dur=3" -t 6 -c:v libvpx -c:a libopus sample.webm
           docker run -d --name recap -p 3000:3000 -e ALLOW_SIGNUP=false recap:test
           for i in $(seq 1 90); do curl -fsS localhost:3000/api/health && break || sleep 3; done
           echo; curl -fsS -o health.json localhost:3000/api/health && grep -q '"ok":true' health.json
@@ -56,6 +56,14 @@ jobs:
           for i in $(seq 1 60); do S=$(curl -fsS -b jar localhost:3000/api/videos/$ID | python3 -c "import sys,json;print(json.load(sys.stdin)['meta']['status'])"); [ "$S" = ready ] && break; [ "$S" = error ] && exit 1; sleep 2; done
           test "$S" = ready
           curl -fsS -o page.html localhost:3000/v/$ID && grep -q 'og:title' page.html
+          # Clean cut (second ffmpeg pass with a filter-graph file): never covered before, and broken on
+          # Debian's ffmpeg 5.1. With pauses enabled at the minimum threshold there's always something to cut.
+          curl -fsS -b jar -H 'Content-Type: application/json' -d '{"fillers":true,"silences":true,"minSilence":0.4}' localhost:3000/api/videos/$ID/clean -o clean.json -w '%{http_code}\n' || true
+          cat clean.json; echo
+          if grep -q '"ok":true' clean.json; then
+            for i in $(seq 1 60); do C=$(curl -fsS -b jar localhost:3000/api/videos/$ID | python3 -c "import sys,json;print(json.load(sys.stdin)['meta']['clean']['status'])"); [ "$C" = ready ] && break; [ "$C" = error ] && { curl -fsS -b jar localhost:3000/api/videos/$ID; exit 1; }; sleep 2; done
+            test "$C" = ready
+          fi
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:3000/api/videos)" = 401
           docker exec recap test ! -e /app/data
           echo "smoke test passed"

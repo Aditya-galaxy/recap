@@ -179,4 +179,4 @@ class Engine extends EventEmitter {
   }
 }
 
-module.exports = { engine: new Engine() };
+module.exports = { engine: new Engine(), bin };

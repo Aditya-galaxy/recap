@@ -94,8 +94,8 @@ export async function endSession() {
  * (desktop apps). Null when anonymous.
  */
 export async function currentUser(): Promise<User | null> {
-  // Local mode: src/proxy.ts has already checked the per-launch secret on every request.
-  if (config.localToken) return localUser();
+  // Local mode: re-check the per-launch secret here too (proxy.ts skips the upload route).
+  if (config.localToken) return (await localAuthorized()) ? localUser() : null;
   const auth = (await headers()).get("authorization");
   if (auth?.startsWith("Bearer ")) {
     const hash = sha256(auth.slice(7).trim());
@@ -129,6 +129,18 @@ function localUser(): User {
 }
 
 export const isLocalMode = () => !!config.localToken;
+
+/** Local mode: request is addressed to this machine and carries the launch secret (cookie or bearer). */
+async function localAuthorized() {
+  const h = await headers();
+  const host = (h.get("host") ?? "").replace(/:\d+$/, "");
+  if (host !== "127.0.0.1" && host !== "localhost") return false;
+  const want = Buffer.from(config.localToken ?? "");
+  const bearer = Buffer.from(h.get("authorization")?.replace(/^Bearer\s+/, "") ?? "");
+  const cookie = Buffer.from((await cookies()).get("recap_local")?.value ?? "");
+  const eq = (b: Buffer) => b.length === want.length && want.length > 0 && timingSafeEqual(b, want);
+  return eq(bearer) || eq(cookie);
+}
 
 export const unauthorized = () => Response.json({ error: "Sign in required." }, { status: 401 });
 

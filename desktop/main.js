@@ -442,8 +442,13 @@ async function checkForUpdate() {
       for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
       return false;
     };
-    if (tag && newer(tag, app.getVersion())) {
-      session.update = { version: tag.replace(/^v/, ""), url: "https://recap.kronagent.dev" };
+    if (tag && newer(tag, app.getVersion()) && session.update?.version !== tag.replace(/^v/, "")) {
+      // Straight to this platform's installer; the release page if we don't know which one.
+      const file = { darwin: "Recap-mac-arm64.dmg", win32: "Recap-windows-x64-setup.exe", linux: "Recap-linux-x86_64.AppImage" }[process.platform];
+      session.update = {
+        version: tag.replace(/^v/, ""),
+        url: file ? `https://github.com/Aditya-galaxy/recap/releases/download/${tag}/${file}` : url,
+      };
       broadcast();
       buildTrayMenu();
       if (Notification.isSupported()) {
@@ -636,7 +641,11 @@ app.whenReady().then(() => {
     else if (engine.state !== "ready") panel.show();
     if (!process.env.RECAP_SELFTEST) setTimeout(recoverLeftovers, 2000);
   });
-  if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT) setTimeout(checkForUpdate, 5000);
+  // Recap lives in the menu bar for days at a time, so look again every 6 hours, not just at launch.
+  if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT) {
+    setTimeout(checkForUpdate, 5000);
+    setInterval(checkForUpdate, 6 * 60 * 60_000);
+  }
 
   const trayIcon = nativeImage.createFromPath(path.join(__dirname, "build", process.platform === "darwin" ? "trayTemplate.png" : "tray.png"));
   tray = new Tray(trayIcon);

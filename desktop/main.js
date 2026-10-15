@@ -539,10 +539,15 @@ function shareFile(req, sender) {
 async function copyFileToClipboard(file) {
   if (process.platform === "darwin") {
     // NSPasteboard writes the file URL immediately (AppleScript's `set the clipboard` hands over a lazy
-    // promise that vanishes when osascript exits).
+    // promise that vanishes when osascript exits). Read it back through the same API to confirm, and
+    // try again if another process got in between.
     const js = 'ObjC.import("AppKit"); function run(argv) { const pb = $.NSPasteboard.generalPasteboard; pb.clearContents; return pb.writeObjects($([$.NSURL.fileURLWithPath(argv[0])])); }';
-    const { stdout } = await execFileP("osascript", ["-l", "JavaScript", "-e", js, file]);
-    if (stdout.trim() !== "true") throw new Error("Couldn't copy the video.");
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await execFileP("osascript", ["-l", "JavaScript", "-e", js, file]);
+      if (path.basename((await clipboardFile().catch(() => "")) ?? "") === path.basename(file)) return;
+      await new Promise((r) => setTimeout(r, 250));
+    }
+    throw new Error("Couldn't copy the video.");
   } else if (process.platform === "win32") {
     // -Command would splice extra arguments into the script text, so the path travels in the environment.
     await execFileP("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard -LiteralPath $env:RECAP_SHARE_FILE"], {
@@ -554,9 +559,12 @@ async function copyFileToClipboard(file) {
   }
 }
 
-/** What the clipboard's file reference points at (self-test only). */
+/** The file the clipboard currently points at, if any. */
 async function clipboardFile() {
-  if (process.platform === "darwin") return (await execFileP("osascript", ["-e", "POSIX path of (the clipboard as «class furl»)"])).stdout.trim();
+  if (process.platform === "darwin") {
+    const js = 'ObjC.import("AppKit"); function run() { const urls = $.NSPasteboard.generalPasteboard.readObjectsForClassesOptions($([$.NSURL]), $()); return urls.isNil() || urls.count === 0 ? "" : ObjC.unwrap(urls.objectAtIndex(0).path); }';
+    return (await execFileP("osascript", ["-l", "JavaScript", "-e", js])).stdout.trim();
+  }
   if (process.platform === "win32") {
     return (await execFileP("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(Get-Clipboard -Format FileDropList)[0].FullName"], { windowsHide: true })).stdout.trim();
   }

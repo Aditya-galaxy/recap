@@ -4,10 +4,9 @@
 share link with a transcript and captions, and remove the "um"s and dead air in one click.
 Transcription runs on your own machine with whisper.cpp. No account, no API keys.
 
-> **Status: early release (v0.4).** The desktop app runs everything on your own computer: recording,
-> transcription and clean-up, with no account needed. For share links, connect a free **Recap Cloud** account
-> (the first 100 confirmed accounts are free for life) or run your own server. See [docs/ROADMAP.md](docs/ROADMAP.md).
-> Issues and PRs welcome.
+> **Status: early release (v0.3).** The desktop app runs everything on your own computer: recording,
+> transcription and clean-up, with no account needed. Teams that want share links can run their own server.
+> See [docs/ROADMAP.md](docs/ROADMAP.md). Issues and PRs welcome.
 
 - **Record:** screen + draggable camera bubble, mic and system audio, pause/resume.
   Use the web app in Chrome, or the native apps for macOS, Windows and Linux (global hotkey ⌥⌘R / Ctrl+Alt+R).
@@ -34,12 +33,11 @@ Download from **https://recap.kronagent.dev**, or straight from [Releases](https
 
 On first launch it downloads the transcription model (~140 MB, once). Everything else is in the installer:
 the Recap engine, ffmpeg and whisper.cpp. Your library lives in `Videos/Recap/library` (`Movies` on macOS).
-**Nothing is uploaded unless you share a video.**
+**Nothing is uploaded anywhere.**
 
 - Record with the **record** button or **Ctrl+Alt+R** / **⌥⌘R** from any app: screen + a floating camera bubble.
 - When you stop, the video opens in your library with a transcript; **clean up** cuts fillers and pauses.
-- Share with **share link**: connect Recap Cloud once (settings → connect, approve the code in your browser) and
-  each video uploads with the transcript made on your computer. Or **export mp4** and send it yourself.
+- Share with **export mp4** (original or cleaned) and send it any way you like.
 
 ### Self-hosted server (for share links)
 
@@ -87,9 +85,8 @@ cd desktop && npm install && npm run engine && npm start     # desktop app again
 
 - On a server, videos are **unlisted** by default: anyone with the link can watch without an account, and pages are
   never indexed. Switch a video to **private** to make it visible only to you.
-- In the desktop app, nothing leaves your computer unless you export it, share it to Recap Cloud, or choose a server.
-- Recap Cloud: [terms](https://app.recap.kronagent.dev/terms) · [privacy](https://app.recap.kronagent.dev/privacy).
-  Anyone can report a shared video; admins review reports at `/admin`.
+- In the desktop app, nothing leaves your computer unless you export it.
+- On a server, anyone can report a shared video; admins review reports at `/admin`.
 - The **feedback** box sends only what you type (plus app version) to recap.kronagent.dev. Never video or transcripts.
 
 ## Performance

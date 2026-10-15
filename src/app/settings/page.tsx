@@ -28,5 +28,5 @@ async function Loader() {
     foundersLeft: config.cloud ? founderStats().left : 0,
     price: config.paidPriceLabel,
   };
-  return <Settings account={account} user={user} tokens={listApiTokens(user.id)} server={await baseUrl()} signupOpen={config.allowSignup} local={isLocalMode() ? { dataDir: config.dataDir, model: config.whisperModel } : null} />;
+  return <Settings account={account} user={user} tokens={listApiTokens(user.id)} server={await baseUrl()} signupOpen={config.allowSignup} local={isLocalMode() ? { dataDir: config.dataDir, model: config.whisperModel, cloud: !!config.cloudUrl } : null} />;
 }

@@ -26,8 +26,8 @@ do {
 } while (pageToken);
 
 rows.sort((a, b) => val(a.createdAt).localeCompare(val(b.createdAt)));
-console.log("email,interest,createdAt,lastSeenAt,signups,source,referrer");
+console.log("email,interest,os,createdAt,lastSeenAt,signups,source,referrer");
 for (const f of rows) {
-  console.log([val(f.email), val(f.interest), val(f.createdAt), val(f.lastSeenAt), val(f.signups), val(f.source), val(f.referrer)].map(csv).join(","));
+  console.log([val(f.email), val(f.interest), val(f.os), val(f.createdAt), val(f.lastSeenAt), val(f.signups), val(f.source), val(f.referrer)].map(csv).join(","));
 }
 console.error(`${rows.length} signup(s)`);

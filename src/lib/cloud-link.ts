@@ -53,7 +53,7 @@ export async function linkStatus(): Promise<LinkStatus> {
   const link = await readLink();
   if (link) return { state: "connected", url: link.url, email: link.email };
   const p = g.__recapPending;
-  if (!p) return { state: "disconnected", url: config.cloudUrl };
+  if (!p) return { state: "disconnected", url: config.cloudUrl ?? "" };
   if (p.expiresAt < Date.now()) {
     g.__recapPending = null;
     return { state: "disconnected", url: p.url, error: "The code expired. Try again." };
@@ -79,6 +79,7 @@ export async function linkStatus(): Promise<LinkStatus> {
 
 export async function startLink(): Promise<LinkStatus> {
   const url = config.cloudUrl;
+  if (!url) throw new Error("No Recap server is configured (RECAP_CLOUD_URL).");
   const client = `Recap desktop (${{ darwin: "macOS", win32: "Windows", linux: "Linux" }[process.platform as string] ?? process.platform})`;
   const r = await cloudFetch(`${url}/api/device/code`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client }) });
   if (!r.ok) throw new Error(`Recap Cloud answered ${r.status}.`);

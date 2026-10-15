@@ -124,7 +124,7 @@ jobs:
               install old-setup.exe; echo "old installed: $(ver)"
               run; grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json"
               install "dist\\Recap-windows-x64-setup.exe"; NEW=$(ver); echo "after upgrade: $NEW"
-              [ "$NEW" = "$(node -p "require('./package.json').version")" ]
+              [[ "$NEW" == "$(node -p "require('./package.json').version")"* ]]   # Windows adds a fourth part: 0.4.3.0
               run; grep -q '"panel":true' "$RUNNER_TEMP/panel.json"; grep -q '"engine":"ready"' "$RUNNER_TEMP/panel.json"
               powershell -NoProfile -Command "Start-Process -Wait -FilePath '$W\\Uninstall Recap.exe' -ArgumentList '/S'"
               for i in $(seq 1 60); do [ ! -f "$DEST/Recap.exe" ] && break; sleep 2; done

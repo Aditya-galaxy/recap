@@ -37,7 +37,8 @@ the Recap engine, ffmpeg and whisper.cpp. Your library lives in `Videos/Recap/li
 
 - Record with the **record** button or **Ctrl+Alt+R** / **⌥⌘R** from any app: screen + a floating camera bubble.
 - When you stop, the video opens in your library with a transcript; **clean up** cuts fillers and pauses.
-- Share with **export mp4** (original or cleaned) and send it any way you like.
+- **share** a video straight from the app: drag it into Slack, Teams or an email, **copy video** and paste it
+  anywhere (macOS, Windows), or use the macOS share menu (Mail, Messages, AirDrop). Or **export mp4**.
 
 ### Self-hosted server (for share links)
 

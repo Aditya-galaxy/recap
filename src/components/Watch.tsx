@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { ShareToCloud } from "@/components/CloudShare";
+import DesktopShare from "@/components/DesktopShare";
 import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
@@ -240,8 +241,9 @@ export default function Watch({
           )}
           {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>}
           {cloudShare && ready && <ShareToCloud videoId={id} version={version} canClean={meta.clean.status === "ready"} />}
+          {local && ready && <DesktopShare video={{ id, version, title: meta.title }} />}
           {ready && (
-            <a className={local ? "btn-primary" : "btn-ghost"} href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
+            <a className="btn-ghost" href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
               {local ? `export ${version === "clean" ? "cleaned " : ""}mp4` : "download"}
             </a>
           )}

@@ -52,6 +52,8 @@ class Engine extends EventEmitter {
   get dataDir() {
     // The self-test gets its own throwaway library; it must never touch a real one.
     if (process.env.RECAP_SELFTEST) return path.join(process.env.RECAP_SELFTEST, "library");
+    // Development: a scratch home so trying a build never migrates or touches the real library.
+    if (process.env.RECAP_DEV_HOME) return path.join(process.env.RECAP_DEV_HOME, "library");
     return path.join(app.getPath("videos"), "Recap", "library");
   }
 

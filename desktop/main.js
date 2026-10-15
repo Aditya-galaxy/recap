@@ -6,11 +6,13 @@
 //   panel  – recorder settings + start; also hosts the MediaRecorder (kept alive while hidden)
 //   bubble – circular camera window, always on top, captured with the screen on purpose
 //   bar    – timer / pause / stop / discard, always on top, excluded from capture where the OS allows
-const { app, BrowserWindow, Tray, Menu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage, dialog, Notification } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ShareMenu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage, dialog, Notification } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Readable } = require("node:stream");
 const { engine, bin } = require("./engine");
+const { execFile } = require("node:child_process");
+const execFileP = require("node:util").promisify(execFile);
 
 const HOTKEY = "CommandOrControl+Alt+R";
 // Startup milestones (ms since launch), reported by the self-test.
@@ -74,7 +76,11 @@ function setPhase(phase, extra = {}) {
 }
 
 const libraryDir = () => {
-  const d = process.env.RECAP_SELFTEST ? path.join(process.env.RECAP_SELFTEST, "raw") : path.join(app.getPath("videos"), "Recap");
+  const d = process.env.RECAP_SELFTEST
+    ? path.join(process.env.RECAP_SELFTEST, "raw")
+    : process.env.RECAP_DEV_HOME
+      ? path.join(process.env.RECAP_DEV_HOME, "raw")
+      : path.join(app.getPath("videos"), "Recap");
   fs.mkdirSync(d, { recursive: true });
   return d;
 };
@@ -495,6 +501,95 @@ ipcMain.on("state?", () => broadcast());
 ipcMain.handle("token:has", () => !!readToken());
 ipcMain.handle("token:set", (_e, token) => writeToken(token));
 ipcMain.handle("connection:check", (_e, server) => checkConnection(server));
+// ---- Sharing a video from the library: system share menu, copy, drag, show in folder ----------------
+// The renderer names a video (id + version + title); the main process works out the file itself, so a
+// page can never point these at an arbitrary path. Each share hands over "<title>.mp4" (a hard link into
+// a temp folder, so even multi-GB videos cost no copy) rather than the library's internal "video.mp4".
+const shareDir = path.join(app.getPath("temp"), "recap-share");
+function shareFile(req, sender) {
+  if (!library || sender !== library.webContents || !sender.getURL().startsWith(engine.url)) throw new Error("not allowed");
+  const id = String(req?.id ?? "");
+  if (!/^[a-z0-9]{10}$/.test(id)) throw new Error("bad video id");
+  const version = req?.version === "clean" ? "clean" : "original";
+  const src = path.join(engine.dataDir, "videos", id, version === "clean" ? "clean.mp4" : "video.mp4");
+  if (!fs.existsSync(src)) throw new Error("That version of the video isn't ready.");
+  const title =
+    String(req?.title ?? "")
+      .replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^\.+|[. ]+$/g, "")
+      .slice(0, 120) || "Recap video";
+  const dir = path.join(shareDir, `${id}-${version}`);
+  const out = path.join(dir, `${title}${version === "clean" ? " (cleaned)" : ""}.mp4`);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    fs.linkSync(src, out);
+  } catch {
+    fs.copyFileSync(src, out); // different volume, or a filesystem without hard links
+  }
+  return { out, thumb: path.join(engine.dataDir, "videos", id, "thumb.jpg") };
+}
+
+// Puts the file itself on the clipboard: paste into Slack, Teams, Mail, a chat or a folder. Electron's
+// clipboard can't carry file references, so this uses the OS's own tool; the path never becomes script text.
+async function copyFileToClipboard(file) {
+  if (process.platform === "darwin") {
+    // NSPasteboard writes the file URL immediately (AppleScript's `set the clipboard` hands over a lazy
+    // promise that vanishes when osascript exits).
+    const js = 'ObjC.import("AppKit"); function run(argv) { const pb = $.NSPasteboard.generalPasteboard; pb.clearContents; return pb.writeObjects($([$.NSURL.fileURLWithPath(argv[0])])); }';
+    const { stdout } = await execFileP("osascript", ["-l", "JavaScript", "-e", js, file]);
+    if (stdout.trim() !== "true") throw new Error("Couldn't copy the video.");
+  } else if (process.platform === "win32") {
+    // -Command would splice extra arguments into the script text, so the path travels in the environment.
+    await execFileP("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "Set-Clipboard -LiteralPath $env:RECAP_SHARE_FILE"], {
+      windowsHide: true,
+      env: { ...process.env, RECAP_SHARE_FILE: file },
+    });
+  } else {
+    throw new Error("Copying files isn't supported on Linux yet. Drag the video instead.");
+  }
+}
+
+/** What the clipboard's file reference points at (self-test only). */
+async function clipboardFile() {
+  if (process.platform === "darwin") return (await execFileP("osascript", ["-e", "POSIX path of (the clipboard as «class furl»)"])).stdout.trim();
+  if (process.platform === "win32") {
+    return (await execFileP("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", "(Get-Clipboard -Format FileDropList)[0].FullName"], { windowsHide: true })).stdout.trim();
+  }
+  return null;
+}
+
+ipcMain.handle("share", async (e, req) => {
+  const { out } = shareFile(req, e.sender);
+  switch (req?.action) {
+    case "menu":
+      if (process.platform !== "darwin") throw new Error("The share menu is macOS only.");
+      new ShareMenu({ filePaths: [out] }).popup({ window: library });
+      return "menu";
+    case "copy":
+      await copyFileToClipboard(out);
+      return "copied";
+    case "folder":
+      shell.showItemInFolder(out);
+      return "shown";
+    default:
+      throw new Error("unknown share action");
+  }
+});
+
+// Drag the video out of the window into Slack, Teams, an email or a folder. Must answer synchronously.
+ipcMain.on("share:drag", (e, req) => {
+  try {
+    const { out, thumb } = shareFile(req, e.sender);
+    const icon = fs.existsSync(thumb) ? nativeImage.createFromPath(thumb).resize({ width: 96 }) : nativeImage.createFromPath(path.join(__dirname, "build", "icon.png")).resize({ width: 64 });
+    e.sender.startDrag({ file: out, icon });
+  } catch (err) {
+    console.error("[share] drag failed:", err.message);
+  }
+});
+
 ipcMain.on("library", (_e, pathname) => openLibrary(typeof pathname === "string" && pathname.startsWith("/") ? pathname : "/"));
 ipcMain.on("model:retry", () => engine.ensureModel());
 // The panel reports where recordings go, so recovery only imports into the local library.
@@ -516,6 +611,7 @@ app.on("second-instance", () => (engine.state === "ready" ? openLibrary() : pane
 if (isLinux) app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
 
 app.whenReady().then(() => {
+  fs.rmSync(shareDir, { recursive: true, force: true }); // leftovers from a quit that skipped will-quit (e.g. a crash)
   createPanel();
   engine.on("status", broadcast);
   engine.ensureModel();
@@ -635,6 +731,19 @@ async function selftest(dir, sample) {
     await wait(2500);
     await shot("library-home.png");
 
+    // Sharing: a hard-linked copy named after the title, and (macOS/Windows) the file on the clipboard.
+    try {
+      const { out } = shareFile({ id: video.id, version: "original", title: "Self: test/share?" }, library.webContents);
+      step("share: copy named after the title", path.basename(out) === "Self test share.mp4" && fs.statSync(out).size > 0, { file: path.basename(out) });
+      if (process.platform !== "linux") {
+        await copyFileToClipboard(out);
+        const got = await clipboardFile();
+        step("share: video file on the clipboard", !!got && path.basename(got) === path.basename(out), { got });
+      }
+    } catch (err) {
+      step("share", false, { error: String(err?.message ?? err) });
+    }
+
     // Crash recovery: an orphaned raw recording is imported on the next start.
     const orphan = path.join(libraryDir(), "Recap 2026-01-01-00-00-00.webm");
     fs.copyFileSync(sample, orphan);
@@ -712,5 +821,8 @@ app.on("before-quit", (e) => {
 });
 
 app.on("activate", () => (engine.state === "ready" ? openLibrary() : panel?.show()));
-app.on("will-quit", () => globalShortcut.unregisterAll());
+app.on("will-quit", () => {
+  globalShortcut.unregisterAll();
+  fs.rmSync(shareDir, { recursive: true, force: true }); // hard links: the library copies are untouched
+});
 app.on("window-all-closed", (e) => e.preventDefault());

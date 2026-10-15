@@ -744,7 +744,12 @@ async function selftest(dir, sample) {
       step("share: copy named after the title", path.basename(out) === "Self test share.mp4" && fs.statSync(out).size > 0, { file: path.basename(out) });
       if (process.platform !== "linux") {
         await copyFileToClipboard(out);
-        const got = await clipboardFile();
+        // CI runners share one pasteboard with other processes; read back a few times before failing.
+        let got = null;
+        for (let i = 0; i < 5 && !got; i++) {
+          got = await clipboardFile().catch(() => null);
+          if (!got || path.basename(got) !== path.basename(out)) (got = null), await wait(400), await copyFileToClipboard(out);
+        }
         step("share: video file on the clipboard", !!got && path.basename(got) === path.basename(out), { got });
       }
     } catch (err) {

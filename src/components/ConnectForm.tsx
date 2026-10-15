@@ -48,7 +48,7 @@ export default function ConnectForm({ initialCode, client, email, verified }: { 
             maxLength={9}
             autoComplete="off"
             spellCheck={false}
-            className="w-full rounded-sm border border-border bg-surface px-3 py-3 text-center text-xl tracking-[0.3em] outline-none focus:border-border-strong"
+            className="w-full rounded-lg border border-border bg-surface px-3 py-3 text-center text-xl tracking-[0.3em] outline-none focus:border-border-strong"
           />
           {error && <p className="text-[12px] text-muted">{error}</p>}
           <div className="flex gap-2">

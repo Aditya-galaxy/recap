@@ -51,7 +51,7 @@ export default function DesktopShare({ video }: { video: Video }) {
     }
   }
 
-  const item = "block w-full rounded-sm px-3 py-2 text-left hover:bg-surface-2";
+  const item = "block w-full rounded-lg px-3 py-2 text-left hover:bg-surface-2";
   return (
     <div className="relative" ref={box}>
       <button className="btn-primary" onClick={() => (setOpen((o) => !o), setNote(""))} aria-expanded={open}>
@@ -65,7 +65,7 @@ export default function DesktopShare({ video }: { video: Video }) {
               e.preventDefault();
               api.dragVideo(video);
             }}
-            className="mb-1 cursor-grab rounded-sm border border-dashed border-border-strong px-3 py-3 text-center active:cursor-grabbing"
+            className="mb-1 cursor-grab rounded-lg border border-dashed border-border-strong px-3 py-3 text-center active:cursor-grabbing"
             title="Drag this into another app"
           >
             <p>drag into Slack, Teams or an email</p>

@@ -36,7 +36,7 @@ export default function FeedbackButton({ url, where, version }: { url: string; w
     }
   }
 
-  const input = "w-full rounded-sm border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
+  const input = "w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
   return (
     <>
       <button className="underline" onClick={() => { setOpen(true); setStatus(null); }}>feedback</button>
@@ -47,13 +47,13 @@ export default function FeedbackButton({ url, where, version }: { url: string; w
               <h2 className="font-medium">send feedback</h2>
               <button type="button" className="text-muted hover:text-text" onClick={() => setOpen(false)} aria-label="close">✕</button>
             </div>
-            <div className="grid grid-cols-4 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]">
+            <div className="grid grid-cols-4 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
               {KINDS.map((k) => (
                 <button
                   type="button"
                   key={k}
                   onClick={() => setKind(k)}
-                  className={`rounded-sm py-1 ${kind === k ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+                  className={`rounded-lg py-1 ${kind === k ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
                 >
                   {k}
                 </button>

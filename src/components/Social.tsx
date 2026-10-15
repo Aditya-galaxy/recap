@@ -60,7 +60,7 @@ export function ReactionsBar({ videoId, now, duration }: { videoId: string; now:
           <button
             key={e}
             onClick={() => react(e)}
-            className={`rounded-sm border border-border px-2 py-1 text-[13px] transition hover:border-border-strong ${flash === e ? "scale-110" : ""}`}
+            className={`rounded-lg border border-border px-2 py-1 text-[13px] transition hover:border-border-strong ${flash === e ? "scale-110" : ""}`}
             title={`React at ${fmtTime(now)}`}
           >
             {e} {counts[e] ? <span className="text-[11px] text-muted">{counts[e]}</span> : null}
@@ -157,7 +157,7 @@ export function CommentsPanel({
               rows={2}
               maxLength={2000}
               placeholder="add a comment…"
-              className="w-full resize-none rounded-sm border border-border bg-surface px-2.5 py-2 text-[13px] outline-none focus:border-border-strong"
+              className="w-full resize-none rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] outline-none focus:border-border-strong"
             />
             <div className="flex items-center justify-between gap-2 text-[11px]">
               <label className="flex items-center gap-1.5 text-muted">
@@ -195,11 +195,11 @@ export function InsightsPanel({ videoId }: { videoId: string }) {
   return (
     <div className="space-y-5 overflow-y-auto p-5 text-[13px]">
       <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-sm border border-border p-3">
+        <div className="rounded-lg border border-border p-3">
           <p className="label">viewers</p>
           <p className="mt-1 text-xl font-light">{data.uniqueViewers}</p>
         </div>
-        <div className="rounded-sm border border-border p-3">
+        <div className="rounded-lg border border-border p-3">
           <p className="label">avg watched</p>
           <p className="mt-1 text-xl font-light">{Math.round(data.avgCompletion * 100)}%</p>
         </div>
@@ -272,7 +272,7 @@ export function ReportButton({ videoId }: { videoId: string }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             required
-            className="w-full rounded-sm border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
+            className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
           >
             <option value="" disabled>
               why?
@@ -287,7 +287,7 @@ export function ReportButton({ videoId }: { videoId: string }) {
             rows={2}
             maxLength={500}
             placeholder="details (optional)"
-            className="w-full resize-none rounded-sm border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
+            className="w-full resize-none rounded-lg border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
           />
           {error && <p className="text-muted">{error}</p>}
           <div className="flex justify-end gap-2">

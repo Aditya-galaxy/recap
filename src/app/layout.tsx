@@ -25,11 +25,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
-      <body className="grid-bg min-h-full flex flex-col font-mono text-[14px]">
+      <body className="min-h-full flex flex-col font-sans text-[14px]">
         <header className="sticky top-0 z-10 border-b border-border bg-bg/85 backdrop-blur">
           <div className="mx-auto flex h-12 max-w-6xl items-center justify-between px-4">
-            <Link href="/" className="flex items-center text-[14px] font-medium">
-              <span className="text-muted">~/</span>recap<span className="cursor-blink ml-0.5 inline-block h-3.5 w-[7px] bg-text" />
+            <Link href="/" className="flex items-center text-[16px] font-semibold tracking-tight">
+              recap
             </Link>
             <Suspense fallback={<nav className="h-8" />}>
               <Nav />

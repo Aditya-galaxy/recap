@@ -49,7 +49,7 @@ export default function AuthForm({
     router.refresh();
   }
 
-  const input = "w-full rounded-sm border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
+  const input = "w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
   if (checkEmail) {
     return (
       <div className="mx-auto max-w-sm px-4 py-16 text-[13px]">
@@ -100,7 +100,7 @@ export default function AuthForm({
           {mode === "login" && <Link href="/forgot" className="mt-1 block text-[11px] text-muted underline">forgot password?</Link>}
         </label>
         {error && (
-          <p className="rounded-sm border border-border-strong p-2.5 text-[12px]">
+          <p className="rounded-lg border border-border-strong p-2.5 text-[12px]">
             <span className="text-muted">error: </span>
             {error}
           </p>

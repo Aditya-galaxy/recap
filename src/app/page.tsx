@@ -39,7 +39,7 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
             defaultValue={q}
             placeholder="search titles"
             aria-label="Search videos by title"
-            className="w-44 rounded-sm border border-border bg-surface px-2.5 py-1.5 text-[12px] outline-none focus:border-border-strong sm:w-60"
+            className="w-44 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] outline-none focus:border-border-strong sm:w-60"
           />
         </form>
       </div>
@@ -70,15 +70,15 @@ $ recap record --screen --cam`}
                     <img src={`/api/videos/${v.id}/thumb`} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover grayscale transition group-hover:grayscale-0" />
                   ) : null}
                   {v.status !== "ready" && (
-                    <span className="absolute left-2 top-2 rounded-sm bg-black px-1.5 py-0.5 text-[11px] text-white">
+                    <span className="absolute left-2 top-2 rounded-lg bg-black px-1.5 py-0.5 text-[11px] text-white">
                       {v.status === "error" ? "failed" : (v.stage ?? "processing").toLowerCase() + "…"}
                     </span>
                   )}
                   {v.clean.status === "ready" && (
-                    <span className="absolute bottom-2 left-2 rounded-sm bg-white px-1.5 py-0.5 text-[11px] text-black">cleaned</span>
+                    <span className="absolute bottom-2 left-2 rounded-lg bg-white px-1.5 py-0.5 text-[11px] text-black">cleaned</span>
                   )}
                   {v.duration ? (
-                    <span className="absolute bottom-2 right-2 rounded-sm bg-black px-1.5 py-0.5 text-[11px] text-white">
+                    <span className="absolute bottom-2 right-2 rounded-lg bg-black px-1.5 py-0.5 text-[11px] text-white">
                       {fmtTime(v.duration)}
                     </span>
                   ) : null}

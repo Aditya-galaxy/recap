@@ -190,9 +190,12 @@ export async function processVideo(id: string) {
     const n = haveSrc ? (srcInfo?.audio ?? 0) : (await inspect(mp4)).audio;
     if (!n) return { words: [], silences: [] };
     await timed("extract audio", () => run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", from, ...audioMap(n), "-ar", "16000", "-ac", "1", wav]));
-    const words = await timed("transcribe", () => transcribe(id, wav));
     const length = (await inspect(wav)).duration;
     const silences = await timed("pauses", () => detectSilences(wav, length));
+    // All silence (mic off, or the recorder's placeholder track): nothing to transcribe, and whisper tends to
+    // invent a "Thank you." on silence.
+    const quiet = silences.reduce((s, r) => s + (r.end - r.start), 0);
+    const words = length > 0 && quiet >= length - 0.25 ? [] : await timed("transcribe", () => transcribe(id, wav));
     await fs.rm(wav, { force: true });
     await fs.rm(file(id, "whisper.json"), { force: true });
     return { words: snapToSilences(words, silences), silences };

@@ -85,7 +85,8 @@ jobs:
             linux)
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
               sudo apt-get install -y -qq ./dist/Recap-linux-amd64.deb >/dev/null
-              BIN=$(dpkg -L recap-desktop | grep -E '/recap-desktop$' | head -1); echo "installed: $BIN"
+              BIN=$(for f in $(dpkg -L recap-desktop); do [ -f "$f" ] && [ -x "$f" ] && [ "$(basename "$f")" = recap-desktop ] && echo "$f"; done | head -1)
+              echo "installed: $BIN"; [ -n "$BIN" ]
               export RECAP_SELFTEST_CAPTURE=1
               APP=(xvfb-run -a -s "-screen 0 1920x1080x24" "$BIN" --no-sandbox) ;;
             macos) APP=("dist/mac-arm64/Recap.app/Contents/MacOS/Recap") ;;

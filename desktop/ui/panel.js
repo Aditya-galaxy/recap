@@ -28,6 +28,8 @@ function bindSeg(id, key) {
     settings[key] = v;
     save();
     render();
+    // The bubble size also applies to a recording in progress.
+    if (key === "bubbleSize") window.recap.bubbleSize(v);
   });
 }
 function bindSwitch(id, key) {

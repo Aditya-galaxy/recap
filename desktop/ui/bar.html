@@ -40,11 +40,12 @@
     }
 
     window.recap.on("state", (s) => {
-      if (s.phase === lastPhase && ["recording", "paused"].includes(s.phase)) {
+      const key = `${s.phase}|${s.bubbleOn}|${s.bubbleSize}`;
+      if (key === lastPhase && ["recording", "paused"].includes(s.phase)) {
         document.getElementById("time").textContent = fmt(s.elapsed);
         return;
       }
-      lastPhase = s.phase;
+      lastPhase = key;
       bar.innerHTML = "";
       if (s.phase === "countdown") {
         const t = document.createElement("span");
@@ -61,6 +62,7 @@
         grow.className = "grow";
         bar.append(
           dot, time, grow,
+          ...(s.bubbleOn ? [btn(`◯ ${s.bubbleSize ?? "m"}`, "bubble", "", "Camera bubble size (s / m / l)")] : []),
           s.phase === "recording" ? btn("❚❚", "pause", "", "Pause") : btn("▶", "resume", "", "Resume"),
           btn("■ stop", "stop", "primary"),
           btn("✕", "discard", "", "Discard"),

@@ -1,77 +1,107 @@
-// Point the main download button at this visitor's OS.
-(() => {
-  const btn = document.getElementById("dl-primary");
-  const base = "https://github.com/Aditya-galaxy/recap/releases/latest/download/";
+// Download gate: visitors leave an email, then the download for their OS starts right away.
+// Someone who already gave their email on this browser just gets the download.
+
+const RELEASES = "https://github.com/Aditya-galaxy/recap/releases/latest/download/";
+
+function detectOs() {
   const ua = navigator.userAgent;
   const platform = navigator.userAgentData?.platform ?? navigator.platform ?? "";
-  if (/Mac/i.test(platform) || /Macintosh/.test(ua)) {
-    btn.href = base + "Recap-mac-arm64.dmg";
-    btn.textContent = "download for macOS";
-  } else if (/Win/i.test(platform) || /Windows/.test(ua)) {
-    btn.href = base + "Recap-windows-x64-setup.exe";
-    btn.textContent = "download for Windows";
-  } else if (/Linux/i.test(platform) && !/Android/i.test(ua)) {
-    btn.href = base + "Recap-linux-x86_64.AppImage";
-    btn.textContent = "download for Linux";
-  }
-})();
+  if (/Mac/i.test(platform) || /Macintosh/.test(ua)) return { os: "mac", name: "macOS", file: "Recap-mac-arm64.dmg" };
+  if (/Win/i.test(platform) || /Windows/.test(ua)) return { os: "windows", name: "Windows", file: "Recap-windows-x64-setup.exe" };
+  if (/Linux/i.test(platform) && !/Android/i.test(ua)) return { os: "linux", name: "Linux", file: "Recap-linux-x86_64.AppImage" };
+  return { os: "other", name: "", file: "" };
+}
+const target = detectOs();
+const downloadUrl = target.file ? RELEASES + target.file : "https://github.com/Aditya-galaxy/recap/releases/latest";
 
-// Recap Cloud founding spots: real numbers from the cloud server. Stays hidden if it can't be reached.
-(async () => {
-  const CLOUD = "https://app.recap.kronagent.dev";
-  try {
-    const r = await fetch(CLOUD + "/api/public/stats", { signal: AbortSignal.timeout(5000) });
-    if (!r.ok) return;
-    const { limit, left } = await r.json();
-    if (!Number.isInteger(limit) || !Number.isInteger(left)) return;
-    document.getElementById("founding-limit").textContent = limit;
-    document.getElementById("founding-left").textContent = left > 0 ? `${left} of ${limit}` : "All";
-    document.getElementById("founding-text").textContent = left > 0 ? "founding spots left" : `${limit} founding spots are taken`;
-    document.getElementById("founding-bar").style.width = `${Math.round(((limit - left) / limit) * 100)}%`;
-    if (left === 0) document.getElementById("founding-cta").textContent = "sign up for Recap Cloud";
-    document.getElementById("founding").hidden = false;
-  } catch {
-    /* cloud unreachable: keep the section hidden */
-  }
-})();
+const KEY = "recap_download_ok";
+const store = {
+  get() {
+    try {
+      return localStorage.getItem(KEY) === "1";
+    } catch {
+      return false;
+    }
+  },
+  set() {
+    try {
+      localStorage.setItem(KEY, "1");
+    } catch {
+      /* private mode: they'll just be asked again next time */
+    }
+  },
+};
 
-const form = document.getElementById("signup");
-const status = document.getElementById("status");
-const button = form.querySelector("button");
+function showReady(gate) {
+  const ready = document.getElementById("ready").content.cloneNode(true);
+  ready.querySelector("[data-primary]").href = downloadUrl;
+  // Phones and tablets can't install it: point them at their computer instead.
+  if (!target.file) ready.querySelector(".ready-title").textContent = "You're in. Open this page on your computer to install Recap.";
+  gate.replaceChildren(ready);
+}
 
-form.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const email = form.email.value.trim();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    status.textContent = "Enter a valid email address.";
-    form.email.focus();
-    return;
+function startDownload() {
+  // A download link doesn't navigate away; mobile visitors get the releases page instead.
+  if (target.file) location.href = downloadUrl;
+  else window.open(downloadUrl, "_blank", "noopener");
+}
+
+for (const gate of document.querySelectorAll("[data-gate]")) {
+  const form = gate.querySelector("form");
+  const status = gate.querySelector("[data-status]");
+  const button = gate.querySelector("[data-label]");
+  if (target.name) button.textContent = `Download for ${target.name}`;
+  if (!target.file) status.textContent = "Recap is a desktop app for Mac, Windows and Linux. Open this page on your computer to install it.";
+
+  // Already signed up on this browser: no second ask.
+  if (store.get()) {
+    form.email.closest("form").classList.add("known");
+    form.email.remove();
+    form.querySelector(".hp").remove();
+    status.textContent = "Free and open source.";
   }
-  button.disabled = true;
-  status.classList.remove("ok");
-  status.textContent = "…";
-  try {
-    const res = await fetch("/api/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        website: form.website.value,
-        interest: document.querySelector('input[name="interest"]:checked')?.value,
-        source: new URLSearchParams(location.search).get("ref") || undefined,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
-    form.reset();
-    status.classList.add("ok");
-    status.textContent = "✓ You're on the list. We'll email you about new releases.";
-  } catch (err) {
-    status.textContent = err.message;
-  } finally {
-    button.disabled = false;
-  }
-});
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (store.get()) {
+      startDownload();
+      showReady(gate);
+      return;
+    }
+    const email = form.email.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      status.classList.add("err");
+      status.textContent = "Enter a valid email address.";
+      form.email.focus();
+      return;
+    }
+    button.disabled = true;
+    status.classList.remove("err");
+    status.textContent = "One moment…";
+    try {
+      const res = await fetch("/api/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email,
+          website: form.website.value,
+          interest: "download",
+          os: target.os,
+          source: new URLSearchParams(location.search).get("ref") || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
+      store.set();
+      startDownload();
+      showReady(gate);
+    } catch (err) {
+      status.classList.add("err");
+      status.textContent = err.message;
+      button.disabled = false;
+    }
+  });
+}
 
 const fb = document.getElementById("fb");
 const fbStatus = document.getElementById("fb-status");
@@ -79,8 +109,7 @@ fb.addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = fb.querySelector("button");
   btn.disabled = true;
-  fbStatus.classList.remove("ok");
-  fbStatus.textContent = "…";
+  fbStatus.textContent = "Sending…";
   try {
     const res = await fetch("/api/feedback", {
       method: "POST",
@@ -97,8 +126,7 @@ fb.addEventListener("submit", async (e) => {
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Something went wrong. Please try again.");
     fb.reset();
-    fbStatus.classList.add("ok");
-    fbStatus.textContent = "✓ Thanks, it's been received and will be read.";
+    fbStatus.textContent = "Thanks, it's been received and will be read.";
   } catch (err) {
     fbStatus.textContent = err.message;
   } finally {

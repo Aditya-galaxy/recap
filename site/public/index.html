@@ -4,120 +4,157 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Recap: record it once, skip the meeting</title>
-  <meta name="description" content="Recap is a free, open-source Loom alternative that runs on your own computer. Record your screen and camera, get a transcript, and cut the ums and dead air in one click." />
+  <meta name="description" content="Recap is a free screen recorder for Mac, Windows and Linux. Record your screen and camera, get a transcript, and cut the ums and dead air in one click. Everything stays on your computer." />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Recap: record it once, skip the meeting" />
-  <meta property="og:description" content="Free, open-source, local-first screen recorder with transcripts and one-click filler-word removal." />
+  <meta property="og:description" content="A free screen recorder that transcribes on your computer and cuts the ums in one click." />
   <meta property="og:url" content="https://recap.kronagent.dev/" />
   <meta property="og:image" content="https://recap.kronagent.dev/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
   <link rel="icon" href="/icon.png" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=2" />
 </head>
 <body>
-  <header class="wrap top">
-    <a class="logo" href="/"><span class="muted">~/</span>recap<span class="cursor"></span></a>
-    <nav><a href="#feedback">feedback</a> <a href="https://github.com/Aditya-galaxy/recap">github</a></nav>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="logo" href="/">recap</a>
+      <nav>
+        <a href="https://github.com/Aditya-galaxy/recap">GitHub</a>
+        <a class="nav-cta" href="#get">Get Recap</a>
+      </nav>
+    </div>
   </header>
 
-  <main class="wrap">
-    <section class="hero">
-      <p class="label">open-source async video</p>
-      <h1>Record it once. Share it.<br /><span class="muted">Skip the meeting.</span></h1>
+  <main>
+    <section class="hero wrap" id="get">
+      <p class="eyebrow">Free for Mac, Windows and Linux</p>
+      <h1>Record it once.<br /><span class="soft">Skip the meeting.</span></h1>
       <p class="lede">
-        Recap records your screen and camera, transcribes it on your own computer, and cuts the
-        “um”s and dead air in one click. Free, private, no account, no upload limits.
+        Recap records your screen and camera, writes the transcript on your own computer,
+        and cuts every “um” and long pause in one click.
       </p>
 
-      <div class="download" id="download">
-        <a class="btn primary big" id="dl-primary" href="https://github.com/Aditya-galaxy/recap/releases/latest">download for your computer</a>
-        <p class="fine dl-others">
-          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-mac-arm64.dmg">macOS (Apple silicon)</a> ·
-          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">Windows</a> ·
-          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-x86_64.AppImage">Linux AppImage</a> ·
-          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-amd64.deb">.deb</a>
-          <br />free · open source · early release, so builds aren't code-signed yet (<a href="https://github.com/Aditya-galaxy/recap#desktop-app-recommended">first-launch steps</a>)
-        </p>
+      <div class="gate" data-gate>
+        <form class="gate-form" novalidate>
+          <label class="sr" for="email-1">Email</label>
+          <input id="email-1" name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
+          <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <button type="submit" class="btn primary" data-label>Download</button>
+        </form>
+        <p class="fine" role="status" data-status>Free and open source. We'll only email you about Recap.</p>
       </div>
-
-      <div class="founding" id="founding" hidden>
-        <p class="label">recap cloud · share links with comments and viewer insights</p>
-        <p class="founding-line"><span id="founding-left">–</span> <span id="founding-text"></span></p>
-        <div class="bar" aria-hidden="true"><div id="founding-bar"></div></div>
-        <a class="btn" id="founding-cta" href="https://app.recap.kronagent.dev/signup">claim a founding spot</a>
-        <p class="fine">The first <span id="founding-limit">100</span> confirmed accounts are free for life (fair-use storage). The count is live; we don't fake scarcity.</p>
-      </div>
-
-      <p class="label" style="margin-top:36px">get updates</p>
-
-      <form id="signup" class="signup" novalidate>
-        <label class="sr" for="email">email</label>
-        <input id="email" name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
-        <!-- honeypot: hidden from people, irresistible to bots -->
-        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
-        <button type="submit" class="btn">notify me</button>
-      </form>
-      <fieldset class="interest" id="interest">
-        <legend class="label">i'm most interested in</legend>
-        <label><input type="radio" name="interest" value="desktop" checked /> new releases</label>
-        <label><input type="radio" name="interest" value="hosted" /> a hosted version for my team</label>
-        <label><input type="radio" name="interest" value="selfhost" /> self-hosting it</label>
-      </fieldset>
-      <p class="fine" id="status" role="status">Occasional emails about new releases. Unsubscribe anytime.</p>
     </section>
 
-    <section class="grid">
-      <div><p class="label">record</p><p>Screen + a camera bubble you can drag anywhere. Mac, Windows, Linux, or the browser. Global hotkey to start and stop.</p></div>
-      <div><p class="label">transcribe</p><p>Word-level transcript and captions from whisper.cpp, running locally. Click any word to jump there.</p></div>
-      <div><p class="label">clean up</p><p>Remove filler words and shorten long pauses. See the time saved, preview, then export the clean cut.</p></div>
-      <div><p class="label">own it</p><p>Everything stays on your machine. Unlimited videos. MIT licensed. Optional self-hosted server for share links.</p></div>
+    <section class="wrap showcase" aria-label="What Recap looks like">
+      <div class="window">
+        <div class="chrome"><span></span><span></span><span></span><p>Weekly update · 4:12</p></div>
+        <div class="window-body">
+          <div class="player">
+            <div class="screen"></div>
+            <div class="bubble"></div>
+            <div class="scrub"><div></div></div>
+          </div>
+          <div class="transcript">
+            <p class="tag">Transcript</p>
+            <p>Hi team, <s>um</s> quick update on the launch. <s>So, uh,</s> the recorder works on all three platforms now.</p>
+            <p><s>Like,</s> the big change is that cleanup runs <s>um</s> entirely on your machine.</p>
+            <p class="saved">−1:08 of ums and pauses removed</p>
+          </div>
+        </div>
+      </div>
     </section>
 
-    <section class="compare">
-      <p class="label">why not just use loom?</p>
+    <section class="wrap features">
+      <div>
+        <p class="num">01</p>
+        <h2>Record</h2>
+        <p>Your screen with a camera bubble you can drag anywhere. Start and stop from any app with one shortcut.</p>
+      </div>
+      <div>
+        <p class="num">02</p>
+        <h2>Transcribe</h2>
+        <p>A word-by-word transcript and captions, written by whisper.cpp on your computer. Click any word to jump there.</p>
+      </div>
+      <div>
+        <p class="num">03</p>
+        <h2>Clean up</h2>
+        <p>Remove filler words and shorten long pauses. Preview the result, then export an MP4 that's ready to send.</p>
+      </div>
+    </section>
+
+    <section class="wrap statement">
+      <h2>Your recordings never leave your computer.</h2>
+      <p>No account. No upload. No limits on how many videos you make or how long they run.</p>
+    </section>
+
+    <section class="wrap compare">
       <table>
-        <tr><th></th><th>Loom</th><th>Recap</th></tr>
-        <tr><td>Price</td><td>$15–20 per user / month</td><td>Free, open source</td></tr>
-        <tr><td>Free-tier limits</td><td>25 videos, 5 min each</td><td>None</td></tr>
-        <tr><td>Where videos live</td><td>Loom's cloud</td><td>Your computer or your server</td></tr>
-        <tr><td>Filler-word removal</td><td>Paid AI plan</td><td>Included, runs locally</td></tr>
+        <thead><tr><th></th><th>Loom</th><th>Recap</th></tr></thead>
+        <tbody>
+          <tr><td>Price</td><td>$15–20 per person, per month</td><td>Free</td></tr>
+          <tr><td>Free plan</td><td>25 videos, 5 minutes each</td><td>Unlimited</td></tr>
+          <tr><td>Where videos live</td><td>Loom's servers</td><td>Your computer</td></tr>
+          <tr><td>Removing ums and pauses</td><td>Paid AI add-on</td><td>Included</td></tr>
+        </tbody>
       </table>
     </section>
 
-    <section class="selfhost">
-      <p class="label">available today: self-host it</p>
-      <p>Run the Recap server for your team with Docker. Share links, accounts, transcripts and clean-up included.</p>
-      <pre><code>curl -O https://raw.githubusercontent.com/Aditya-galaxy/recap/main/docker-compose.yml
-docker compose up -d   # → http://localhost:3217</code></pre>
-      <p><a href="https://github.com/Aditya-galaxy/recap#quick-start">setup guide →</a></p>
+    <section class="wrap closing">
+      <h2>Make your next update a two&#8209;minute video.</h2>
+      <div class="gate" data-gate>
+        <form class="gate-form" novalidate>
+          <label class="sr" for="email-2">Email</label>
+          <input id="email-2" name="email" type="email" required autocomplete="email" placeholder="you@company.com" />
+          <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <button type="submit" class="btn primary" data-label>Download</button>
+        </form>
+        <p class="fine" role="status" data-status>Free and open source. We'll only email you about Recap.</p>
+      </div>
     </section>
-    <section class="feedback" id="feedback">
-      <p class="label">feedback</p>
-      <p>Tried it? Something broken, missing, or great? This goes straight to the person building Recap.</p>
-      <form id="fb" class="fb" novalidate>
-        <div class="kinds" role="radiogroup" aria-label="kind">
-          <label><input type="radio" name="kind" value="idea" checked /> idea</label>
-          <label><input type="radio" name="kind" value="bug" /> bug</label>
-          <label><input type="radio" name="kind" value="praise" /> praise</label>
-          <label><input type="radio" name="kind" value="other" /> other</label>
-        </div>
-        <label class="sr" for="fb-message">message</label>
-        <textarea id="fb-message" name="message" rows="4" maxlength="4000" required placeholder="what would make Recap useful for you or your team?"></textarea>
-        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
-        <div class="fb-row">
-          <label class="sr" for="fb-email">email (optional)</label>
-          <input id="fb-email" name="email" type="email" autocomplete="email" placeholder="email, optional, if you'd like a reply" />
-          <button type="submit" class="btn primary">send</button>
-        </div>
-        <p class="fine" id="fb-status" role="status"></p>
-      </form>
+
+    <!-- Shown once an email is in: OS-aware download plus the other builds. -->
+    <template id="ready">
+      <div class="ready">
+        <p class="ready-title">Your download is starting.</p>
+        <p class="fine">
+          Didn't start? <a data-primary href="#">Download for your computer</a>.
+          Other builds: <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-mac-arm64.dmg">macOS (Apple silicon)</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">Windows</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-x86_64.AppImage">Linux AppImage</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-amd64.deb">.deb</a>
+        </p>
+        <p class="fine">Early release: builds aren't code-signed yet, so your computer will ask you to confirm on first launch. <a href="https://github.com/Aditya-galaxy/recap#desktop-app-recommended">How to open it</a>.</p>
+      </div>
+    </template>
+
+    <section class="wrap feedback" id="feedback">
+      <details>
+        <summary>Send feedback</summary>
+        <form id="fb" class="fb" novalidate>
+          <div class="kinds" role="radiogroup" aria-label="Kind">
+            <label><input type="radio" name="kind" value="idea" checked /> Idea</label>
+            <label><input type="radio" name="kind" value="bug" /> Bug</label>
+            <label><input type="radio" name="kind" value="praise" /> Praise</label>
+            <label><input type="radio" name="kind" value="other" /> Other</label>
+          </div>
+          <label class="sr" for="fb-message">Message</label>
+          <textarea id="fb-message" name="message" rows="4" maxlength="4000" required placeholder="What would make Recap more useful to you?"></textarea>
+          <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <div class="fb-row">
+            <label class="sr" for="fb-email">Email (optional)</label>
+            <input id="fb-email" name="email" type="email" autocomplete="email" placeholder="Email, if you'd like a reply" />
+            <button type="submit" class="btn">Send</button>
+          </div>
+          <p class="fine" id="fb-status" role="status"></p>
+        </form>
+      </details>
     </section>
   </main>
 
   <footer class="wrap foot">
-    <span>MIT licensed · whisper.cpp + ffmpeg · <a href="https://github.com/Aditya-galaxy/recap">source</a></span>
+    <span>recap · MIT licensed · <a href="https://github.com/Aditya-galaxy/recap">source</a></span>
     <span>We only use your email to tell you about Recap.</span>
   </footer>
-  <script src="/app.js"></script>
+  <script src="/app.js?v=2"></script>
 </body>
 </html>

@@ -16,13 +16,13 @@ browser, and send a link a colleague can watch without signing in.
 
 ## Phases
 
-### v0.4: Recap Cloud *(done)*
-- [x] Hosted mode (`CLOUD_MODE`): open sign-up with email confirmation (Resend), password reset.
-- [x] Founding plan: the first 100 confirmed accounts are free for life (fair-use storage); live, real count.
-- [x] Timestamped comments, emoji reactions, viewer insights (who watched, how far), email notifications.
-- [x] Abuse reports with an admin review queue and takedowns; Terms and Privacy pages.
-- [x] Desktop app connects with a code (device flow) and shares videos with the transcript it already made,
-      so the cloud runs on a free-tier VM without whisper (`SERVER_TRANSCRIBE=false`).
+### Server: hosted mode *(built, not hosted)*
+- [x] `CLOUD_MODE` for anyone running a public Recap server: open sign-up with email confirmation (Resend),
+      password reset, founding plan with storage quotas, comments, reactions, viewer insights, reports and
+      takedowns, Terms and Privacy pages.
+- [x] The desktop app can connect to such a server with a code (set `RECAP_CLOUD_URL`) and share videos with the
+      transcript it already made, so the server can run without whisper (`SERVER_TRANSCRIBE=false`).
+- We tried running it as a free hosted service and turned it off: Recap stays a desktop app first.
 
 ### v0.3: Local-first desktop *(done)*
 - [x] The desktop app bundles the Recap engine, ffmpeg and whisper.cpp; no server or account needed.
@@ -57,10 +57,10 @@ browser, and send a link a colleague can watch without signing in.
 - S3/R2 storage driver for larger deployments; scheduled backups of `data/`.
 - Resumable uploads (tus) for long recordings on flaky networks.
 - Optional AI summaries, titles and chapters (bring your own Claude API key).
-- Workspaces/teams; SSO; paid plan once founding spots are gone (no billing until it's announced).
+- Workspaces/teams; SSO.
 - Trim start/end in the app.
 - Signed + notarized desktop builds (needs paid Apple/Microsoft certificates).
 
 ## Non-goals (for now)
-- Cloud-only features. Everything in Recap Cloud also works self-hosted.
+- A hosted SaaS. Recap is a desktop app first; the server is for teams that run their own.
 - A video editor beyond trimming fillers and pauses.

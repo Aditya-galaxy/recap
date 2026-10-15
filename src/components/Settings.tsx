@@ -22,7 +22,7 @@ export default function Settings({
   tokens: ApiToken[];
   server: string;
   signupOpen: boolean;
-  local: { dataDir: string; model: string } | null;
+  local: { dataDir: string; model: string; cloud: boolean } | null;
   account: Account;
 }) {
   const router = useRouter();
@@ -86,11 +86,13 @@ export default function Settings({
         </section>
         <section className="space-y-3">
           <h2 className="label">sharing</h2>
-          <CloudLinkCard />
-          <p className="text-[12px] text-muted">
-            Or use <span className="text-text">export</span> on any video to save the MP4 and send it yourself. Running your own server works too:
-            one <code>docker compose up</code>, then point the recorder&apos;s <span className="text-text">server</span> setting at it.
-          </p>
+          {local.cloud && <CloudLinkCard />}
+          <div className="card p-4 text-[13px]">
+            <p>
+              Open a video and use <span className="text-text">export</span> to save the original or cleaned MP4, then send it any way you
+              like: Slack, email, a shared drive.
+            </p>
+          </div>
         </section>
       </div>
     );

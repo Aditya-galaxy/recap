@@ -16,6 +16,7 @@ export default function Watch({
   owner,
   shareUrl,
   local = false,
+  cloudShare = false,
   viewer = null,
 }: {
   initialMeta: VideoMeta;
@@ -23,6 +24,8 @@ export default function Watch({
   owner: boolean;
   shareUrl: string;
   local?: boolean;
+  /** Desktop app connected to a Recap server (RECAP_CLOUD_URL): offer "share link". */
+  cloudShare?: boolean;
   viewer?: Viewer | null;
 }) {
   const router = useRouter();
@@ -236,7 +239,7 @@ export default function Watch({
             </div>
           )}
           {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>}
-          {local && ready && <ShareToCloud videoId={id} version={version} canClean={meta.clean.status === "ready"} />}
+          {cloudShare && ready && <ShareToCloud videoId={id} version={version} canClean={meta.clean.status === "ready"} />}
           {ready && (
             <a className={local ? "btn-primary" : "btn-ghost"} href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
               {local ? `export ${version === "clean" ? "cleaned " : ""}mp4` : "download"}

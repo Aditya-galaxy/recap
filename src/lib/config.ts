@@ -31,8 +31,11 @@ export const config = {
    * VM) turn this off: the desktop app transcribes on the user's machine and uploads the transcript with the video.
    */
   serverTranscribe: bool(process.env.SERVER_TRANSCRIBE, true),
-  /** The Recap Cloud server the desktop app connects to for share links. */
-  cloudUrl: (process.env.RECAP_CLOUD_URL ?? "https://app.recap.kronagent.dev").replace(/\/+$/, ""),
+  /**
+   * A Recap server (CLOUD_MODE) the desktop app can connect to for share links. Unset by default: the app is
+   * fully local, and the connect / share-link UI only appears when this points at a server you run.
+   */
+  cloudUrl: process.env.RECAP_CLOUD_URL ? process.env.RECAP_CLOUD_URL.replace(/\/+$/, "") : null,
   /**
    * Recap Cloud mode (the hosted service): email verification is required, accounts get a plan
    * (founding / standard) with storage quotas, and the first FOUNDER_LIMIT verified accounts are founders.

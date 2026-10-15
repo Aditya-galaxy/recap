@@ -34,9 +34,9 @@ then `gcloud compute instances stop recap-1 --zone $Z && gcloud compute instance
 
 **Logs:** `sudo tail -f /var/log/recap-startup.log` and `cd /opt/recap && sudo docker compose logs -f`.
 
-## Recap Cloud on the free tier (e2-micro)
+## Hosted mode on the free tier (e2-micro)
 
-Recap Cloud (open sign-up with email confirmation, founding plan, comments and insights) runs on Google's
+A public Recap server in `CLOUD_MODE` (open sign-up with email confirmation, founding plan, comments and insights) runs on Google's
 always-free `e2-micro` (us-west1, us-central1 or us-east1, 30 GB **standard** disk). The server doesn't run
 whisper there: the desktop app uploads each shared video with the transcript it made on the user's machine.
 Free tier covers the VM and disk; the external IP and outbound traffic past 1 GB/month are billed, so

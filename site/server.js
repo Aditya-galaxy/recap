@@ -28,7 +28,7 @@ const TYPES = {
 
 const SECURITY_HEADERS = {
   "Content-Security-Policy":
-    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' https://app.recap.kronagent.dev; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+    "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
   "Strict-Transport-Security": "max-age=31536000",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
@@ -95,7 +95,8 @@ async function subscribe(req, res) {
 
   const doc = {
     email,
-    interest: ["desktop", "hosted", "selfhost"].includes(body.interest) ? body.interest : "desktop",
+    interest: ["download", "desktop", "hosted", "selfhost"].includes(body.interest) ? body.interest : "desktop",
+    os: ["mac", "windows", "linux", "other"].includes(body.os) ? body.os : undefined,
     source: clean(body.source, 80) || undefined,
     referrer: clean(req.headers.referer, 300) || undefined,
     userAgent: clean(req.headers["user-agent"], 300) || undefined,
@@ -111,7 +112,7 @@ async function subscribe(req, res) {
         tx.set(ref, snap.exists ? doc : { ...doc, createdAt: FieldValue.serverTimestamp() }, { merge: true });
       });
     } else {
-      console.log("[dry-run] signup", email, doc.interest);
+      console.log("[dry-run] signup", email, doc.interest, doc.os ?? "");
     }
   } catch (err) {
     console.error("signup failed", err);

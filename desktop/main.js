@@ -60,6 +60,8 @@ function broadcast() {
     platform: process.platform,
     engine: engine.status(),
     update: session.update,
+    bubbleSize: session.opts?.bubbleSize ?? null,
+    bubbleOn: !!bubble && !bubble.isDestroyed() && session.opts?.mode !== "cam",
   };
   for (const w of [panel, bar, bubble]) if (w && !w.isDestroyed()) w.webContents.send("state", s);
   tray?.setToolTip(s.phase === "recording" ? `Recap: recording ${fmt(s.elapsed)}` : "Recap");
@@ -155,9 +157,11 @@ function displayFor(id) {
   return screen.getAllDisplays().find((d) => String(d.id) === String(id)) ?? screen.getPrimaryDisplay();
 }
 
+const BUBBLE_SIZES = { s: 140, m: 200, l: 280 };
+
 function createBubble(opts) {
   const d = displayFor(opts.displayId).workArea;
-  const size = opts.mode === "cam" ? 320 : { s: 140, m: 200, l: 280 }[opts.bubbleSize] ?? 200;
+  const size = opts.mode === "cam" ? 320 : BUBBLE_SIZES[opts.bubbleSize] ?? 200;
   bubble = new BrowserWindow({
     width: size,
     height: size,
@@ -177,9 +181,27 @@ function createBubble(opts) {
   bubble.loadFile(path.join(__dirname, "ui", "bubble.html"), { query: { cam: opts.cameraId || "" } });
 }
 
+/** Resize the camera bubble mid-recording, keeping its centre where the person dragged it. */
+function setBubbleSize(key) {
+  if (!BUBBLE_SIZES[key]) return;
+  if (session.opts) session.opts.bubbleSize = key;
+  if (!bubble || bubble.isDestroyed() || session.opts?.mode === "cam") return;
+  const b = bubble.getBounds();
+  const size = BUBBLE_SIZES[key];
+  const area = screen.getDisplayMatching(b).workArea;
+  const cx = b.x + b.width / 2;
+  const cy = b.y + b.height / 2;
+  const x = Math.round(Math.min(Math.max(cx - size / 2, area.x), area.x + area.width - size));
+  const y = Math.round(Math.min(Math.max(cy - size / 2, area.y), area.y + area.height - size));
+  bubble.setResizable(true);
+  bubble.setBounds({ x, y, width: size, height: size });
+  bubble.setResizable(false);
+  broadcast();
+}
+
 function createBar(opts) {
   const d = displayFor(opts.displayId).workArea;
-  const w = 340;
+  const w = 380;
   const h = 52;
   bar = new BrowserWindow({
     width: w,
@@ -477,8 +499,13 @@ ipcMain.handle("displays", () =>
 ipcMain.on("start", (_e, opts) => start(opts));
 ipcMain.on("discard", () => discard());
 ipcMain.on("retry-upload", () => session.lastFile && upload(session.lastFile));
+ipcMain.on("bubble-size", (_e, key) => setBubbleSize(String(key)));
 ipcMain.on("control", (_e, action) => {
   if (action === "discard") return discard();
+  if (action === "bubble") {
+    const order = ["s", "m", "l"];
+    return setBubbleSize(order[(order.indexOf(session.opts?.bubbleSize ?? "m") + 1) % order.length]);
+  }
   panel?.webContents.send("control", action);
 });
 ipcMain.on("recorder", (_e, ev) => {

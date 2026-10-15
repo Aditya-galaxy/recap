@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("recap", {
   start: (opts) => ipcRenderer.send("start", opts),
   discard: () => ipcRenderer.send("discard"),
   control: (action) => ipcRenderer.send("control", action),
+  bubbleSize: (key) => ipcRenderer.send("bubble-size", key),
   retryUpload: () => ipcRenderer.send("retry-upload"),
   recorder: (ev) => ipcRenderer.send("recorder", ev),
   chunk: (buf) => ipcRenderer.send("chunk", buf),

@@ -207,7 +207,7 @@ function closeOverlays() {
   bar = null;
 }
 
-// ---- API token (encrypted with the OS keychain / DPAPI / libsecret via safeStorage) ------
+// ---- API token (safeStorage: DPAPI on Windows, libsecret on Linux; macOS uses a mock keychain, see below) ----
 
 const tokenFile = () => path.join(app.getPath("userData"), "token.bin");
 
@@ -611,6 +611,11 @@ app.on("second-instance", () => (engine.state === "ready" ? openLibrary() : pane
 
 // PipeWire screen capture on Wayland.
 if (isLinux) app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
+// macOS: keep Chromium (cookie encryption) and safeStorage out of the login keychain. Builds are only
+// ad-hoc signed, so every update looks like a new app to the keychain and would ask for the user's
+// password. The library's cookie is per-launch and local-only; the optional server token is protected
+// by owner-only file permissions instead.
+if (process.platform === "darwin") app.commandLine.appendSwitch("use-mock-keychain");
 
 app.whenReady().then(() => {
   fs.rmSync(shareDir, { recursive: true, force: true }); // leftovers from a quit that skipped will-quit (e.g. a crash)

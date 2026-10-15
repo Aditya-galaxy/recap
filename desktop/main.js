@@ -803,6 +803,41 @@ async function selftest(dir, sample) {
     const recovered = (await (await api("/api/videos")).json()).find((v) => v.title.startsWith("Recovered recording"));
     step("orphaned recording recovered", !!recovered && !fs.existsSync(orphan));
 
+    // A real recording through the recorder itself (screen capture → MediaRecorder → import → processing),
+    // not a sample file. CI turns this on for Windows and Linux; macOS runners can't grant screen access.
+    if (process.env.RECAP_SELFTEST_CAPTURE === "1") {
+      try {
+        const before = new Set((await (await api("/api/videos")).json()).map((v) => v.id));
+        openLibrary("/"); // something on screen to record
+        await wait(1500);
+        start({ mode: "screen", micOn: false, systemAudio: false, server: "", displayId: screen.getPrimaryDisplay().id, title: "Capture test" });
+        for (let i = 0; i < 200 && session.phase !== "recording" && session.phase !== "error"; i++) await wait(100);
+        step("capture: recording started", session.phase === "recording", { phase: session.phase, error: session.error || undefined });
+        await wait(5000);
+        panel.webContents.send("control", "stop");
+        let captured = null;
+        for (let i = 0; i < 1200 && !captured; i++) {
+          await wait(100);
+          const list = await (await api("/api/videos")).json();
+          captured = list.find((v) => !before.has(v.id) && (v.status === "ready" || v.status === "error")) ?? null;
+        }
+        step("capture: video saved and processed", captured?.status === "ready", { status: captured?.status, error: captured?.error });
+        if (captured) {
+          const meta = (await (await api(`/api/videos/${captured.id}`)).json()).meta;
+          step("capture: real screen resolution and length", meta.width >= 640 && meta.height >= 360 && meta.duration >= 3, {
+            width: meta.width, height: meta.height, duration: meta.duration,
+          });
+          // The library window was on screen, so the frames must have content (not a black or empty capture).
+          const video = path.join(engine.dataDir, "videos", captured.id, "video.mp4");
+          const { stderr } = await execFileP(bin("ffmpeg"), ["-hide_banner", "-ss", "2", "-i", video, "-frames:v", "1", "-vf", "signalstats,metadata=print", "-f", "null", "-"]).catch((e) => e);
+          const range = Number(/YHIGH=(\d+)/.exec(stderr ?? "")?.[1] ?? 0) - Number(/YLOW=(\d+)/.exec(stderr ?? "")?.[1] ?? 0);
+          step("capture: frames have content", range > 40, { lumaRange: range });
+        }
+      } catch (err) {
+        step("capture", false, { error: String(err?.message ?? err) });
+      }
+    }
+
     // Deleting removes it everywhere.
     for (const v of await (await api("/api/videos")).json()) await api(`/api/videos/${v.id}`, { method: "DELETE" });
     step("delete", (await (await api("/api/videos")).json()).length === 0);

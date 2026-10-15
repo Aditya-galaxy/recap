@@ -79,12 +79,23 @@ jobs:
             -c:v libx264 -preset veryfast -b:v 4M -c:a libopus "$RUNNER_TEMP/sample.mkv"
           ls -l "$RUNNER_TEMP/sample.mkv"
           export RECAP_SELFTEST_EXPECT_CUTS=1
+          # Windows and Linux: install the real installer people download, test the installed copy, and make a
+          # real screen recording through the recorder (macOS runners can't grant screen access).
           case "${{ matrix.name }}" in
             linux)
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
-              APP=(xvfb-run -a dist/linux-unpacked/recap-desktop --no-sandbox) ;;
+              sudo apt-get install -y -qq ./dist/Recap-linux-amd64.deb >/dev/null
+              BIN=$(dpkg -L recap-desktop | grep -E '/recap-desktop$' | head -1); echo "installed: $BIN"
+              export RECAP_SELFTEST_CAPTURE=1
+              APP=(xvfb-run -a -s "-screen 0 1920x1080x24" "$BIN" --no-sandbox) ;;
             macos) APP=("dist/mac-arm64/Recap.app/Contents/MacOS/Recap") ;;
-            windows) APP=("dist/win-unpacked/Recap.exe") ;;
+            windows)
+              DEST="$RUNNER_TEMP/RecapInstalled"
+              cmd.exe //c "dist\\Recap-windows-x64-setup.exe /S /D=$(cygpath -w "$DEST")"
+              for i in $(seq 1 60); do [ -f "$DEST/Recap.exe" ] && break; sleep 2; done
+              ls "$DEST" | head; echo "installed: $DEST/Recap.exe"
+              export RECAP_SELFTEST_CAPTURE=1
+              APP=("$DEST/Recap.exe") ;;
           esac
           # macOS has no `timeout`; perl's alarm does the same job there.
           if command -v timeout >/dev/null; then LIMIT=(timeout 900); else LIMIT=(perl -e 'alarm shift; exec @ARGV' 900); fi

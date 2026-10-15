@@ -96,7 +96,7 @@ async function subscribe(req, res) {
   const doc = {
     email,
     interest: ["download", "desktop", "hosted", "selfhost"].includes(body.interest) ? body.interest : "desktop",
-    os: ["mac", "windows", "linux", "other"].includes(body.os) ? body.os : undefined,
+    os: ["mac", "mac-intel", "windows", "linux", "other"].includes(body.os) ? body.os : undefined,
     source: clean(body.source, 80) || undefined,
     referrer: clean(req.headers.referer, 300) || undefined,
     userAgent: clean(req.headers["user-agent"], 300) || undefined,

@@ -63,7 +63,8 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-feature-settings: "ss01", "zero";
+  letter-spacing: -0.005em;
+  -webkit-font-smoothing: antialiased;
 }
 
 ::selection {
@@ -71,17 +72,12 @@ body {
   color: var(--accent-text);
 }
 
-/* Faint dot grid behind everything, the one bit of texture. */
-.grid-bg {
-  background-image: radial-gradient(var(--border) 1px, transparent 1px);
-  background-size: 20px 20px;
-}
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-sm px-3 py-1.5 text-[13px] lowercase transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition disabled:opacity-40 disabled:cursor-not-allowed;
 }
 @utility btn-primary {
-  @apply btn border border-accent bg-accent text-accent-text hover:bg-transparent hover:text-text;
+  @apply btn border border-accent bg-accent text-accent-text hover:opacity-85;
 }
 @utility btn-ghost {
   @apply btn border border-border bg-surface text-text hover:border-border-strong;
@@ -90,15 +86,40 @@ body {
   @apply btn border border-border bg-surface text-muted hover:border-border-strong hover:text-text hover:line-through;
 }
 @utility card {
-  @apply rounded-sm border border-border bg-surface;
+  @apply rounded-xl border border-border bg-surface;
 }
 @utility label {
-  @apply text-[11px] uppercase tracking-[0.12em] text-muted;
+  @apply font-mono text-[11px] uppercase tracking-[0.14em] text-muted;
 }
 
-@keyframes blink {
-  50% { opacity: 0; }
+/* Calm indeterminate progress (processing, rendering). */
+@keyframes slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
 }
-.cursor-blink {
-  animation: blink 1.1s steps(1) infinite;
+.working-bar {
+  position: relative;
+  overflow: hidden;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--border);
+}
+.working-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  border-radius: 2px;
+  background: var(--text);
+  animation: slide 1.6s ease-in-out infinite;
+}
+/* Recording indicator: a slow breathe, not a blink. */
+@keyframes breathe {
+  50% { opacity: 0.35; }
+}
+.rec-dot {
+  animation: breathe 2s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .working-bar::after, .rec-dot { animation: none; }
 }

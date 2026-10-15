@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-const input = "w-full rounded-sm border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
+const input = "w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
 
 export function ForgotForm() {
   const [sent, setSent] = useState(false);
@@ -53,7 +53,7 @@ export function ResetForm({ token }: { token: string }) {
         <span className="mt-1 block text-[11px] text-muted">at least 10 characters</span>
       </label>
       {error && (
-        <p className="rounded-sm border border-border-strong p-2.5 text-[12px]">
+        <p className="rounded-lg border border-border-strong p-2.5 text-[12px]">
           <span className="text-muted">error: </span>
           {error} {error.includes("expired") && <Link href="/forgot" className="underline">request a new link</Link>}
         </p>

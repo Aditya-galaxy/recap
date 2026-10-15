@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { ShareToCloud } from "@/components/CloudShare";
+import DesktopShare from "@/components/DesktopShare";
 import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
@@ -190,7 +191,7 @@ export default function Watch({
   return (
     <div className="mx-auto max-w-6xl px-4 py-6">
       {meta.disabled && (
-        <p className="mb-4 rounded-sm border border-border-strong px-3 py-2 text-[12px]">
+        <p className="mb-4 rounded-lg border border-border-strong px-3 py-2 text-[12px]">
           This video was taken down after a report. Only {owner ? "you" : "its owner"} and admins can open it.
         </p>
       )}
@@ -205,11 +206,11 @@ export default function Watch({
                 if (e.key === "Enter") e.currentTarget.blur();
                 if (e.key === "Escape") setEditing(false);
               }}
-              className="w-full rounded-sm border border-border-strong bg-surface px-2 py-1 text-[17px] font-medium outline-none"
+              className="w-full rounded-lg border border-border-strong bg-surface px-2 py-1 text-[17px] font-medium outline-none"
             />
           ) : (
             <h1
-              className={`truncate rounded-sm px-2 py-1 text-[17px] font-medium ${owner ? "cursor-text hover:bg-surface-2" : ""}`}
+              className={`truncate rounded-lg px-2 py-1 text-[17px] font-medium ${owner ? "cursor-text hover:bg-surface-2" : ""}`}
               title={owner ? "Click to rename" : undefined}
               onClick={() => owner && setEditing(true)}
             >
@@ -225,13 +226,13 @@ export default function Watch({
         </div>
         <div className="flex flex-wrap items-start justify-end gap-2">
           {owner && !local && (
-            <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]" title="Who can watch">
+            <div className="inline-grid grid-cols-2 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]" title="Who can watch">
               {(["unlisted", "private"] as const).map((v) => (
                 <button
                   key={v}
                   onClick={() => setVisibility(v)}
                   title={v === "unlisted" ? "Anyone with the link" : "Only you"}
-                  className={`rounded-sm px-2.5 py-1 ${meta.visibility === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+                  className={`rounded-lg px-2.5 py-1 ${meta.visibility === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
                 >
                   {v === "unlisted" ? "link" : "private"}
                 </button>
@@ -240,8 +241,9 @@ export default function Watch({
           )}
           {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>}
           {cloudShare && ready && <ShareToCloud videoId={id} version={version} canClean={meta.clean.status === "ready"} />}
+          {local && ready && <DesktopShare video={{ id, version, title: meta.title }} />}
           {ready && (
-            <a className={local ? "btn-primary" : "btn-ghost"} href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
+            <a className="btn-ghost" href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
               {local ? `export ${version === "clean" ? "cleaned " : ""}mp4` : "download"}
             </a>
           )}
@@ -280,11 +282,9 @@ export default function Watch({
                     <p className="mt-2 break-words font-mono text-xs text-muted">{meta.error}</p>
                   </div>
                 ) : (
-                  <div>
-                    <p className="text-[13px] text-muted">
-                      <span className="text-text">$</span> {(meta.stage ?? "processing").toLowerCase()}
-                      <span className="cursor-blink ml-1 inline-block h-3 w-[7px] translate-y-0.5 bg-text" />
-                    </p>
+                  <div className="w-56 space-y-3">
+                    <p className="text-[13px] text-muted">{meta.stage ?? "Processing"}…</p>
+                    <div className="working-bar" aria-hidden="true" />
                   </div>
                 )}
               </div>
@@ -294,7 +294,7 @@ export default function Watch({
           {ready && !local && <ReactionsBar videoId={id} now={origNow} duration={duration} />}
           {!owner && !local && <ReportButton videoId={id} />}
           {meta.clean.status === "ready" && (
-            <div className="inline-grid grid-cols-2 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]">
+            <div className="inline-grid grid-cols-2 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
               {(["clean", "original"] as const).map((v) => (
                 <button
                   key={v}
@@ -302,7 +302,7 @@ export default function Watch({
                     setVersion(v);
                     setPreviewing(false);
                   }}
-                  className={`rounded-sm px-3 py-1.5 ${version === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+                  className={`rounded-lg px-3 py-1.5 ${version === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
                 >
                   {v === "clean" ? `cleaned · ${fmtTime(meta.clean.duration)}` : `original · ${fmtTime(meta.duration)}`}
                 </button>
@@ -410,7 +410,7 @@ export default function Watch({
                 </label>
               )}
 
-              <div className="rounded-sm border border-dashed border-border p-4">
+              <div className="rounded-lg border border-dashed border-border p-4">
                 <p className="text-2xl font-light tabular-nums">−{fmtTime(draftSaved)}</p>
                 <p className="text-muted">
                   {duration ? `${Math.round((draftSaved / duration) * 100)}% shorter · ` : ""}
@@ -450,7 +450,7 @@ export default function Watch({
                 </button>
               )}
               {(err || meta.clean.status === "error") && (
-                <p className="rounded-sm border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || meta.clean.error}</p>
+                <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || meta.clean.error}</p>
               )}
             </div>
           )}
@@ -467,7 +467,7 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint: strin
         <span className="block">{label}</span>
         <span className="block text-[11px] text-muted">{hint}</span>
       </span>
-      <span className={`relative h-4 w-8 shrink-0 rounded-sm border transition ${checked ? "border-accent bg-accent" : "border-border"}`}>
+      <span className={`relative h-4 w-8 shrink-0 rounded-lg border transition ${checked ? "border-accent bg-accent" : "border-border"}`}>
         <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-[1px] transition-all ${checked ? "left-[18px] bg-accent-text" : "left-0.5 bg-muted"}`} />
       </span>
     </button>

@@ -24,8 +24,8 @@ function html({ text, action }: Mail) {
     ? `<p style="margin:22px 0"><a href="${esc(action.url)}" style="background:#0a0a0a;color:#fafafa;padding:11px 18px;border-radius:3px;text-decoration:none;display:inline-block">${esc(action.label)}</a></p>`
     : "";
   return `<!doctype html><html><body style="margin:0;background:#fafafa">
-<div style="max-width:520px;margin:0 auto;padding:32px 20px;font:14px/1.6 ui-monospace,Menlo,Consolas,monospace;color:#0a0a0a">
-<p style="margin:0 0 24px;font-weight:600"><span style="color:#737373">~/</span>recap</p>${paras}${button}
+<div style="max-width:520px;margin:0 auto;padding:32px 20px;font:15px/1.6 -apple-system,BlinkMacSystemFont,Segoe UI,Helvetica,Arial,sans-serif;color:#0a0a0a">
+<p style="margin:0 0 24px;font-weight:600;font-size:16px">recap</p>${paras}${button}
 <p style="margin:28px 0 0;font-size:11px;color:#737373">Recap · open-source async video · recap.kronagent.dev</p>
 </div></body></html>`;
 }

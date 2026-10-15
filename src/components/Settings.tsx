@@ -68,7 +68,7 @@ export default function Settings({
     if (r.ok) form.reset();
   }
 
-  const input = "w-full rounded-sm border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
+  const input = "w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong";
 
   if (local) {
     return (
@@ -79,7 +79,7 @@ export default function Settings({
         <section className="space-y-3">
           <h2 className="label">running locally</h2>
           <div className="card space-y-3 p-4 text-[13px]">
-            <p>Recordings, transcripts and clean-ups stay on this computer. Nothing is uploaded unless you share a video.</p>
+            <p>Recordings, transcripts and clean-ups stay on this computer. Nothing is uploaded anywhere.</p>
             <p className="text-muted">library: <code className="text-text">{local.dataDir}</code></p>
             <p className="text-muted">transcription model: <code className="text-text">{local.model.split(/[\\/]/).pop()}</code></p>
           </div>
@@ -89,8 +89,8 @@ export default function Settings({
           {local.cloud && <CloudLinkCard />}
           <div className="card p-4 text-[13px]">
             <p>
-              Open a video and use <span className="text-text">export</span> to save the original or cleaned MP4, then send it any way you
-              like: Slack, email, a shared drive.
+              Open a video and use <span className="text-text">share</span>: drag it into Slack, Teams or an email, copy it and paste it
+              anywhere, or use <span className="text-text">export</span> to save the MP4.
             </p>
           </div>
         </section>
@@ -116,7 +116,7 @@ export default function Settings({
             <div className="border-t border-border pt-4">
               {user.founderNumber ? (
                 <p>
-                  <span className="rounded-sm bg-accent px-1.5 py-0.5 text-[11px] text-accent-text">founding member #{user.founderNumber}</span>
+                  <span className="rounded-lg bg-accent px-1.5 py-0.5 text-[11px] text-accent-text">founding member #{user.founderNumber}</span>
                   <span className="ml-2 text-muted">free for life, with fair-use limits</span>
                 </p>
               ) : (
@@ -166,11 +166,11 @@ export default function Settings({
             In the Mac, Windows or Linux app, open <span className="text-text">server</span> and paste these two values.
           </p>
           <div className="flex items-center gap-2">
-            <code className="flex-1 truncate rounded-sm border border-border px-3 py-2">{server}</code>
+            <code className="flex-1 truncate rounded-lg border border-border px-3 py-2">{server}</code>
             <button className="btn-ghost" onClick={() => copy(server, "server")}>{copied === "server" ? "copied ✓" : "copy"}</button>
           </div>
           {fresh ? (
-            <div className="space-y-2 rounded-sm border border-border-strong p-3">
+            <div className="space-y-2 rounded-lg border border-border-strong p-3">
               <p className="text-[12px]">New token. Copy it now; it won&apos;t be shown again.</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 truncate">{fresh}</code>

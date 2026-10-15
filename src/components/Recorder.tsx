@@ -456,8 +456,8 @@ export default function Recorder() {
 
   const controls = (compact: boolean) => (
     <div className={`flex items-center gap-2 ${compact ? "justify-center" : ""}`}>
-      <span className={`flex items-center gap-2 rounded-sm border border-border px-3 py-1.5 text-[13px] tabular-nums ${compact ? "px-2" : ""}`}>
-        <span className={`h-2.5 w-2.5 rounded-full ${phase === "recording" ? "cursor-blink bg-text" : "bg-muted"}`} />
+      <span className={`flex items-center gap-2 rounded-lg border border-border px-3 py-1.5 text-[13px] tabular-nums ${compact ? "px-2" : ""}`}>
+        <span className={`h-2.5 w-2.5 rounded-full ${phase === "recording" ? "rec-dot bg-text" : "bg-muted"}`} />
         {fmtTime(elapsed)}
       </span>
       {phase === "recording" ? (
@@ -536,7 +536,7 @@ export default function Recorder() {
         </div>
 
         <fieldset disabled={live || phase === "uploading"} className="space-y-5 disabled:opacity-60">
-          <div className="grid grid-cols-3 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]">
+          <div className="grid grid-cols-3 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
             {([
               ["screen-cam", "screen+cam"],
               ["screen", "screen"],
@@ -545,7 +545,7 @@ export default function Recorder() {
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`whitespace-nowrap rounded-sm px-1 py-1.5 ${mode === m ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+                className={`whitespace-nowrap rounded-lg px-1 py-1.5 ${mode === m ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
               >
                 {label}
               </button>
@@ -558,7 +558,7 @@ export default function Recorder() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="untitled recording"
-              className="w-full rounded-sm border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
+              className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
             />
           </label>
 
@@ -568,7 +568,7 @@ export default function Recorder() {
               <select
                 value={camId}
                 onChange={(e) => setCamId(e.target.value)}
-                className="w-full rounded-sm border border-border bg-surface px-3 py-2"
+                className="w-full rounded-lg border border-border bg-surface px-3 py-2"
               >
                 <option value="">default camera</option>
                 {cams.map((c) => (
@@ -585,7 +585,7 @@ export default function Recorder() {
                 role="switch"
                 aria-checked={micOn}
                 onClick={() => setMicOn(!micOn)}
-                className={`relative h-4 w-8 rounded-sm border transition ${micOn ? "border-accent bg-accent" : "border-border"}`}
+                className={`relative h-4 w-8 rounded-lg border transition ${micOn ? "border-accent bg-accent" : "border-border"}`}
               >
                 <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-[1px] transition-all ${micOn ? "left-[18px] bg-accent-text" : "left-0.5 bg-muted"}`} />
               </button>
@@ -595,7 +595,7 @@ export default function Recorder() {
                 <select
                   value={micId}
                   onChange={(e) => setMicId(e.target.value)}
-                  className="w-full rounded-sm border border-border bg-surface px-3 py-2"
+                  className="w-full rounded-lg border border-border bg-surface px-3 py-2"
                 >
                   <option value="">default microphone</option>
                   {mics.map((m) => (
@@ -612,12 +612,12 @@ export default function Recorder() {
           {mode === "screen-cam" && (
             <div className="text-[13px]">
               <span className="label mb-1.5 block">bubble</span>
-              <div className="grid grid-cols-3 gap-0.5 rounded-sm border border-border p-0.5 text-[12px]">
+              <div className="grid grid-cols-3 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
                 {(["s", "m", "l"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setBubbleSize(s)}
-                    className={`rounded-sm py-1 ${bubbleSize === s ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+                    className={`rounded-lg py-1 ${bubbleSize === s ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
                   >
                     {s}
                   </button>
@@ -627,7 +627,7 @@ export default function Recorder() {
           )}
         </fieldset>
 
-        {error && <p className="rounded-sm border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{error}</p>}
+        {error && <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{error}</p>}
         {failed && phase === "error" && (
           <div className="grid grid-cols-2 gap-2">
             <button className="btn-primary" onClick={() => upload(failed)}>retry upload</button>

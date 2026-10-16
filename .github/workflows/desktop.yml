@@ -123,6 +123,9 @@ jobs:
           # case no app could see the update. Only then is a missing notice not a failure.
           update_shown() {
             grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json" && return 0
+            # On a tag build the new release is still being assembled (other OS jobs create it before this one
+            # attaches its installer), and the app rightly won't announce a release it can't download.
+            [[ "$GITHUB_REF" == refs/tags/* ]] && { echo "::warning::update notice not checked on a tag build (release still uploading)"; return 0; }
             left=$(curl -s https://api.github.com/rate_limit | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).resources.core.remaining))')
             [ "$left" = 0 ] && { echo "::warning::update notice not checked: GitHub API rate limit exhausted on this runner"; return 0; }
             return 1

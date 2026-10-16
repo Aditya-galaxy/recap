@@ -114,6 +114,14 @@ jobs:
           OLD=v0.4.1   # an older release, so it must announce the latest one
           HOME_DIR="$RUNNER_TEMP/lifecycle-home"
           probe() { node scripts/ci-panel.mjs 9333 | tee "$RUNNER_TEMP/panel.json"; }
+          # The app checks GitHub's API anonymously; shared runners sometimes have that quota used up, in which
+          # case no app could see the update. Only then is a missing notice not a failure.
+          update_shown() {
+            grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json" && return 0
+            left=$(curl -s https://api.github.com/rate_limit | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).resources.core.remaining))')
+            [ "$left" = 0 ] && { echo "::warning::update notice not checked: GitHub API rate limit exhausted on this runner"; return 0; }
+            return 1
+          }
           case "${{ matrix.name }}" in
             windows)
               DEST="$RUNNER_TEMP/RecapLifecycle"; W=$(cygpath -w "$DEST")
@@ -122,7 +130,7 @@ jobs:
               install() { cmd.exe //c "$1 /S /D=$W"; for i in $(seq 1 60); do [ -f "$DEST/Recap.exe" ] && break; sleep 2; done; sleep 3; }
               run() { RECAP_DEV_HOME="$HOME_DIR" "$DEST/Recap.exe" --remote-debugging-port=9333 > "$RUNNER_TEMP/app.log" 2>&1 & sleep 25; probe; taskkill //IM Recap.exe //F >/dev/null 2>&1 || true; sleep 3; }
               install old-setup.exe; echo "old installed: $(ver)"
-              run; grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json"
+              run; update_shown
               install "dist\\Recap-windows-x64-setup.exe"; NEW=$(ver); echo "after upgrade: $NEW"
               [[ "$NEW" == "$(node -p "require('./package.json').version")"* ]]   # Windows adds a fourth part: 0.4.3.0
               run; grep -q '"panel":true' "$RUNNER_TEMP/panel.json"; grep -q '"engine":"ready"' "$RUNNER_TEMP/panel.json"
@@ -136,7 +144,7 @@ jobs:
               sudo apt-get install -y -qq ./old.deb >/dev/null; echo "old installed: $(dpkg-query -W -f='${Version}' recap-desktop)"
               BIN=$(dpkg -L recap-desktop | grep -E '^/opt/.+/recap-desktop$' | head -1)
               run() { RECAP_DEV_HOME="$HOME_DIR" xvfb-run -a -s "-screen 0 1920x1080x24" "$@" --no-sandbox --remote-debugging-port=9333 > "$RUNNER_TEMP/app.log" 2>&1 & sleep 25; probe; pkill -f remote-debugging-port=9333 || true; sleep 3; }
-              run "$BIN"; grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json"
+              run "$BIN"; update_shown
               sudo apt-get install -y -qq ./dist/Recap-linux-amd64.deb >/dev/null; NEW=$(dpkg-query -W -f='${Version}' recap-desktop); echo "after upgrade: $NEW"
               [ "$NEW" = "$(node -p "require('./package.json').version")" ]
               run "$BIN"; grep -q '"engine":"ready"' "$RUNNER_TEMP/panel.json"

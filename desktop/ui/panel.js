@@ -113,8 +113,8 @@ function render() {
   let engineMsg = "";
   if (local && eng) {
     if (eng.state === "error") engineMsg = eng.error;
-    else if (eng.state !== "ready") engineMsg = "$ starting local engine…";
-    else if (eng.model?.state === "downloading") engineMsg = `$ downloading transcription model ${Math.round(eng.model.progress * 100)}% (first run only)`;
+    else if (eng.state !== "ready") engineMsg = "Getting ready…";
+    else if (eng.model?.state === "downloading") engineMsg = `Setting up transcription: ${Math.round(eng.model.progress * 100)}% (one-time 140 MB download)`;
     else if (eng.model?.state === "error") engineMsg = eng.model.error;
   }
   $("engineStatus").hidden = !engineMsg;
@@ -129,7 +129,6 @@ function render() {
   if (state.phase === "error") {
     $("error").innerHTML = "";
     const msg = document.createElement("div");
-    msg.innerHTML = '<span class="muted">error: </span>';
     msg.append(state.error);
     $("error").append(msg);
     if (state.lastFile && /retry/.test(state.error)) {
@@ -142,7 +141,7 @@ function render() {
     }
   }
   $("status").hidden = !["finishing", "uploading"].includes(state.phase);
-  $("statusText").textContent = state.phase === "uploading" ? `$ uploading ${Math.round(state.progress * 100)}%` : "$ saving…";
+  $("statusText").textContent = state.phase === "uploading" ? `Uploading ${Math.round(state.progress * 100)}%` : "Saving your recording…";
   $("progress").style.width = `${(state.progress || 0) * 100}%`;
   $("lastField").hidden = !state.lastLink;
   $("update").hidden = !state.update;
@@ -200,6 +199,9 @@ async function startRecording() {
 
 function captureError(err) {
   const what = err.what ?? "screen or camera";
+  if (err.name === "NotAllowedError" && platform === "win32" && (what === "camera" || what === "microphone")) {
+    return `Windows is blocking the ${what}. Open Settings → Privacy & security → ${what === "camera" ? "Camera" : "Microphone"}, turn on “Let desktop apps access your ${what}”, then try again.`;
+  }
   if (err.name === "NotAllowedError") return `Recap isn't allowed to use the ${what}. Check your system's privacy settings, then try again.`;
   if (err.name === "NotFoundError" || err.name === "OverconstrainedError") return `No ${what} found. Check it's connected${err.what === "microphone" ? ", or turn the microphone off" : ""}.`;
   if (err.name === "NotReadableError") return `The ${what} is busy in another app (a video call?). Close it and try again.`;
@@ -238,22 +240,50 @@ function cleanup() {
   rec = null;
 }
 
+// Windows hands a camera (or the screen) back slowly after another app or window let go of it, so a
+// "busy" error right at the start is often gone a moment later. Retry those before giving up.
+async function getMedia(constraints, what) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await navigator.mediaDevices.getUserMedia(constraints);
+    } catch (err) {
+      const transient = err.name === "NotReadableError" || err.name === "AbortError";
+      if (!transient || attempt >= 3) {
+        err.what ??= what;
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+    }
+  }
+}
+
 window.recap.on("begin", async (o) => {
   discarding = false;
   try {
     let video;
+    const desktop = { chromeMediaSource: "desktop", chromeMediaSourceId: o.sourceId };
     if (o.mode === "cam") {
-      video = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: o.cameraId ? { ideal: o.cameraId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
+      video = await getMedia({ video: { deviceId: o.cameraId ? { ideal: o.cameraId } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } } }, "camera");
     } else {
       // Electron's desktop-capture constraints: no picker, no user-gesture requirement.
-      video = await navigator.mediaDevices.getUserMedia({
-        audio: o.systemAudio ? { mandatory: { chromeMediaSource: "desktop" } } : false,
-        video: { mandatory: { chromeMediaSource: "desktop", chromeMediaSourceId: o.sourceId, maxWidth: 2560, maxHeight: 1600, maxFrameRate: 30 } },
-      });
+      video = await getMedia({ audio: false, video: { mandatory: { ...desktop, maxWidth: 2560, maxHeight: 1600, maxFrameRate: 30 } } }, "screen");
     }
     streams.push(video);
+
+    // System audio separately (Windows): if this computer can't provide it, record the mic instead of failing.
+    if (o.mode !== "cam" && o.systemAudio) {
+      try {
+        const sys = await navigator.mediaDevices.getUserMedia({
+          audio: { mandatory: { chromeMediaSource: "desktop" } },
+          video: { mandatory: { ...desktop, maxWidth: 320, maxHeight: 240, maxFrameRate: 1 } },
+        });
+        sys.getVideoTracks().forEach((t) => t.stop());
+        streams.push(sys);
+        if (sys.getAudioTracks().length) video = new MediaStream([...video.getVideoTracks(), ...sys.getAudioTracks()]);
+      } catch {
+        window.recap.recorder({ type: "notice", message: "Computer sound couldn't be recorded on this PC, so this recording has your microphone only." });
+      }
+    }
 
     const audioSources = [];
     if (video.getAudioTracks().length) audioSources.push(video);

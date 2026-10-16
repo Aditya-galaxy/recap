@@ -517,6 +517,11 @@ ipcMain.on("recorder", (_e, ev) => {
     session.elapsed = ev.value;
     broadcast();
   } else if (ev.type === "stopped") finish();
+  else if (ev.type === "notice" || ev.type === "camera-unavailable") {
+    // Something degraded but the recording goes on: say so once, without interrupting.
+    if (ev.type === "camera-unavailable" && bubble && !bubble.isDestroyed()) bubble.destroy();
+    if (Notification.isSupported()) new Notification({ title: "Recap", body: String(ev.message ?? "") }).show();
+  }
   else if (ev.type === "error") {
     closeOverlays();
     session.file?.stream.end();

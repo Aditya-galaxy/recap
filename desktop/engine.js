@@ -106,6 +106,7 @@ class Engine extends EventEmitter {
         FFMPEG_BIN: bin("ffmpeg"),
         WHISPER_BIN: bin("whisper-cli"),
         WHISPER_MODEL: this.modelPath,
+        WHISPER_VAD_MODEL: path.join(resources(), "bin", "ggml-silero-v5.1.2.bin"),
         // Local library: no upload cap (a 2-hour 1080p recording is ~7 GB).
         MAX_UPLOAD_MB: "1000000",
         FEEDBACK_URL: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",
@@ -176,7 +177,17 @@ class Engine extends EventEmitter {
       this.set({ model: { state: "ready", progress: 1, error: "" } });
     } catch (err) {
       fs.rmSync(part, { force: true });
-      this.set({ model: { state: "error", progress: 0, error: `Couldn't download the transcription model (${err.cause?.code ?? err.message}).` } });
+      const code = err.cause?.code ?? err.message;
+      const offline = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT|fetch failed/i.test(String(code));
+      this.set({
+        model: {
+          state: "error",
+          progress: 0,
+          error: offline
+            ? "Recap needs the internet once to download its transcription model (140 MB). Connect, then click retry."
+            : `Couldn't download the transcription model (${code}). Click retry.`,
+        },
+      });
     }
   }
 }

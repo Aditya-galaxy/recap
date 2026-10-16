@@ -19,6 +19,8 @@ export const config = {
    */
   localToken: process.env.RECAP_LOCAL_TOKEN || null,
   whisperModel: process.env.WHISPER_MODEL ?? inRoot("models", "ggml-base.en.bin"),
+  /** Silero voice-activity model: whisper skips non-speech audio instead of inventing words in it. Optional. */
+  vadModel: process.env.WHISPER_VAD_MODEL ?? inRoot("models", "ggml-silero-v5.1.2.bin"),
   /** After the first (admin) account exists, can anyone else sign up? */
   allowSignup: bool(process.env.ALLOW_SIGNUP, true),
   /** If set, creating the first (admin) account requires this code, so a fresh public server can't be claimed by someone else. */

@@ -5,9 +5,12 @@ import path from "node:path";
 import type { User } from "./auth";
 import { config } from "./config";
 import { db, now } from "./db";
+import { syncNamedFiles } from "./folder";
 import type { Transcript, VideoMeta, Visibility } from "./types";
 
 export const DATA_DIR = path.join(config.dataDir, "videos");
+
+syncNamedFiles(); // on start: pick up recordings made before this existed
 
 export const ID_RE = /^[a-z0-9]{10}$/;
 
@@ -67,6 +70,7 @@ export async function updateMeta(id: string, patch: (m: VideoMeta) => void | Vid
   const r = db.prepare("SELECT * FROM videos WHERE id = ?").get(id) as Row | undefined;
   if (!r) throw new Error(`video ${id} not found`);
   const m = toMeta(r);
+  const m0 = { title: m.title, status: m.status, clean: { status: m.clean.status } };
   const out = patch(m) ?? m;
   db.prepare(
     `UPDATE videos SET title = ?, visibility = ?, status = ?, stage = ?, error = ?, duration = ?, width = ?, height = ?,
@@ -76,6 +80,7 @@ export async function updateMeta(id: string, patch: (m: VideoMeta) => void | Vid
     out.height ?? null, out.clean.status, out.clean.options ? JSON.stringify(out.clean.options) : null,
     out.clean.duration ?? null, out.clean.error ?? null, id,
   );
+  if (out.title !== m0.title || out.status !== m0.status || out.clean.status !== m0.clean.status) syncNamedFiles();
   return out;
 }
 
@@ -113,7 +118,9 @@ export async function readTranscript(id: string): Promise<Transcript | null> {
 
 export async function deleteVideo(id: string) {
   db.prepare("DELETE FROM videos WHERE id = ?").run(id);
-  await fs.rm(videoDir(id), { recursive: true, force: true });
+  syncNamedFiles();
+  // Windows: a file open in a player can't be removed for a moment.
+  await fs.rm(videoDir(id), { recursive: true, force: true, maxRetries: 5 });
 }
 
 export function countView(id: string) {

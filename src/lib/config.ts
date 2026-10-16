@@ -18,6 +18,8 @@ export const config = {
    * per-launch secret. No accounts; every request must carry the secret (see src/proxy.ts).
    */
   localToken: process.env.RECAP_LOCAL_TOKEN || null,
+  /** Desktop app: also show finished recordings here under readable names (hard links; see folder.ts). */
+  namedDir: process.env.RECAP_NAMED_DIR || null,
   whisperModel: process.env.WHISPER_MODEL ?? inRoot("models", "ggml-base.en.bin"),
   /** Silero voice-activity model: whisper skips non-speech audio instead of inventing words in it. Optional. */
   vadModel: process.env.WHISPER_VAD_MODEL ?? inRoot("models", "ggml-silero-v5.1.2.bin"),

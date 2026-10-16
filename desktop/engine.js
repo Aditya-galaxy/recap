@@ -101,6 +101,8 @@ class Engine extends EventEmitter {
         PORT: String(port),
         HOSTNAME: "127.0.0.1",
         DATA_DIR: this.dataDir,
+        // Finished recordings show up next to the library folder under their titles.
+        RECAP_NAMED_DIR: path.dirname(this.dataDir),
         RECAP_LOCAL_TOKEN: this.token,
         RECAP_VERSION: app.getVersion(),
         FFMPEG_BIN: bin("ffmpeg"),

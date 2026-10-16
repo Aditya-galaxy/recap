@@ -214,20 +214,52 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
   );
 }
 
-/** Optional on-device AI: rewrites spoken steps as clean instructions. Hidden where it isn't bundled. */
+/** Guide-specific wiring for the shared AI polish bar. */
 function AiPolish({ videoId, guide, setGuide }: { videoId: string; guide: Guide; setGuide: (g: Guide) => void }) {
+  return (
+    <AiPolishBar
+      polishUrl={`/api/videos/${videoId}/guide/polish`}
+      polished={!!guide.polished}
+      error={guide.error}
+      onStarted={(j) => setGuide((j as { guide: Guide }).guide)}
+      onUndo={async () => {
+        const r = await fetch(`/api/videos/${videoId}/guide`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: guide.spokenTitle ?? guide.title, steps: guide.steps.map((s) => ({ image: s.image, text: s.spoken ?? s.text })), polished: false }),
+        });
+        if (r.ok) setGuide((await r.json()).guide);
+      }}
+    />
+  );
+}
+
+/** Optional on-device AI: rewrites spoken text as clean writing. Hidden where it isn't bundled. */
+export function AiPolishBar({ polishUrl, polished, error, onStarted, onUndo, what = "steps" }: {
+  polishUrl: string;
+  polished: boolean;
+  error?: string;
+  onStarted: (json: unknown) => void;
+  onUndo: () => void;
+  what?: string;
+}) {
   const [ai, setAi] = useState<Ai | null>(null);
   const [asking, setAsking] = useState(false);
   const [err, setErr] = useState("");
   const pending = useRef(false);
 
+  // The parent passes a fresh callback each render; keep the latest in a ref so the status effect stays put.
+  const started = useRef(onStarted);
+  useEffect(() => {
+    started.current = onStarted;
+  }, [onStarted]);
   const polish = useCallback(async () => {
     setErr("");
-    const r = await fetch(`/api/videos/${videoId}/guide/polish`, { method: "POST" });
+    const r = await fetch(polishUrl, { method: "POST" });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return setErr(j.error ?? "Couldn't start.");
-    setGuide(j.guide);
-  }, [videoId, setGuide]);
+    started.current(j);
+  }, [polishUrl]);
 
   useEffect(() => {
     let alive = true;
@@ -258,27 +290,14 @@ function AiPolish({ videoId, guide, setGuide }: { videoId: string; guide: Guide;
     if (r.ok) setAi(await r.json());
   }
 
-  async function undo() {
-    const r = await fetch(`/api/videos/${videoId}/guide`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: guide.spokenTitle ?? guide.title,
-        steps: guide.steps.map((s) => ({ image: s.image, text: s.spoken ?? s.text })),
-        polished: false,
-      }),
-    });
-    if (r.ok) setGuide((await r.json()).guide);
-  }
-
   const gb = (ai.bytes / 1e9).toFixed(1);
-  const message = err || guide.error || (ai.model === "error" ? ai.error : "");
+  const message = err || error || (ai.model === "error" ? ai.error : "");
   return (
     <div className="mb-8 rounded-xl border border-border p-4 text-[13px]">
-      {guide.polished ? (
+      {polished ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-muted">✦ Polished by on-device AI. Check each step before you share it.</span>
-          <button className="btn-ghost" onClick={undo}>undo polish</button>
+          <button className="btn-ghost" onClick={onUndo}>undo polish</button>
         </div>
       ) : ai.model === "downloading" ? (
         <div className="space-y-2">
@@ -287,7 +306,7 @@ function AiPolish({ videoId, guide, setGuide }: { videoId: string; guide: Guide;
         </div>
       ) : asking ? (
         <div className="space-y-3">
-          <p>Polish rewrites each spoken step as a short, clear instruction. It runs entirely on this computer and needs a one-time {gb} GB download.</p>
+          <p>Polish rewrites what you said as short, clear writing. It runs entirely on this computer and needs a one-time {gb} GB download.</p>
           <div className="flex gap-2">
             <button className="btn-primary" onClick={download}>download and polish</button>
             <button className="btn-ghost" onClick={() => setAsking(false)}>not now</button>
@@ -295,7 +314,7 @@ function AiPolish({ videoId, guide, setGuide }: { videoId: string; guide: Guide;
         </div>
       ) : (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-muted">Turn spoken steps into clean written instructions. Runs on this computer.</span>
+          <span className="text-muted">Turn spoken {what} into clean writing. Runs on this computer.</span>
           <button className="btn-primary" onClick={() => (ai.model === "ready" ? polish() : setAsking(true))}>✦ polish with on-device AI</button>
         </div>
       )}

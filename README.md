@@ -129,6 +129,10 @@ self-test on Linux. See [desktop/THIRD_PARTY.md](desktop/THIRD_PARTY.md) for bun
 `mac/` contains an experimental native Swift recorder (ScreenCaptureKit, records system audio) that uploads to a
 Recap server. It isn't part of the release builds.
 
+## Support
+
+Recap is free and open source. If it's useful to you, you can [sponsor it on GitHub](https://github.com/sponsors/Aditya-galaxy).
+
 ## License
 
 [MIT](LICENSE)

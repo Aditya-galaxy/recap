@@ -17,6 +17,7 @@ const execFileP = require("node:util").promisify(execFile);
 const HOTKEY = "CommandOrControl+Alt+R";
 // How the shortcut is written on each platform: ⌥⌘R on macOS, Ctrl+Alt+R elsewhere.
 const HOTKEY_LABEL = process.platform === "darwin" ? "⌥⌘R" : "Ctrl+Alt+R";
+let hotkeyLabel = HOTKEY_LABEL; // blank when another app already owns the shortcut
 // Startup milestones (ms since launch), reported by the self-test.
 const T0 = Date.now();
 const milestones = {};
@@ -56,7 +57,7 @@ function broadcast() {
     error: session.error,
     lastLink: session.lastLink,
     lastFile: session.lastFile,
-    hotkey: HOTKEY_LABEL,
+    hotkey: hotkeyLabel,
     platform: process.platform,
     engine: engine.status(),
     update: session.update,
@@ -402,7 +403,7 @@ function buildTrayMenu() {
       ...(session.update ? [{ label: `Update available: ${session.update.version}…`, click: () => shell.openExternal(session.update.url) }, { type: "separator" }] : []),
       { label: "Open library", click: () => openLibrary() },
       { label: "New recording…", click: () => panel.show() },
-      { label: `Start / stop recording (${HOTKEY_LABEL})`, click: toggle },
+      { label: hotkeyLabel ? `Start / stop recording (${hotkeyLabel})` : "Start / stop recording", click: toggle },
       { label: "Open recordings folder", click: () => shell.openPath(libraryDir()) },
       { type: "separator" },
       { label: "Quit", click: () => app.quit() },
@@ -703,10 +704,13 @@ app.whenReady().then(() => {
   const trayIcon = nativeImage.createFromPath(path.join(__dirname, "build", process.platform === "darwin" ? "trayTemplate.png" : "tray.png"));
   tray = new Tray(trayIcon);
   tray.setToolTip("Recap");
+  // Another app (a screen recorder, a video-call app) may already own the shortcut: then don't show one that does nothing.
+  if (!globalShortcut.register(HOTKEY, toggle)) {
+    console.warn(`could not register ${HOTKEY}`);
+    hotkeyLabel = "";
+  }
   buildTrayMenu();
   tray.on("click", () => (panel.isVisible() ? panel.hide() : panel.show()));
-
-  if (!globalShortcut.register(HOTKEY, toggle)) console.warn(`could not register ${HOTKEY}`);
 
   // Dev aid: RECAP_SNAPSHOT=dir renders the panel and the overlays to PNGs, then quits.
   if (process.env.RECAP_SNAPSHOT) snapshot(process.env.RECAP_SNAPSHOT);

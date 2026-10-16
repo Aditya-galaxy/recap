@@ -52,6 +52,7 @@ function showReady(gate) {
   // Phones and tablets can't install it: point them at their computer instead.
   if (target.os === "mac-intel") ready.querySelector(".ready-title").textContent = "You're on the list. We'll email you when Recap runs on Intel Macs.";
   else if (!target.file) ready.querySelector(".ready-title").textContent = "You're in. Open this page on your computer to install Recap.";
+  for (const el of ready.querySelectorAll("[data-os]")) el.hidden = el.dataset.os !== target.os;
   gate.replaceChildren(ready);
 }
 

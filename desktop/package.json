@@ -2,7 +2,7 @@
   "name": "recap-desktop",
   "productName": "Recap",
   "version": "0.4.5",
-  "description": "Recap screen recorder for Windows and Linux",
+  "description": "Record your screen and camera, get a transcript, and cut the ums. Everything stays on your computer.",
   "author": "Aditya",
   "homepage": "https://github.com/Aditya-galaxy/recap",
   "license": "MIT",
@@ -24,7 +24,8 @@
       "preload.js",
       "library-preload.js",
       "ui/**",
-      "build/tray*.png"
+      "build/tray*.png",
+      "build/icon.png"
     ],
     "directories": {
       "output": "dist",
@@ -50,7 +51,9 @@
       "icon": "build/icon.png",
       "category": "AudioVideo",
       "maintainer": "Aditya <noreply@github.com>",
-      "artifactName": "Recap-linux-${arch}.${ext}"
+      "artifactName": "Recap-linux-${arch}.${ext}",
+      "synopsis": "Screen recorder with local transcripts",
+      "description": "Record your screen and camera, get a transcript, and cut the ums. Everything stays on your computer."
     },
     "mac": {
       "target": [
@@ -101,7 +104,8 @@
       "enableEmbeddedAsarIntegrityValidation": true,
       "onlyLoadAppFromAsar": true,
       "enableCookieEncryption": true
-    }
+    },
+    "copyright": "Copyright © 2026 Aditya"
   },
   "devDependencies": {
     "electron": "^44.7.2",

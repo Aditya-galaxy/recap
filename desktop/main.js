@@ -406,9 +406,30 @@ function buildTrayMenu() {
       { label: hotkeyLabel ? `Start / stop recording (${hotkeyLabel})` : "Start / stop recording", click: toggle },
       { label: "Open recordings folder", click: () => shell.openPath(libraryDir()) },
       { type: "separator" },
-      { label: "Quit", click: () => app.quit() },
+      ...(process.platform === "linux"
+        ? []
+        : [{
+            label: "Open at login",
+            type: "checkbox",
+            checked: app.getLoginItemSettings().openAtLogin,
+            click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked, args: ["--hidden"] }),
+          }]),
+      { label: "About Recap", click: showAbout },
+      { label: "Quit Recap", click: () => app.quit() },
     ]),
   );
+}
+
+function showAbout() {
+  if (process.platform !== "win32") return app.showAboutPanel();
+  dialog.showMessageBox({
+    type: "none",
+    icon: nativeImage.createFromPath(path.join(__dirname, "build", "icon.png")),
+    title: "About Recap",
+    message: `Recap ${app.getVersion()}`,
+    detail: "Free and open source. Recordings and transcripts stay on this computer.\nUses FFmpeg and whisper.cpp.\n\n© 2026 Aditya · MIT License",
+    buttons: ["OK", "Website"],
+  }).then(({ response }) => response === 1 && shell.openExternal("https://recap.kronagent.dev"));
 }
 
 // macOS: without Screen Recording permission the capture is silently black, so check up front.
@@ -653,6 +674,11 @@ ipcMain.on("record-request", () => {
 // ---- app lifecycle --------------------------------------------------------------------
 
 if (!app.requestSingleInstanceLock()) app.quit();
+// Windows: notifications and the taskbar need the same app ID the installer gave the Start menu shortcut,
+// otherwise notices (camera busy, mic lost…) don't show.
+if (process.platform === "win32") app.setAppUserModelId("dev.recap.desktop");
+// Started by "Open at login": stay in the tray/menu bar instead of opening the library.
+const startedHidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
 app.on("second-instance", () => (engine.state === "ready" ? openLibrary() : panel?.show()));
 
 // PipeWire screen capture on Wayland.
@@ -670,6 +696,15 @@ if (process.env.RECAP_SELFTEST && process.env.RECAP_SELFTEST_FAKE_MEDIA === "1")
 }
 
 app.whenReady().then(() => {
+  app.setAboutPanelOptions({
+    applicationName: "Recap",
+    applicationVersion: app.getVersion(),
+    version: "",
+    copyright: "© 2026 Aditya · MIT License",
+    website: "https://recap.kronagent.dev",
+    credits: "Free and open source. Recordings and transcripts stay on this computer. Uses FFmpeg and whisper.cpp.",
+    iconPath: path.join(__dirname, "build", "icon.png"),
+  });
   fs.rmSync(shareDir, { recursive: true, force: true }); // leftovers from a quit that skipped will-quit (e.g. a crash)
   createPanel();
   engine.on("status", broadcast);
@@ -691,7 +726,7 @@ app.whenReady().then(() => {
   engine.ensureModel();
   engine.start().then(() => {
     milestones.engineReady = Date.now() - T0;
-    if (engine.state === "ready" && !process.env.RECAP_SNAPSHOT && !process.env.RECAP_SELFTEST) openLibrary();
+    if (engine.state === "ready" && !startedHidden && !process.env.RECAP_SNAPSHOT && !process.env.RECAP_SELFTEST) openLibrary();
     else if (engine.state !== "ready") panel.show();
     if (!process.env.RECAP_SELFTEST) setTimeout(recoverLeftovers, 2000);
   });

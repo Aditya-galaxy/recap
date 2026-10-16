@@ -21,6 +21,25 @@ every build.
 | Library page with 2,000 videos | small, fast | **100 KB, 0.06 s**, 48 lazy thumbnails/page (was 3.5 MB, 2,000 thumbnails) |
 | Title search over 2,000 videos | < 50 ms | **9 ms** |
 
+## v0.4.5 re-check (noise filter on)
+
+Same machine, packaged v0.4.5 engine (Silero VAD noise filter enabled). The 60-min recording here is
+near-continuous speech (7,277 words, 719 fillers), so it's heavier than the one above.
+
+| Metric | Result |
+| --- | --- |
+| 10-min recording → watchable + transcribed | **18.6 s (0.031×)**, v0.3.2 was 28.7 s |
+| 60-min recording → watchable + transcribed | **123 s (0.034×)**: remux 52 s, transcribe 116 s (in parallel) |
+| Noise filter cost on 60 min of speech | none: whisper 115 s with it, 120 s without |
+| Clean cut, 60 min / 719 fillers + pauses (3,600 s → 3,106 s) | **664 s** |
+| Peak memory, 60 min (engine + ffmpeg + whisper) | **1.1 GB** |
+| Soak: 20 × upload → transcribe → clean cut → delete | 20/20 ok, engine memory 110 → 120 MB (flat) |
+| 6 concurrent uploads | 6/6 processed, none lost |
+| Published Mac build (DMG from the release page) | signature valid, self-test 29/29 |
+
+Known limit: the clean cut misses some fillers in natural, fast speech (around 3 in 5 in our tests); it
+never cut a real word in these runs. A precise fix needs forced alignment and is on the roadmap.
+
 ## Recording
 
 | Codec (1080p30, 8 Mbps, Electron) | CPU | Frames captured | Notes |
@@ -59,3 +78,5 @@ cat /tmp/out/report.json
 ```
 
 It uses an isolated library under the output folder and never touches your real one.
+
+For the hands-on checks CI can't do (real cameras, permission prompts), see [UAT.md](UAT.md).

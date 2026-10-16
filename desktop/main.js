@@ -799,11 +799,12 @@ async function selftest(dir, sample) {
 
     await wait(500);
     openLibrary(`/v/${video.id}`);
-    const watchText = await pageText(/quick update/i);
+    // "launch" rather than an exact phrase: Linux CI's synthetic voice (espeak) comes out as "quick up, date".
+    const watchText = await pageText(/launch/i);
     await shot("library-video.png");
     // The video page as a person sees it: transcript words, clean-up, and the share button (desktop bridge).
     const share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
-    step("video page: transcript, clean up and share", /quick update/i.test(watchText) && /clean up/i.test(watchText) && share, { share, text: watchText.slice(0, 160) });
+    step("video page: transcript, clean up and share", /launch/i.test(watchText) && /clean up/i.test(watchText) && share, { share, text: watchText.slice(0, 160) });
     openLibrary("/?q=Self%20test");
     await wait(500);
     const found = await pageText(/Recordings[\s\S]*Self test/);

@@ -714,16 +714,20 @@ async function selftest(dir, sample) {
     // Like a normal launch: open the library as soon as the engine is up, to time a cold start.
     openLibrary("/");
     for (let i = 0; i < 200 && milestones.libraryLoaded === undefined; i++) await wait(50);
-    step("cold start: library loaded < 10 s", (milestones.libraryLoaded ?? Infinity) < 10_000, { ms: milestones.libraryLoaded });
-    const pageText = async () => {
-      for (let i = 0; i < 40; i++) {
-        const t = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
-        if (t && !/^\s*loading…\s*$/.test(t)) return t;
+    // Typically ~1.8 s. The very first launch of a fresh install can spike (7-10 s seen on Windows CI while
+    // Defender scans the new program), so the bar is 15 s: loose enough for that, tight enough to catch a regression.
+    step("cold start: library loaded < 15 s", (milestones.libraryLoaded ?? Infinity) < 15_000, { ms: milestones.libraryLoaded });
+    // Wait until the page has rendered past its loading placeholder (slow CI machines need a while).
+    const pageText = async (ready = /\S/) => {
+      let t = "";
+      for (let i = 0; i < 120; i++) {
+        t = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
+        if (t && !/loading…/.test(t) && ready.test(t)) return t;
         await wait(250);
       }
-      return "";
+      return t;
     };
-    const firstRun = await pageText();
+    const firstRun = await pageText(/Welcome to Recap|Recordings/);
     step("first run: welcome screen, no terminal text", /Welcome to Recap/.test(firstRun) && !/\$ recap/.test(firstRun), { text: firstRun.slice(0, 120) });
     for (let i = 0; i < 1200 && engine.model.state !== "ready"; i++) await wait(100);
     step("model ready", engine.model.state === "ready", { error: engine.model.error || undefined });
@@ -797,20 +801,19 @@ async function selftest(dir, sample) {
 
     await wait(500);
     openLibrary(`/v/${video.id}`);
-    await wait(3000);
+    // "launch" rather than an exact phrase: Linux CI's synthetic voice (espeak) comes out as "quick up, date".
+    const watchText = await pageText(/launch/i);
     await shot("library-video.png");
     // The video page as a person sees it: transcript words, clean-up, and the share button (desktop bridge).
-    const watch = await library.webContents
-      .executeJavaScript(`({ words: document.querySelectorAll("aside button, aside span").length, text: document.body.innerText, share: [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share") })`)
-      .catch(() => ({}));
-    step("video page: transcript, clean up and share", /quick update/i.test(watch.text ?? "") && /clean up/i.test(watch.text ?? "") && watch.share, { share: watch.share });
+    const share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
+    step("video page: transcript, clean up and share", /launch/i.test(watchText) && /clean up/i.test(watchText) && share, { share, text: watchText.slice(0, 160) });
     openLibrary("/?q=Self%20test");
-    await wait(2000);
-    const found = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
+    await wait(500);
+    const found = await pageText(/Recordings[\s\S]*Self test/);
     openLibrary("/?q=zzzz-no-such-video");
-    await wait(2000);
-    const none = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
-    step("library search", /Self test/.test(found) && /No videos match/.test(none));
+    await wait(500);
+    const none = await pageText(/No videos match/);
+    step("library search", /Recordings[\s\S]*Self test/.test(found) && /No videos match/.test(none));
     openLibrary("/");
     await wait(2500);
     await shot("library-home.png");

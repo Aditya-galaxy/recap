@@ -79,12 +79,24 @@ jobs:
             -c:v libx264 -preset veryfast -b:v 4M -c:a libopus "$RUNNER_TEMP/sample.mkv"
           ls -l "$RUNNER_TEMP/sample.mkv"
           export RECAP_SELFTEST_EXPECT_CUTS=1
+          # Windows and Linux: install the real installer people download, test the installed copy, and make a
+          # real screen recording through the recorder (macOS runners can't grant screen access).
           case "${{ matrix.name }}" in
             linux)
               sudo apt-get update -qq && sudo apt-get install -y -qq xvfb >/dev/null
-              APP=(xvfb-run -a dist/linux-unpacked/recap-desktop --no-sandbox) ;;
+              sudo apt-get install -y -qq ./dist/Recap-linux-amd64.deb >/dev/null
+              BIN=$(dpkg -L recap-desktop | grep -E '^/opt/.+/recap-desktop$' | head -1)
+              echo "installed: $BIN"; [ -n "$BIN" ]
+              export RECAP_SELFTEST_CAPTURE=1
+              APP=(xvfb-run -a -s "-screen 0 1920x1080x24" "$BIN" --no-sandbox) ;;
             macos) APP=("dist/mac-arm64/Recap.app/Contents/MacOS/Recap") ;;
-            windows) APP=("dist/win-unpacked/Recap.exe") ;;
+            windows)
+              DEST="$RUNNER_TEMP/RecapInstalled"
+              cmd.exe //c "dist\\Recap-windows-x64-setup.exe /S /D=$(cygpath -w "$DEST")"
+              for i in $(seq 1 60); do [ -f "$DEST/Recap.exe" ] && break; sleep 2; done
+              ls "$DEST" | head; echo "installed: $DEST/Recap.exe"
+              export RECAP_SELFTEST_CAPTURE=1
+              APP=("$DEST/Recap.exe") ;;
           esac
           # macOS has no `timeout`; perl's alarm does the same job there.
           if command -v timeout >/dev/null; then LIMIT=(timeout 900); else LIMIT=(perl -e 'alarm shift; exec @ARGV' 900); fi
@@ -92,6 +104,47 @@ jobs:
           cat "$OUT/report.json"
           PY=$(command -v python3 || command -v python)
           "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all', len(r['steps']), 'steps passed'); sys.exit(1 if bad or not r['steps'] else 0)" "$OUT/report.json"
+
+      - name: Lifecycle (update notice, upgrade in place, AppImage, uninstall)
+        if: matrix.name != 'macos'
+        shell: bash
+        working-directory: desktop
+        run: |
+          set -euxo pipefail
+          OLD=v0.4.1   # an older release, so it must announce the latest one
+          HOME_DIR="$RUNNER_TEMP/lifecycle-home"
+          probe() { node scripts/ci-panel.mjs 9333 | tee "$RUNNER_TEMP/panel.json"; }
+          case "${{ matrix.name }}" in
+            windows)
+              DEST="$RUNNER_TEMP/RecapLifecycle"; W=$(cygpath -w "$DEST")
+              curl -sSL -o old-setup.exe "https://github.com/Aditya-galaxy/recap/releases/download/$OLD/Recap-windows-x64-setup.exe"
+              ver() { powershell -NoProfile -Command "(Get-Item '$W\\Recap.exe').VersionInfo.ProductVersion"; }
+              install() { cmd.exe //c "$1 /S /D=$W"; for i in $(seq 1 60); do [ -f "$DEST/Recap.exe" ] && break; sleep 2; done; sleep 3; }
+              run() { RECAP_DEV_HOME="$HOME_DIR" "$DEST/Recap.exe" --remote-debugging-port=9333 > "$RUNNER_TEMP/app.log" 2>&1 & sleep 25; probe; taskkill //IM Recap.exe //F >/dev/null 2>&1 || true; sleep 3; }
+              install old-setup.exe; echo "old installed: $(ver)"
+              run; grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json"
+              install "dist\\Recap-windows-x64-setup.exe"; NEW=$(ver); echo "after upgrade: $NEW"
+              [[ "$NEW" == "$(node -p "require('./package.json').version")"* ]]   # Windows adds a fourth part: 0.4.3.0
+              run; grep -q '"panel":true' "$RUNNER_TEMP/panel.json"; grep -q '"engine":"ready"' "$RUNNER_TEMP/panel.json"
+              powershell -NoProfile -Command "Start-Process -Wait -FilePath '$W\\Uninstall Recap.exe' -ArgumentList '/S'"
+              for i in $(seq 1 60); do [ ! -f "$DEST/Recap.exe" ] && break; sleep 2; done
+              [ ! -f "$DEST/Recap.exe" ] && echo "uninstalled"
+              ;;
+            linux)
+              sudo apt-get remove -y -qq recap-desktop >/dev/null || true
+              curl -sSL -o old.deb "https://github.com/Aditya-galaxy/recap/releases/download/$OLD/Recap-linux-amd64.deb"
+              sudo apt-get install -y -qq ./old.deb >/dev/null; echo "old installed: $(dpkg-query -W -f='${Version}' recap-desktop)"
+              BIN=$(dpkg -L recap-desktop | grep -E '^/opt/.+/recap-desktop$' | head -1)
+              run() { RECAP_DEV_HOME="$HOME_DIR" xvfb-run -a -s "-screen 0 1920x1080x24" "$@" --no-sandbox --remote-debugging-port=9333 > "$RUNNER_TEMP/app.log" 2>&1 & sleep 25; probe; pkill -f remote-debugging-port=9333 || true; sleep 3; }
+              run "$BIN"; grep -q '"updateShown":true' "$RUNNER_TEMP/panel.json"
+              sudo apt-get install -y -qq ./dist/Recap-linux-amd64.deb >/dev/null; NEW=$(dpkg-query -W -f='${Version}' recap-desktop); echo "after upgrade: $NEW"
+              [ "$NEW" = "$(node -p "require('./package.json').version")" ]
+              run "$BIN"; grep -q '"engine":"ready"' "$RUNNER_TEMP/panel.json"
+              chmod +x dist/Recap-linux-x86_64.AppImage
+              APPIMAGE_EXTRACT_AND_RUN=1 run ./dist/Recap-linux-x86_64.AppImage; grep -q '"engine":"ready"' "$RUNNER_TEMP/panel.json"
+              sudo apt-get remove -y -qq recap-desktop >/dev/null; [ ! -e "$BIN" ] && echo "uninstalled"
+              ;;
+          esac
 
       - name: Upload self-test screenshots
         if: always()

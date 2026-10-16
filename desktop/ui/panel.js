@@ -282,6 +282,19 @@ window.recap.on("begin", async (o) => {
       audioTracks = dest.stream.getAudioTracks();
     }
 
+    // No mic and no system audio: add a silent track. Desktop capture only delivers frames when the screen
+    // changes, so a still screen with no audio would otherwise produce a recording with no length (seen on
+    // Windows). The audio keeps time; the engine skips transcription when it's all silence.
+    if (!audioTracks.length) {
+      audioCtx = new AudioContext();
+      const dest = audioCtx.createMediaStreamDestination();
+      const silence = audioCtx.createConstantSource();
+      silence.offset.value = 0;
+      silence.connect(dest);
+      silence.start();
+      audioTracks = dest.stream.getAudioTracks();
+    }
+
     const out = new MediaStream([...video.getVideoTracks(), ...audioTracks]);
     // Hardware H.264 first: measured 2.4x less CPU than VP9 at 1080p30 with no dropped frames (VP9 dropped
     // ~19%), and the engine can remux it instead of re-encoding. VP9/VP8 where H.264 isn't available.

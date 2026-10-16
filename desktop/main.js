@@ -661,6 +661,12 @@ if (isLinux) app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapt
 // password. The library's cookie is per-launch and local-only; the optional server token is protected
 // by owner-only file permissions instead.
 if (process.platform === "darwin") app.commandLine.appendSwitch("use-mock-keychain");
+// Self-test on CI machines without a camera or microphone: Chromium's simulated devices (a moving test
+// pattern and a beeping tone) let the real recording paths run end to end.
+if (process.env.RECAP_SELFTEST && process.env.RECAP_SELFTEST_FAKE_MEDIA === "1") {
+  app.commandLine.appendSwitch("use-fake-device-for-media-stream");
+  app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
+}
 
 app.whenReady().then(() => {
   fs.rmSync(shareDir, { recursive: true, force: true }); // leftovers from a quit that skipped will-quit (e.g. a crash)
@@ -709,6 +715,16 @@ async function selftest(dir, sample) {
     openLibrary("/");
     for (let i = 0; i < 200 && milestones.libraryLoaded === undefined; i++) await wait(50);
     step("cold start: library loaded < 10 s", (milestones.libraryLoaded ?? Infinity) < 10_000, { ms: milestones.libraryLoaded });
+    const pageText = async () => {
+      for (let i = 0; i < 40; i++) {
+        const t = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
+        if (t && !/^\s*loading…\s*$/.test(t)) return t;
+        await wait(250);
+      }
+      return "";
+    };
+    const firstRun = await pageText();
+    step("first run: welcome screen, no terminal text", /Welcome to Recap/.test(firstRun) && !/\$ recap/.test(firstRun), { text: firstRun.slice(0, 120) });
     for (let i = 0; i < 1200 && engine.model.state !== "ready"; i++) await wait(100);
     step("model ready", engine.model.state === "ready", { error: engine.model.error || undefined });
     const auth = { Authorization: `Bearer ${engine.token}` };
@@ -783,6 +799,18 @@ async function selftest(dir, sample) {
     openLibrary(`/v/${video.id}`);
     await wait(3000);
     await shot("library-video.png");
+    // The video page as a person sees it: transcript words, clean-up, and the share button (desktop bridge).
+    const watch = await library.webContents
+      .executeJavaScript(`({ words: document.querySelectorAll("aside button, aside span").length, text: document.body.innerText, share: [...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share") })`)
+      .catch(() => ({}));
+    step("video page: transcript, clean up and share", /quick update/i.test(watch.text ?? "") && /clean up/i.test(watch.text ?? "") && watch.share, { share: watch.share });
+    openLibrary("/?q=Self%20test");
+    await wait(2000);
+    const found = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
+    openLibrary("/?q=zzzz-no-such-video");
+    await wait(2000);
+    const none = await library.webContents.executeJavaScript("document.body.innerText").catch(() => "");
+    step("library search", /Self test/.test(found) && /No videos match/.test(none));
     openLibrary("/");
     await wait(2500);
     await shot("library-home.png");
@@ -861,6 +889,83 @@ async function selftest(dir, sample) {
         }
       } catch (err) {
         step("capture", false, { error: String(err?.message ?? err) });
+      }
+
+      // Camera, microphone, the camera bubble, pause/resume and discard, with simulated devices on CI.
+      if (process.env.RECAP_SELFTEST_FAKE_MEDIA === "1") {
+        const waitPhase = async (phases, ms = 20_000) => {
+          for (let i = 0; i < ms / 100 && !phases.includes(session.phase); i++) await wait(100);
+          return session.phase;
+        };
+        const known = async () => new Set((await (await api("/api/videos")).json()).map((v) => v.id));
+        const newVideo = async (before) => {
+          for (let i = 0; i < 1200; i++) {
+            const v = (await (await api("/api/videos")).json()).find((x) => !before.has(x.id) && (x.status === "ready" || x.status === "error"));
+            if (v) return v;
+            await wait(100);
+          }
+          return null;
+        };
+        const hasAudio = async (id) => /Audio:/.test(((await execFileP(bin("ffmpeg"), ["-hide_banner", "-i", path.join(engine.dataDir, "videos", id, "video.mp4")]).catch((e) => e)).stderr ?? ""));
+        const base = { server: "", systemAudio: false, displayId: screen.getPrimaryDisplay().id, cameraId: "", micId: "" };
+
+        try {
+          // Camera only, with the microphone.
+          let before = await known();
+          start({ ...base, mode: "cam", micOn: true, title: "Camera test" });
+          step("camera: recording started", (await waitPhase(["recording", "error"])) === "recording", { error: session.error || undefined });
+          await wait(4000);
+          panel.webContents.send("control", "stop");
+          let v = await newVideo(before);
+          step("camera: video with sound", v?.status === "ready" && v.width > 0 && v.duration >= 3 && (await hasAudio(v.id)), { status: v?.status, width: v?.width, duration: v?.duration });
+          await waitPhase(["idle"]);
+
+          // Screen + camera bubble, resized mid-recording.
+          before = await known();
+          start({ ...base, mode: "screenCam", micOn: true, bubbleSize: "m", title: "Bubble test" });
+          await waitPhase(["recording", "error"]);
+          const m = bubble && !bubble.isDestroyed() ? bubble.getBounds().width : 0;
+          setBubbleSize("l");
+          await wait(300);
+          const l = bubble && !bubble.isDestroyed() ? bubble.getBounds().width : 0;
+          step("bubble: shown and resizes live", m === 200 && l === 280, { medium: m, large: l });
+          await wait(3000);
+          panel.webContents.send("control", "stop");
+          v = await newVideo(before);
+          step("screen + camera: video with sound", v?.status === "ready" && v.duration >= 2.5 && (await hasAudio(v.id)), { status: v?.status, duration: v?.duration });
+          await waitPhase(["idle"]);
+
+          // Pause and resume: the paused stretch isn't in the video.
+          before = await known();
+          start({ ...base, mode: "screen", micOn: true, title: "Pause test" });
+          await waitPhase(["recording", "error"]);
+          await wait(2000);
+          panel.webContents.send("control", "pause");
+          const paused = await waitPhase(["paused"], 5000);
+          await wait(4000);
+          panel.webContents.send("control", "resume");
+          await waitPhase(["recording"], 5000);
+          await wait(2000);
+          panel.webContents.send("control", "stop");
+          v = await newVideo(before);
+          step("pause / resume leaves the paused part out", paused === "paused" && v?.status === "ready" && v.duration >= 3 && v.duration < 6, { duration: v?.duration });
+          await waitPhase(["idle"]);
+
+          // Discard: nothing saved, no leftover raw file.
+          before = await known();
+          const raws = new Set(fs.readdirSync(libraryDir()));
+          start({ ...base, mode: "screen", micOn: true, title: "Discard test" });
+          await waitPhase(["recording", "error"]);
+          await wait(2000);
+          discard();
+          await waitPhase(["idle"], 5000);
+          await wait(3000);
+          const after = await known();
+          const leftovers = fs.readdirSync(libraryDir()).filter((f) => !raws.has(f) && f.endsWith(".webm"));
+          step("discard saves nothing", after.size === before.size && leftovers.length === 0, { leftovers });
+        } catch (err) {
+          step("media", false, { error: String(err?.message ?? err) });
+        }
       }
     }
 

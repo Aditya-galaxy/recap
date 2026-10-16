@@ -87,15 +87,20 @@ jobs:
               sudo apt-get install -y -qq ./dist/Recap-linux-amd64.deb >/dev/null
               BIN=$(dpkg -L recap-desktop | grep -E '^/opt/.+/recap-desktop$' | head -1)
               echo "installed: $BIN"; [ -n "$BIN" ]
-              export RECAP_SELFTEST_CAPTURE=1
+              export RECAP_SELFTEST_CAPTURE=1 RECAP_SELFTEST_FAKE_MEDIA=1
               APP=(xvfb-run -a -s "-screen 0 1920x1080x24" "$BIN" --no-sandbox) ;;
-            macos) APP=("dist/mac-arm64/Recap.app/Contents/MacOS/Recap") ;;
+            macos)
+              # The app people download: mount the DMG and run the copy inside it.
+              hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/dmg" dist/Recap-mac-arm64.dmg
+              cp -R "$RUNNER_TEMP/dmg/Recap.app" "$RUNNER_TEMP/Recap.app"; hdiutil detach "$RUNNER_TEMP/dmg"
+              codesign --verify --deep --strict "$RUNNER_TEMP/Recap.app" && echo "signature valid"
+              APP=("$RUNNER_TEMP/Recap.app/Contents/MacOS/Recap") ;;
             windows)
               DEST="$RUNNER_TEMP/RecapInstalled"
               cmd.exe //c "dist\\Recap-windows-x64-setup.exe /S /D=$(cygpath -w "$DEST")"
               for i in $(seq 1 60); do [ -f "$DEST/Recap.exe" ] && break; sleep 2; done
               ls "$DEST" | head; echo "installed: $DEST/Recap.exe"
-              export RECAP_SELFTEST_CAPTURE=1
+              export RECAP_SELFTEST_CAPTURE=1 RECAP_SELFTEST_FAKE_MEDIA=1
               APP=("$DEST/Recap.exe") ;;
           esac
           # macOS has no `timeout`; perl's alarm does the same job there.

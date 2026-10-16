@@ -23,6 +23,9 @@ export const config = {
   whisperModel: process.env.WHISPER_MODEL ?? inRoot("models", "ggml-base.en.bin"),
   /** Silero voice-activity model: whisper skips non-speech audio instead of inventing words in it. Optional. */
   vadModel: process.env.WHISPER_VAD_MODEL ?? inRoot("models", "ggml-silero-v5.1.2.bin"),
+  /** Optional on-device language model that polishes guide steps (llama.cpp + a small model downloaded on request). */
+  llamaBin: process.env.LLAMA_BIN ?? "llama-completion",
+  polishModel: process.env.POLISH_MODEL ?? inRoot("models", "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
   /** After the first (admin) account exists, can anyone else sign up? */
   allowSignup: bool(process.env.ALLOW_SIGNUP, true),
   /** If set, creating the first (admin) account requires this code, so a fresh public server can't be claimed by someone else. */

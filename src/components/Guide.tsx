@@ -4,8 +4,18 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fmtTime } from "@/lib/format";
 
-type Step = { t: number; text: string; image: string };
-type Guide = { status: "making" | "ready" | "error"; error?: string; title: string; steps: Step[]; updatedAt: string };
+type Step = { t: number; text: string; image: string; spoken?: string };
+type Guide = {
+  status: "making" | "polishing" | "ready" | "error";
+  error?: string;
+  title: string;
+  steps: Step[];
+  updatedAt: string;
+  polished?: boolean;
+  spokenTitle?: string;
+  progress?: number;
+};
+type Ai = { available: boolean; model: "none" | "downloading" | "ready" | "error"; progress: number; error?: string; bytes: number };
 
 /** The video's guide, polled while it's being made. */
 function useGuide(videoId: string) {
@@ -25,7 +35,7 @@ function useGuide(videoId: string) {
     };
   }, [videoId]);
   useEffect(() => {
-    if (guide?.status !== "making") return;
+    if (guide?.status !== "making" && guide?.status !== "polishing") return;
     const t = setInterval(load, 1500);
     return () => clearInterval(t);
   }, [guide?.status, load]);
@@ -70,7 +80,7 @@ export function GuidePanel({ videoId, onSeek }: { videoId: string; onSeek: (t: n
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex gap-2 border-b border-border p-3">
         <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/guide`}>open guide</Link>
-        <button className="btn-ghost" disabled={guide.status === "making"} onClick={make} title="Make it again from the recording (your edits are replaced)">
+        <button className="btn-ghost" disabled={guide.status === "making" || guide.status === "polishing"} onClick={make} title="Make it again from the recording (your edits are replaced)">
           {guide.status === "making" ? "remaking…" : "remake"}
         </button>
       </div>
@@ -115,6 +125,15 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
   }
 
   if (guide === undefined) return <p className="text-muted">loading…</p>;
+  if (guide?.status === "polishing") {
+    return (
+      <div className="card mx-auto max-w-lg space-y-4 p-6 text-[14px]">
+        <p>Polishing your guide on this computer… step {Math.min((guide.progress ?? 0) + 1, guide.steps.length)} of {guide.steps.length}</p>
+        <div className="working-bar" />
+        <p className="text-[12px] text-muted">Nothing leaves your computer. You can undo it afterwards.</p>
+      </div>
+    );
+  }
   if (!guide || guide.status !== "ready") {
     return (
       <div className="card mx-auto max-w-lg space-y-4 p-6 text-[14px]">
@@ -161,7 +180,8 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
         onChange={(e) => change({ ...guide, title: e.target.value })}
         aria-label="Guide title"
       />
-      <p className="mb-8 text-[13px] text-muted">{steps.length} steps · edit anything, it saves as you type</p>
+      <p className="mb-4 text-[13px] text-muted">{steps.length} steps · edit anything, it saves as you type</p>
+      <AiPolish videoId={videoId} guide={guide} setGuide={setGuide} />
 
       <ol className="space-y-10">
         {steps.map((s, i) => (
@@ -190,6 +210,96 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
         ))}
       </ol>
       {!steps.length && <p className="text-muted">All steps removed. Remake the guide from the video page to start over.</p>}
+    </div>
+  );
+}
+
+/** Optional on-device AI: rewrites spoken steps as clean instructions. Hidden where it isn't bundled. */
+function AiPolish({ videoId, guide, setGuide }: { videoId: string; guide: Guide; setGuide: (g: Guide) => void }) {
+  const [ai, setAi] = useState<Ai | null>(null);
+  const [asking, setAsking] = useState(false);
+  const [err, setErr] = useState("");
+  const pending = useRef(false);
+
+  const polish = useCallback(async () => {
+    setErr("");
+    const r = await fetch(`/api/videos/${videoId}/guide/polish`, { method: "POST" });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(j.error ?? "Couldn't start.");
+    setGuide(j.guide);
+  }, [videoId, setGuide]);
+
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      const r = await fetch("/api/ai", { cache: "no-store" }).catch(() => null);
+      if (!alive || !r?.ok) return;
+      const a: Ai = await r.json();
+      setAi(a);
+      if (a.model === "ready" && pending.current) {
+        pending.current = false;
+        polish();
+      }
+    };
+    tick();
+    const t = setInterval(() => ai?.model === "downloading" && tick(), 1000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, [ai?.model, polish]);
+
+  if (!ai?.available) return null;
+
+  async function download() {
+    setAsking(false);
+    pending.current = true;
+    const r = await fetch("/api/ai", { method: "POST" });
+    if (r.ok) setAi(await r.json());
+  }
+
+  async function undo() {
+    const r = await fetch(`/api/videos/${videoId}/guide`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: guide.spokenTitle ?? guide.title,
+        steps: guide.steps.map((s) => ({ image: s.image, text: s.spoken ?? s.text })),
+        polished: false,
+      }),
+    });
+    if (r.ok) setGuide((await r.json()).guide);
+  }
+
+  const gb = (ai.bytes / 1e9).toFixed(1);
+  const message = err || guide.error || (ai.model === "error" ? ai.error : "");
+  return (
+    <div className="mb-8 rounded-xl border border-border p-4 text-[13px]">
+      {guide.polished ? (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-muted">✦ Polished by on-device AI. Check each step before you share it.</span>
+          <button className="btn-ghost" onClick={undo}>undo polish</button>
+        </div>
+      ) : ai.model === "downloading" ? (
+        <div className="space-y-2">
+          <p className="text-muted">Downloading the AI model, once… {Math.round(ai.progress * 100)}%</p>
+          <div className="h-1.5 overflow-hidden rounded bg-border"><div className="h-full bg-accent" style={{ width: `${ai.progress * 100}%` }} /></div>
+        </div>
+      ) : asking ? (
+        <div className="space-y-3">
+          <p>Polish rewrites each spoken step as a short, clear instruction. It runs entirely on this computer and needs a one-time {gb} GB download.</p>
+          <div className="flex gap-2">
+            <button className="btn-primary" onClick={download}>download and polish</button>
+            <button className="btn-ghost" onClick={() => setAsking(false)}>not now</button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-muted">Turn spoken steps into clean written instructions. Runs on this computer.</span>
+          <button className="btn-primary" onClick={() => (ai.model === "ready" ? polish() : setAsking(true))}>✦ polish with on-device AI</button>
+        </div>
+      )}
+      {message && <p className="mt-2 text-[12px] text-muted">{message}</p>}
     </div>
   );
 }

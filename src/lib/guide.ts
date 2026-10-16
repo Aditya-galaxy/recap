@@ -2,6 +2,7 @@ import "server-only";
 import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { polishStep, polishTitle } from "./ai";
 import { config } from "./config";
 import { file, readMeta, readTranscript, videoDir } from "./store";
 import type { Word } from "./types";
@@ -18,14 +19,21 @@ export interface GuideStep {
   text: string;
   /** File name inside the video's guide/ folder. */
   image: string;
+  /** The step as it was spoken, kept after an AI polish so it can be undone. */
+  spoken?: string;
 }
 
 export interface Guide {
-  status: "making" | "ready" | "error";
+  status: "making" | "polishing" | "ready" | "error";
   error?: string;
   title: string;
   steps: GuideStep[];
   updatedAt: string;
+  /** Rewritten by the on-device model; spokenTitle and each step's spoken text allow undo. */
+  polished?: boolean;
+  spokenTitle?: string;
+  /** While polishing: steps done so far. */
+  progress?: number;
 }
 
 const GUIDE_FILE = "guide.json";
@@ -198,4 +206,18 @@ ${items.join("\n")}
 
 export function guideMarkdown(g: Guide) {
   return `# ${g.title}\n\n${g.steps.map((s, i) => `${i + 1}. ${s.text || `Step ${i + 1}`}`).join("\n")}\n`;
+}
+
+/** Rewrites each step (and the title) with the on-device model. The spoken text is kept for undo. */
+export async function polishGuide(id: string) {
+  const g = await readGuide(id);
+  if (!g || g.status !== "polishing") return;
+  const steps = g.steps.map((s) => ({ ...s, spoken: s.spoken ?? s.text }));
+  for (let i = 0; i < steps.length; i++) {
+    steps[i].text = await polishStep(steps[i].spoken!);
+    await writeGuide(id, { ...g, steps, progress: i + 1 });
+  }
+  const spokenTitle = g.spokenTitle ?? g.title;
+  const title = await polishTitle(spokenTitle, steps.map((s) => s.text));
+  await writeGuide(id, { ...g, status: "ready", title, spokenTitle, steps, polished: true, progress: undefined, error: undefined, updatedAt: new Date().toISOString() });
 }

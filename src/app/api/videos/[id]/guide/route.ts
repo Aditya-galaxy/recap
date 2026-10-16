@@ -68,7 +68,9 @@ export async function PATCH(req: Request, ctx: RouteContext<"/api/videos/[id]/gu
     .filter((x) => typeof x.image === "string" && known.has(x.image))
     .map((x) => ({ ...known.get(x.image as string)!, text: typeof x.text === "string" ? x.text.slice(0, 2000) : "" }));
   const title = typeof b.title === "string" && b.title.trim() ? b.title.trim().slice(0, 200) : g.title;
-  const next: Guide = { ...g, title, steps, updatedAt: new Date().toISOString() };
+  let next: Guide = { ...g, title, steps, updatedAt: new Date().toISOString() };
+  // Undo an AI polish: the client sends back the spoken text; forget the polish bookkeeping.
+  if (b.polished === false) next = { ...next, polished: false, spokenTitle: undefined, steps: next.steps.map((st) => ({ t: st.t, text: st.text, image: st.image })) };
   await writeGuide(id, next);
   return Response.json({ guide: next });
 }

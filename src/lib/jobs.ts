@@ -1,6 +1,6 @@
 import "server-only";
 import { db, now } from "./db";
-import { makeGuide, readGuide, writeGuide } from "./guide";
+import { makeGuide, polishGuide, readGuide, writeGuide } from "./guide";
 import { PermanentError, processVideo, renderClean } from "./pipeline";
 import { updateMeta } from "./store";
 import type { CleanOptions } from "./types";
@@ -8,7 +8,7 @@ import type { CleanOptions } from "./types";
 // A small durable queue in SQLite. Jobs survive restarts; one worker runs them one at a time
 // (whisper and ffmpeg already use every core, so parallel jobs would only thrash).
 
-export type JobType = "process" | "clean" | "guide";
+export type JobType = "process" | "clean" | "guide" | "polish";
 const MAX_ATTEMPTS = 3;
 const POLL_MS = 1000;
 
@@ -26,6 +26,7 @@ async function execute(job: JobRow) {
   if (job.type === "process") return processVideo(job.video_id);
   if (job.type === "clean") return renderClean(job.video_id, JSON.parse(job.payload ?? "{}") as CleanOptions);
   if (job.type === "guide") return makeGuide(job.video_id);
+  if (job.type === "polish") return polishGuide(job.video_id);
   throw new PermanentError(`unknown job type ${job.type}`);
 }
 
@@ -34,6 +35,15 @@ async function markFailed(job: JobRow, message: string) {
   if (job.type === "guide") {
     const g = await readGuide(job.video_id);
     if (g) await writeGuide(job.video_id, { ...g, status: "error", error: message }).catch(() => {});
+    return;
+  }
+  if (job.type === "polish") {
+    // A failed polish leaves the guide as it was (minus any half-finished rewrite).
+    const g = await readGuide(job.video_id);
+    if (g) {
+      const steps = g.polished ? g.steps : g.steps.map((s) => ({ ...s, text: s.spoken ?? s.text }));
+      await writeGuide(job.video_id, { ...g, steps, status: "ready", progress: undefined, error: `Couldn't polish: ${message}` }).catch(() => {});
+    }
     return;
   }
   await updateMeta(job.video_id, (m) => {

@@ -1,5 +1,6 @@
 import "server-only";
 import { db, now } from "./db";
+import { makeGuide, readGuide, writeGuide } from "./guide";
 import { PermanentError, processVideo, renderClean } from "./pipeline";
 import { updateMeta } from "./store";
 import type { CleanOptions } from "./types";
@@ -7,7 +8,7 @@ import type { CleanOptions } from "./types";
 // A small durable queue in SQLite. Jobs survive restarts; one worker runs them one at a time
 // (whisper and ffmpeg already use every core, so parallel jobs would only thrash).
 
-export type JobType = "process" | "clean";
+export type JobType = "process" | "clean" | "guide";
 const MAX_ATTEMPTS = 3;
 const POLL_MS = 1000;
 
@@ -24,11 +25,17 @@ export function enqueue(type: JobType, videoId: string, payload?: unknown) {
 async function execute(job: JobRow) {
   if (job.type === "process") return processVideo(job.video_id);
   if (job.type === "clean") return renderClean(job.video_id, JSON.parse(job.payload ?? "{}") as CleanOptions);
+  if (job.type === "guide") return makeGuide(job.video_id);
   throw new PermanentError(`unknown job type ${job.type}`);
 }
 
 /** Final failure: surface it on the video so the UI can show it. */
 async function markFailed(job: JobRow, message: string) {
+  if (job.type === "guide") {
+    const g = await readGuide(job.video_id);
+    if (g) await writeGuide(job.video_id, { ...g, status: "error", error: message }).catch(() => {});
+    return;
+  }
   await updateMeta(job.video_id, (m) => {
     if (job.type === "process") {
       m.status = "error";

@@ -853,6 +853,18 @@ async function selftest(dir, sample) {
     const dl = await api(`/api/videos/${video.id}/media?download`, { method: "HEAD" });
     step("export named after the title", /Self%20test/.test(dl.headers.get("content-disposition") ?? ""));
 
+    // Step-by-step guide: steps from the narration with a screenshot each, exported as one HTML file.
+    await api(`/api/videos/${video.id}/guide`, { method: "POST" });
+    let guide = null;
+    for (let i = 0; i < 120 && guide?.status !== "ready" && guide?.status !== "error"; i++) {
+      await wait(1000);
+      guide = (await (await api(`/api/videos/${video.id}/guide`)).json()).guide;
+    }
+    const html = guide?.status === "ready" ? await (await api(`/api/videos/${video.id}/guide?format=html`)).text() : "";
+    step("guide: steps with screenshots, exported", guide?.status === "ready" && guide.steps.length > 0 && guide.steps.every((s) => s.text) && (html.match(/data:image\/jpeg;base64/g) ?? []).length === guide.steps.length, {
+      status: guide?.status, error: guide?.error, steps: guide?.steps?.length,
+    });
+
     await wait(500);
     openLibrary(`/v/${video.id}`);
     // "launch" rather than an exact phrase: Linux CI's synthetic voice (espeak) comes out as "quick up, date".

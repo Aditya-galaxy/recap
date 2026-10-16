@@ -714,7 +714,9 @@ async function selftest(dir, sample) {
     // Like a normal launch: open the library as soon as the engine is up, to time a cold start.
     openLibrary("/");
     for (let i = 0; i < 200 && milestones.libraryLoaded === undefined; i++) await wait(50);
-    step("cold start: library loaded < 10 s", (milestones.libraryLoaded ?? Infinity) < 10_000, { ms: milestones.libraryLoaded });
+    // Typically ~1.8 s. The very first launch of a fresh install can spike (7-10 s seen on Windows CI while
+    // Defender scans the new program), so the bar is 15 s: loose enough for that, tight enough to catch a regression.
+    step("cold start: library loaded < 15 s", (milestones.libraryLoaded ?? Infinity) < 15_000, { ms: milestones.libraryLoaded });
     // Wait until the page has rendered past its loading placeholder (slow CI machines need a while).
     const pageText = async (ready = /\S/) => {
       let t = "";

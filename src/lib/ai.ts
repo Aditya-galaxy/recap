@@ -86,6 +86,18 @@ export async function removeModel() {
   Object.assign(state(), { model: "none", progress: 0, error: undefined });
 }
 
+// Guards against a small model making things up. Content words of the rewrite must mostly come from what was said,
+// and anything quoted (an error message) must survive word for word.
+const STOP = new Set("the a an and or but to of in on at for with from this that these those it its is are was were be been i you we they he she my your our their then now so just".split(" "));
+const words = (t: string) => (t.toLowerCase().match(/[a-z0-9']+/g) ?? []).map((w) => w.replace(/'s$/, "").replace(/(ing|ed|es|s)$/, "")).filter((w) => w.length > 2 && !STOP.has(w));
+export function faithful(out: string, said: string, min = 0.7) {
+  const src = new Set(words(said));
+  const ws = words(out);
+  const kept = ws.filter((w) => src.has(w)).length;
+  const quotes = [...said.matchAll(/["“]([^"”]{3,})["”]/g)].map((m) => m[1].toLowerCase().replace(/[.!?]+$/, ""));
+  return (ws.length === 0 || kept / ws.length >= min) && quotes.every((q) => out.toLowerCase().includes(q));
+}
+
 const chat = (msgs: [string, string][]) => msgs.map(([r, c]) => `<|im_start|>${r}\n${c}<|im_end|>\n`).join("") + "<|im_start|>assistant\n";
 
 /** One constrained completion; returns the parsed JSON the schema describes. */
@@ -143,16 +155,48 @@ export async function polishStep(text: string): Promise<string> {
   msgs.push(["user", JSON.stringify({ step: text })]);
   const { text: out } = await complete<{ text: string }>(msgs, { type: "object", properties: { text: { type: "string", maxLength: 220 } }, required: ["text"] }, 120);
   const clean = (out ?? "").replace(/\s+/g, " ").trim();
-  // Guard against a runaway or empty answer: keep what was said.
-  return clean && clean.length <= text.length * 2.5 + 60 ? clean : text;
+  // Guard against a runaway, empty or made-up answer: keep what was said.
+  return clean && clean.length <= text.length * 2.5 + 60 && faithful(clean, text, 0.6) ? clean : text;
 }
 
-export async function polishTitle(current: string, steps: string[]): Promise<string> {
+export async function polishTitle(current: string, lines: string[], kind: "guide" | "bug" = "guide"): Promise<string> {
+  const system =
+    kind === "guide"
+      ? 'Write a short title for a how-to guide, under 8 words. Start with "How to". Use only what the steps say.'
+      : "Write a short bug report title, under 10 words, saying what goes wrong. Keep error messages and names exactly. Use only what is said.";
   const { title } = await complete<{ title: string }>(
-    [["system", 'Write a short title for a how-to guide, under 8 words. Start with "How to". Use only what the steps say.'], ["user", steps.join("\n")]],
-    { type: "object", properties: { title: { type: "string", maxLength: 70 } }, required: ["title"] },
+    [["system", system], ["user", lines.join("\n")]],
+    { type: "object", properties: { title: { type: "string", maxLength: 80 } }, required: ["title"] },
     40,
   );
-  const t = (title ?? "").split(/[:–—|]| - /)[0].replace(/\s+/g, " ").trim().replace(/[.]$/, "");
-  return /^how to\b/i.test(t) && t.length >= 8 ? t : current;
+  // Guide titles lose anything after a colon or dash ("…: Step-by-Step Guide"); bug titles keep colons (error text).
+  const t = (title ?? "").split(kind === "guide" ? /[:–—|]| - / : /[–—|]| - /)[0].replace(/\s+/g, " ").trim().replace(/[.]$/, "");
+  const said = lines.join(" ");
+  if (kind === "guide") return /^how to\b/i.test(t) && t.length >= 8 && faithful(t.replace(/^how to\s+/i, ""), said, 0.6) ? t : current;
+  return t.length >= 8 && t.length <= 90 && faithful(t, said, 0.75) ? t : current;
+}
+
+const SENTENCE_SHOTS: Record<"expected" | "actual", [string, string][]> = {
+  expected: [
+    ["it should, like, save the file and close the dialog", "The file is saved and the dialog closes."],
+    ["normally you'd see the new invoice in the list", "The new invoice appears in the list."],
+  ],
+  actual: [
+    ["I get this error, it says could not save, try again", 'An error appears: "Could not save, try again".'],
+    ["and it just spins forever, nothing happens", "A spinner shows indefinitely and nothing happens."],
+  ],
+};
+
+/** Rewrites the spoken "expected" or "actual" part of a bug report as one plain sentence. */
+export async function polishSentence(text: string, kind: "expected" | "actual"): Promise<string> {
+  if (!text.trim()) return text;
+  const system =
+    (kind === "expected" ? "Rewrite what should happen" : "Rewrite what actually happens (the problem)") +
+    " as one or two short, plain sentences for a bug report. Keep error messages, button names and numbers exactly. Never add details that weren't said.";
+  const msgs: [string, string][] = [["system", system]];
+  for (const [a, b] of SENTENCE_SHOTS[kind]) msgs.push(["user", JSON.stringify({ said: a })], ["assistant", JSON.stringify({ text: b })]);
+  msgs.push(["user", JSON.stringify({ said: text })]);
+  const { text: out } = await complete<{ text: string }>(msgs, { type: "object", properties: { text: { type: "string", maxLength: 300 } }, required: ["text"] }, 120);
+  const clean = (out ?? "").replace(/\s+/g, " ").trim();
+  return clean && clean.length <= text.length * 2.5 + 60 && faithful(clean, text) ? clean : text;
 }

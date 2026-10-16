@@ -57,7 +57,7 @@ export async function writeGuide(id: string, g: Guide) {
 
 export const imagePath = (id: string, name: string) => path.join(videoDir(id), IMAGE_DIR, name);
 
-function ffmpeg(args: string[]): Promise<string> {
+export function ffmpeg(args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const p = spawn(config.ffmpegBin, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let err = "";
@@ -68,7 +68,7 @@ function ffmpeg(args: string[]): Promise<string> {
 }
 
 /** Moments the screen visibly changes (a click opening a page, a menu, a new window). */
-async function screenChanges(video: string): Promise<number[]> {
+export async function screenChanges(video: string): Promise<number[]> {
   // Small, 5 fps frames are plenty to notice UI changes and keep this quick on long recordings. A screen
   // change only redraws part of the frame, so its score is small (a menu or page change is ~0.008–0.02);
   // the pointer moving or compression noise stays under ~0.001.
@@ -81,9 +81,9 @@ async function screenChanges(video: string): Promise<number[]> {
   return times.filter((t, i) => i === 0 || t - times[i - 1] > 0.6);
 }
 
-type Sentence = { start: number; end: number; words: Word[] };
+export type Sentence = { start: number; end: number; words: Word[] };
 
-function sentences(words: Word[]): Sentence[] {
+export function sentences(words: Word[]): Sentence[] {
   const spoken = words.filter((w) => !w.filler && w.text.trim());
   const out: Sentence[] = [];
   let cur: Word[] = [];
@@ -91,7 +91,9 @@ function sentences(words: Word[]): Sentence[] {
     cur.push(w);
     const next = spoken[i + 1];
     const endsSentence = /[.?!]["')\]]?$/.test(w.text.trim());
-    const longGap = next && next.start - w.end > 1.2;
+    // A long pause only ends a sentence if what follows starts like one: Whisper sometimes stamps the last word of a
+    // phrase late ("display … name."), which looks like a pause in the middle of a sentence.
+    const longGap = next && next.start - w.end > 1.2 && /^["'(]?[A-Z]/.test(next.text.trim());
     if (!next || endsSentence || longGap) {
       out.push({ start: cur[0].start, end: cur[cur.length - 1].end, words: cur });
       cur = [];
@@ -109,12 +111,12 @@ export function tidy(text: string) {
   s = s.replace(/^[,.;:\s]+/, "");
   if (!s) return "";
   s = s[0].toUpperCase() + s.slice(1);
-  if (!/[.?!]$/.test(s)) s += ".";
+  if (!/[.?!]["')\]\u201d]?$/.test(s)) s += ".";
   return s;
 }
 
 /** Group sentences into steps: a new step whenever the screen changed, and at most 3 sentences per step. */
-function group(sents: Sentence[], changes: number[]) {
+export function group(sents: Sentence[], changes: number[]) {
   const steps: Sentence[][] = [];
   let cur: Sentence[] = [];
   for (const s of sents) {
@@ -127,6 +129,21 @@ function group(sents: Sentence[], changes: number[]) {
   }
   if (cur.length) steps.push(cur);
   return steps;
+}
+
+/** One still from the video, sized for documents. */
+export function still(video: string, t: number, out: string) {
+  return ffmpeg(["-hide_banner", "-loglevel", "error", "-ss", t.toFixed(2), "-i", video, "-frames:v", "1", "-vf", "scale='min(1600,iw)':-2", "-q:v", "3", "-y", out]);
+}
+
+/** When to take each step's screenshot: just before the first screen change while (or right after) it's spoken. */
+export function shotTimes(plan: { start: number; end: number }[], changes: number[], duration: number) {
+  return plan.map((p, i) => {
+    const until = plan[i + 1]?.start ?? duration;
+    const c = changes.find((t) => t > p.start + 0.3 && t <= until + 0.3);
+    const t = c !== undefined ? c - 0.25 : p.end;
+    return Math.max(0, Math.min(t, duration - 0.1));
+  });
 }
 
 export async function makeGuide(id: string) {
@@ -148,14 +165,8 @@ export async function makeGuide(id: string) {
     : [0, ...changes].map((t, i, a) => ({ start: t, end: a[i + 1] ?? duration, text: "" }));
   plan = plan.filter((p) => p.text || !sents.length).slice(0, MAX_STEPS);
 
-  // Screenshot at the action: just before the first screen change while (or right after) the step is
-  // spoken, so the pointer is still on what to click. No change: the screen as the sentence ends.
-  const shots = plan.map((p, i) => {
-    const until = plan[i + 1]?.start ?? duration;
-    const c = changes.find((t) => t > p.start + 0.3 && t <= until + 0.3);
-    const t = c !== undefined ? c - 0.25 : p.end;
-    return Math.max(0, Math.min(t, duration - 0.1));
-  });
+  // Screenshot at the action, so the pointer is still on what to click. No change: the screen as the sentence ends.
+  const shots = shotTimes(plan, changes, duration);
 
   const dir = path.join(videoDir(id), IMAGE_DIR);
   await fs.rm(dir, { recursive: true, force: true });
@@ -164,17 +175,14 @@ export async function makeGuide(id: string) {
   const steps: GuideStep[] = [];
   for (let i = 0; i < plan.length; i++) {
     const image = `step-${String(i + 1).padStart(3, "0")}-${tag}.jpg`;
-    await ffmpeg([
-      "-hide_banner", "-loglevel", "error", "-ss", shots[i].toFixed(2), "-i", video, "-frames:v", "1",
-      "-vf", "scale='min(1600,iw)':-2", "-q:v", "3", "-y", path.join(dir, image),
-    ]);
+    await still(video, shots[i], path.join(dir, image));
     steps.push({ t: Number(shots[i].toFixed(2)), text: plan[i].text, image });
   }
   await writeGuide(id, { status: "ready", title: meta.title, steps, updatedAt: new Date().toISOString() });
   return steps.length;
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
+export const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 
 /** One self-contained HTML file (images inlined): opens anywhere, imports into Notion/Docs/Confluence, prints to PDF. */
 export async function guideHtml(id: string, g: Guide) {

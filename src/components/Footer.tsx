@@ -14,7 +14,12 @@ export default async function Footer() {
   if (config.localToken) {
     return (
       <footer className="mx-auto flex w-full max-w-6xl justify-between px-4 py-6 text-[11px] text-muted">
-        <span>{feedback}</span>
+        <span className="flex gap-3">
+          {feedback}
+          <a className="underline" href="https://github.com/sponsors/Aditya-galaxy" target="_blank" rel="noreferrer">
+            support Recap
+          </a>
+        </span>
         {version && <span>Recap {version}</span>}
       </footer>
     );

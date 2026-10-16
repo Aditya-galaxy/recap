@@ -109,6 +109,9 @@ class Engine extends EventEmitter {
         WHISPER_BIN: bin("whisper-cli"),
         WHISPER_MODEL: this.modelPath,
         WHISPER_VAD_MODEL: path.join(resources(), "bin", "ggml-silero-v5.1.2.bin"),
+        // Optional on-device AI for polishing guides; its model is only downloaded if the person asks for it.
+        LLAMA_BIN: bin("llama-completion"),
+        POLISH_MODEL: process.env.RECAP_POLISH_MODEL ?? path.join(app.getPath("userData"), "models", "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
         // Local library: no upload cap (a 2-hour 1080p recording is ~7 GB).
         MAX_UPLOAD_MB: "1000000",
         FEEDBACK_URL: process.env.FEEDBACK_URL ?? "https://recap.kronagent.dev/api/feedback",

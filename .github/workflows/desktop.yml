@@ -40,7 +40,7 @@ jobs:
           npm ci
           cd desktop && npm ci && node node_modules/electron/install.js
 
-      - name: Bundled binaries (pinned ffmpeg + whisper.cpp built from source)
+      - name: Bundled binaries (pinned ffmpeg + whisper.cpp + llama.cpp built from source)
         shell: bash
         working-directory: desktop
         run: npm run bins
@@ -79,6 +79,8 @@ jobs:
             -c:v libx264 -preset veryfast -b:v 4M -c:a libopus "$RUNNER_TEMP/sample.mkv"
           ls -l "$RUNNER_TEMP/sample.mkv"
           export RECAP_SELFTEST_EXPECT_CUTS=1
+          # On-device AI: download the polish model through the app (checksum verified) into a scratch path, then polish a guide.
+          export RECAP_SELFTEST_POLISH=1 RECAP_POLISH_MODEL="$RUNNER_TEMP/polish-model.gguf"
           # Windows and Linux: install the real installer people download, test the installed copy, and make a
           # real screen recording through the recorder (macOS runners can't grant screen access).
           case "${{ matrix.name }}" in

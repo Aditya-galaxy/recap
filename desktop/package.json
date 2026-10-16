@@ -13,7 +13,7 @@
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
     "engine": "node scripts/prepare-engine.mjs",
-    "bins": "node scripts/fetch-ffmpeg.mjs && node scripts/build-whisper.mjs && node scripts/fetch-vad.mjs"
+    "bins": "node scripts/fetch-ffmpeg.mjs && node scripts/build-whisper.mjs && node scripts/build-llama.mjs && node scripts/fetch-vad.mjs"
   },
   "build": {
     "appId": "dev.recap.desktop",

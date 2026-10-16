@@ -8,6 +8,8 @@ Recap itself is MIT licensed. The desktop app also ships these programs as separ
 | whisper.cpp (`bin/whisper-cli`) | v1.9.5 | MIT | https://github.com/ggml-org/whisper.cpp |
 | Whisper `base.en` model (downloaded on first run) | ggml conversion | MIT | https://huggingface.co/ggerganov/whisper.cpp |
 | Silero VAD (`ggml-silero-v5.1.2.bin`, bundled) | v5.1.2, ggml conversion | MIT | https://github.com/snakers4/silero-vad · https://huggingface.co/ggml-org/whisper-vad |
+| llama.cpp (`bin/llama-completion`) | v0.6.0 | MIT | https://github.com/ggml-org/llama.cpp |
+| Qwen2.5 1.5B Instruct, Q4_K_M GGUF (downloaded only if you choose AI polish) | official GGUF | Apache-2.0 | https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF |
 | Electron, Chromium, Node.js | Electron 44 | MIT / BSD and others | https://github.com/electron/electron |
 
 FFmpeg's complete corresponding source code is available from the build sources linked above.

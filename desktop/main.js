@@ -865,6 +865,29 @@ async function selftest(dir, sample) {
       status: guide?.status, error: guide?.error, steps: guide?.steps?.length,
     });
 
+    // Optional on-device AI polish (CI sets RECAP_SELFTEST_POLISH=1): the real download (with its checksum), then a polish.
+    if (process.env.RECAP_SELFTEST_POLISH === "1" && guide?.status === "ready") {
+      const t0 = Date.now();
+      let ai = await (await api("/api/ai", { method: "POST" })).json();
+      for (let i = 0; i < 900 && ai.model === "downloading"; i++) {
+        await wait(1000);
+        ai = await (await api("/api/ai")).json();
+      }
+      step("AI: model downloaded and verified", ai.available && ai.model === "ready", { model: ai.model, error: ai.error, secs: Math.round((Date.now() - t0) / 1000) });
+      if (ai.model === "ready") {
+        const t1 = Date.now();
+        await api(`/api/videos/${video.id}/guide/polish`, { method: "POST" });
+        let pg = null;
+        for (let i = 0; i < 600 && pg?.status !== "ready"; i++) {
+          await wait(1000);
+          pg = (await (await api(`/api/videos/${video.id}/guide`)).json()).guide;
+        }
+        step("AI: guide polished, every step kept", pg?.status === "ready" && pg.polished === true && pg.steps.length === guide.steps.length && pg.steps.every((s) => s.text && s.spoken), {
+          error: pg?.error, secs: Math.round((Date.now() - t1) / 1000), first: pg?.steps?.[0]?.text?.slice(0, 80),
+        });
+      }
+    }
+
     await wait(500);
     openLibrary(`/v/${video.id}`);
     // "launch" rather than an exact phrase: Linux CI's synthetic voice (espeak) comes out as "quick up, date".

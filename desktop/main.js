@@ -672,6 +672,21 @@ app.whenReady().then(() => {
   fs.rmSync(shareDir, { recursive: true, force: true }); // leftovers from a quit that skipped will-quit (e.g. a crash)
   createPanel();
   engine.on("status", broadcast);
+  // After an engine crash it restarts on a new port; point an open library window at it, keeping the page.
+  let engineOrigin = null;
+  engine.on("status", () => {
+    if (engine.state !== "ready") return;
+    const origin = new URL(engine.url).origin;
+    if (engineOrigin && origin !== engineOrigin && library && !library.isDestroyed()) {
+      let page = "/";
+      try {
+        const u = new URL(library.webContents.getURL());
+        if (u.origin === engineOrigin) page = u.pathname + u.search;
+      } catch {}
+      library.loadURL(`${engine.url}/__local?token=${engine.token}&next=${encodeURIComponent(page)}`);
+    }
+    engineOrigin = origin;
+  });
   engine.ensureModel();
   engine.start().then(() => {
     milestones.engineReady = Date.now() - T0;

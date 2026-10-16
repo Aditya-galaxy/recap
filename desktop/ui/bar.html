@@ -30,11 +30,13 @@
     const bar = document.getElementById("bar");
     let lastPhase = "";
 
-    function btn(label, action, cls = "", title = "") {
+    // No title tooltips: they open as separate OS windows that aren't hidden from the capture,
+    // so hovering a button would put its tooltip text into the recording.
+    function btn(label, action, cls = "", name = "") {
       const b = document.createElement("button");
       b.textContent = label;
       b.className = cls;
-      b.title = title;
+      if (name) b.setAttribute("aria-label", name);
       b.onclick = () => window.recap.control(action);
       return b;
     }
@@ -62,10 +64,10 @@
         grow.className = "grow";
         bar.append(
           dot, time, grow,
-          ...(s.bubbleOn ? [btn(`◯ ${s.bubbleSize ?? "m"}`, "bubble", "", "Camera bubble size (s / m / l)")] : []),
-          s.phase === "recording" ? btn("❚❚", "pause", "", "Pause") : btn("▶", "resume", "", "Resume"),
-          btn("■ stop", "stop", "primary"),
-          btn("✕", "discard", "", "Discard"),
+          ...(s.bubbleOn ? [btn(`◯ ${s.bubbleSize ?? "m"}`, "bubble", "", "Camera size")] : []),
+          s.phase === "recording" ? btn("pause", "pause") : btn("resume", "resume"),
+          btn("stop", "stop", "primary"),
+          btn("discard", "discard"),
         );
       } else {
         bar.textContent = s.phase === "uploading" ? "uploading…" : "saving…";

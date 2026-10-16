@@ -1,4 +1,5 @@
 import Link from "next/link";
+import EmptyLibrary from "@/components/EmptyLibrary";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { fmtDate, fmtTime } from "@/lib/format";
@@ -31,13 +32,13 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
     <div className="mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6 flex items-baseline justify-between gap-4 border-b border-border pb-3">
         <h1 className="text-lg font-medium">
-          videos <span className="text-muted">[{total}]</span>
+          Recordings {total > 0 && <span className="text-muted">{total}</span>}
         </h1>
-        <form action="/" className="flex items-center gap-2">
+        <form action="/" className="flex items-center gap-2" hidden={total === 0 && !q}>
           <input
             name="q"
             defaultValue={q}
-            placeholder="search titles"
+            placeholder="search recordings"
             aria-label="Search videos by title"
             className="w-44 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] outline-none focus:border-border-strong sm:w-60"
           />
@@ -47,18 +48,7 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
       {videos.length === 0 && q ? (
         <p className="text-[13px] text-muted">No videos match “{q}”. <Link href="/" className="underline">Clear search</Link></p>
       ) : videos.length === 0 ? (
-        <div className="card px-6 py-16">
-          <pre className="text-[13px] leading-6 text-muted">
-{`$ recap ls
-  no recordings yet
-
-$ recap record --screen --cam`}
-          </pre>
-          <p className="mt-4 max-w-md text-[13px] text-muted">
-            Screen + camera bubble → share link with transcript and captions → cut the ums and dead air in one pass.
-          </p>
-          <Link href="/record" className="btn-primary mt-6">start recording</Link>
-        </div>
+        <EmptyLibrary />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {videos.map((v) => (

@@ -52,6 +52,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 curl c
  && rm -rf /var/lib/apt/lists/*
 COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/ffmpeg
 COPY --from=whisper /src/build/bin/whisper-cli /usr/local/bin/whisper-cli
+# Voice-activity model (0.9 MB): whisper skips non-speech audio instead of inventing words in it.
+RUN curl -fsSL -o /usr/local/share/ggml-silero-v5.1.2.bin https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin \
+ && echo "29940d98d42b91fbd05ce489f3ecf7c72f0a42f027e4875919a28fb4c04ea2cf  /usr/local/share/ggml-silero-v5.1.2.bin" | sha256sum -c -
+ENV WHISPER_VAD_MODEL=/usr/local/share/ggml-silero-v5.1.2.bin
 
 WORKDIR /app
 COPY --from=build --chown=node:node /app/.next/standalone ./

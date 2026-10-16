@@ -1,7 +1,7 @@
 {
   "name": "recap-desktop",
   "productName": "Recap",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Recap screen recorder for Windows and Linux",
   "author": "Aditya",
   "homepage": "https://github.com/Aditya-galaxy/recap",
@@ -13,7 +13,7 @@
     "dist:linux": "electron-builder --linux",
     "dist:mac": "electron-builder --mac",
     "engine": "node scripts/prepare-engine.mjs",
-    "bins": "node scripts/fetch-ffmpeg.mjs && node scripts/build-whisper.mjs"
+    "bins": "node scripts/fetch-ffmpeg.mjs && node scripts/build-whisper.mjs && node scripts/fetch-vad.mjs"
   },
   "build": {
     "appId": "dev.recap.desktop",

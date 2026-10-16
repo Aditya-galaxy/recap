@@ -85,11 +85,18 @@ async function transcribe(id: string, wav: string): Promise<Word[]> {
   // around pauses. -ojf gives per-token offsets, which are tighter than its word-split mode.
   // -bs 1 -bo 1 (greedy, with whisper's temperature fallback): 36% faster than the default 5-wide beam on a
   // 10-minute benchmark, with no loss in word error rate or filler detection.
-  await run(WHISPER_BIN, ["-m", WHISPER_MODEL, "-f", wav, "-ojf", "-of", outBase, "-np", "-nfa", "-bs", "1", "-bo", "1", "--prompt", WHISPER_PROMPT]);
+  // --vad: the Silero model drops background noise, music and silence before decoding, so whisper doesn't
+  // invent words there (measured: noise-only audio went from "[sound of water]" to nothing, and speech in
+  // noise stopped picking up phantom "ah"s). Timestamps stay on the original timeline.
+  // With VAD, whisper.cpp maps segment times back to the original timeline but not token times, so ask for
+  // one word per segment (-ml 1 -sow) and read words from segments: every word keeps its real position.
+  const vad = await exists(config.vadModel);
+  const vadArgs = vad ? ["--vad", "-vm", config.vadModel, "-ml", "1", "-sow"] : [];
+  await run(WHISPER_BIN, ["-m", WHISPER_MODEL, "-f", wav, "-ojf", "-of", outBase, "-np", "-nfa", "-bs", "1", "-bo", "1", ...vadArgs, "--prompt", WHISPER_PROMPT]);
   const j = JSON.parse(await fs.readFile(outBase + ".json", "utf8"));
   const words: Word[] = [];
   let cur: Word | null = null;
-  for (const seg of j.transcription ?? []) {
+  for (const seg of vad ? [] : (j.transcription ?? [])) {
     for (const tok of seg.tokens ?? []) {
       const text: string = tok.text ?? "";
       // Special tokens: [_BEG_], [_TT_123] timing markers and <|endoftext|>-style control tokens.
@@ -107,6 +114,12 @@ async function transcribe(id: string, wav: string): Promise<Word[]> {
     }
   }
   if (cur) words.push(cur);
+  if (vad) {
+    for (const seg of j.transcription ?? []) {
+      const text = String(seg.text ?? "").replace(/<\|[^|]*\|>/g, "").trim();
+      if (text && !/^\[_[^\]]*\]$/.test(text)) words.push({ start: seg.offsets.from / 1000, end: seg.offsets.to / 1000, text });
+    }
+  }
   // Drop non-speech annotations like [BLANK_AUDIO], (music), [Phone ringing] (may span words).
   const speech: Word[] = [];
   let inMarker = false;
@@ -190,9 +203,12 @@ export async function processVideo(id: string) {
     const n = haveSrc ? (srcInfo?.audio ?? 0) : (await inspect(mp4)).audio;
     if (!n) return { words: [], silences: [] };
     await timed("extract audio", () => run("ffmpeg", ["-y", "-hide_banner", "-loglevel", "error", "-i", from, ...audioMap(n), "-ar", "16000", "-ac", "1", wav]));
-    const words = await timed("transcribe", () => transcribe(id, wav));
     const length = (await inspect(wav)).duration;
     const silences = await timed("pauses", () => detectSilences(wav, length));
+    // All silence (mic off, or the recorder's placeholder track): nothing to transcribe, and whisper tends to
+    // invent a "Thank you." on silence.
+    const quiet = silences.reduce((s, r) => s + (r.end - r.start), 0);
+    const words = length > 0 && quiet >= length - 0.25 ? [] : await timed("transcribe", () => transcribe(id, wav));
     await fs.rm(wav, { force: true });
     await fs.rm(file(id, "whisper.json"), { force: true });
     return { words: snapToSilences(words, silences), silences };

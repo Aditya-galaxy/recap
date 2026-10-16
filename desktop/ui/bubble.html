@@ -18,13 +18,26 @@
   <div class="bubble"><video autoplay muted playsinline></video></div>
   <script>
     const cam = new URLSearchParams(location.search).get("cam");
-    navigator.mediaDevices
-      .getUserMedia({ video: { deviceId: cam ? { ideal: cam } : undefined, width: { ideal: 640 }, height: { ideal: 640 } } })
-      .then((s) => {
-        document.querySelector("video").srcObject = s;
-        window.addEventListener("beforeunload", () => s.getTracks().forEach((t) => t.stop()));
-      })
-      .catch(() => {});
+    // Windows can report a camera as busy for a moment after another app or window released it: retry,
+    // and if it never comes, close the bubble and say so instead of recording a black circle.
+    (async () => {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+          const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: cam ? { ideal: cam } : undefined, width: { ideal: 640 }, height: { ideal: 640 } } });
+          document.querySelector("video").srcObject = s;
+          window.addEventListener("beforeunload", () => s.getTracks().forEach((t) => t.stop()));
+          return;
+        } catch (err) {
+          const transient = err.name === "NotReadableError" || err.name === "AbortError";
+          if (!transient || attempt === 4) {
+            const why = err.name === "NotAllowedError" ? "Recap isn't allowed to use the camera" : err.name === "NotFoundError" ? "no camera was found" : "the camera is busy in another app";
+            window.recap?.recorder({ type: "camera-unavailable", message: `Recording without the camera bubble: ${why}.` });
+            return;
+          }
+          await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+        }
+      }
+    })();
   </script>
 </body>
 </html>

@@ -92,7 +92,14 @@ async function loadDevices() {
   $("displayField").hidden = displays.length < 2 || settings.mode === "cam";
   save();
 }
-navigator.mediaDevices.addEventListener("devicechange", () => devicesLoaded && loadDevices());
+// Video-call apps add and remove virtual cameras and mics. While recording, leave the devices alone (re-reading
+// them can ask for the camera again) and catch up once the recording ends.
+let devicesChanged = false;
+navigator.mediaDevices.addEventListener("devicechange", () => {
+  if (!devicesLoaded) return;
+  if (rec) devicesChanged = true;
+  else loadDevices();
+});
 
 function render() {
   for (const b of $("mode").children) b.setAttribute("aria-pressed", String(b.dataset.v === settings.mode));
@@ -238,6 +245,10 @@ function cleanup() {
   audioCtx?.close().catch(() => {});
   audioCtx = null;
   rec = null;
+  if (devicesChanged) {
+    devicesChanged = false;
+    loadDevices();
+  }
 }
 
 // Windows hands a camera (or the screen) back slowly after another app or window let go of it, so a
@@ -300,6 +311,10 @@ window.recap.on("begin", async (o) => {
       }
       streams.push(mic);
       audioSources.push(mic);
+      // Another app (often a video call) can take the microphone mid-recording.
+      mic.getAudioTracks()[0]?.addEventListener("ended", () => {
+        if (rec && rec.state !== "inactive") window.recap.recorder({ type: "notice", message: "The microphone stopped, probably taken by another app. The rest of this recording may have no sound." });
+      });
     }
 
     let audioTracks = [];
@@ -344,8 +359,13 @@ window.recap.on("begin", async (o) => {
       cleanup();
       if (!discarded) window.recap.recorder({ type: "stopped" });
     };
-    // Ending the share from the OS (e.g. the Wayland portal) stops the recording.
-    video.getVideoTracks()[0].addEventListener("ended", () => rec?.state !== "inactive" && rec?.stop());
+    // Ending the share from the OS (e.g. the Wayland portal), or another app taking the camera, stops the
+    // recording; what was recorded is kept.
+    video.getVideoTracks()[0].addEventListener("ended", () => {
+      if (!rec || rec.state === "inactive") return;
+      if (o.mode === "cam") window.recap.recorder({ type: "notice", message: "The camera stopped, probably taken by another app, so the recording ended. What was recorded is saved." });
+      rec.stop();
+    });
 
     rec.start(1000);
     accumulated = 0;

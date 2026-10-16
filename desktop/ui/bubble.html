@@ -19,13 +19,18 @@
   <script>
     const cam = new URLSearchParams(location.search).get("cam");
     // Windows can report a camera as busy for a moment after another app or window released it: retry,
-    // and if it never comes, close the bubble and say so instead of recording a black circle.
-    (async () => {
+    // and if it never comes, close the bubble and say so instead of recording a black circle. The same
+    // happens if another app (a video call) takes the camera mid-recording.
+    const video = document.querySelector("video");
+    async function connect() {
       for (let attempt = 0; attempt < 5; attempt++) {
         try {
           const s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: cam ? { ideal: cam } : undefined, width: { ideal: 640 }, height: { ideal: 640 } } });
-          document.querySelector("video").srcObject = s;
-          window.addEventListener("beforeunload", () => s.getTracks().forEach((t) => t.stop()));
+          video.srcObject = s;
+          s.getVideoTracks()[0].addEventListener("ended", () => {
+            video.srcObject = null;
+            connect();
+          });
           return;
         } catch (err) {
           const transient = err.name === "NotReadableError" || err.name === "AbortError";
@@ -37,7 +42,9 @@
           await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
         }
       }
-    })();
+    }
+    window.addEventListener("beforeunload", () => video.srcObject?.getTracks().forEach((t) => t.stop()));
+    connect();
   </script>
 </body>
 </html>

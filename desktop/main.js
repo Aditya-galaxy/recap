@@ -800,6 +800,27 @@ async function selftest(dir, sample) {
       step("share", false, { error: String(err?.message ?? err) });
     }
 
+    // Background noise must not turn into words: the voice-activity model ships with the app on every
+    // platform and whisper skips non-speech audio.
+    try {
+      const vadModel = path.join(path.dirname(bin("ffmpeg")), "ggml-silero-v5.1.2.bin");
+      step("noise filter bundled", fs.existsSync(vadModel) && fs.statSync(vadModel).size > 500_000, { file: path.basename(vadModel) });
+      const noise = path.join(dir, "noise.mkv");
+      await execFileP(bin("ffmpeg"), ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=gray:s=640x360:r=30:d=12", "-f", "lavfi", "-i", "anoisesrc=color=pink:amplitude=0.15:d=12", "-shortest", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", noise]);
+      const res = await api("/api/videos", { method: "POST", headers: { "x-title": "Noise only" }, body: fs.readFileSync(noise) });
+      const { id } = await res.json();
+      let detail = null;
+      for (let i = 0; i < 600; i++) {
+        detail = await (await api(`/api/videos/${id}`)).json();
+        if (detail.meta.status === "ready" || detail.meta.status === "error") break;
+        await wait(200);
+      }
+      const words = detail?.transcript?.words ?? [];
+      step("noise isn't transcribed as words", detail?.meta.status === "ready" && words.length === 0, { words: words.map((w) => w.text).join(" ").slice(0, 80) || undefined });
+    } catch (err) {
+      step("noise filter", false, { error: String(err?.message ?? err) });
+    }
+
     // Crash recovery: an orphaned raw recording is imported on the next start.
     const orphan = path.join(libraryDir(), "Recap 2026-01-01-00-00-00.webm");
     fs.copyFileSync(sample, orphan);

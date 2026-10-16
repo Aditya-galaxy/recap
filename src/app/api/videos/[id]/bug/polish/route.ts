@@ -5,7 +5,7 @@ import { readReport, writeReport } from "@/lib/report";
 import { isOwner, readMeta } from "@/lib/store";
 
 /** Polish the report with the on-device model. */
-export async function POST(_req: Request, ctx: RouteContext<"/api/videos/[id]/report/polish">) {
+export async function POST(_req: Request, ctx: RouteContext<"/api/videos/[id]/bug/polish">) {
   const { id } = await ctx.params;
   const user = await currentUser();
   if (!user) return unauthorized();

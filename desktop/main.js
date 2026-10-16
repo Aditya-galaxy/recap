@@ -866,14 +866,14 @@ async function selftest(dir, sample) {
     });
 
     // Bug report: steps to reproduce with screenshots, the environment, and an export that carries the screenshots.
-    await api(`/api/videos/${video.id}/report`, { method: "POST" });
+    await api(`/api/videos/${video.id}/bug`, { method: "POST" });
     let bugReport = null;
     for (let i = 0; i < 120 && bugReport?.status !== "ready" && bugReport?.status !== "error"; i++) {
       await wait(1000);
-      bugReport = (await (await api(`/api/videos/${video.id}/report`)).json()).report;
+      bugReport = (await (await api(`/api/videos/${video.id}/bug`)).json()).report;
     }
-    const reportHtml = bugReport?.status === "ready" ? await (await api(`/api/videos/${video.id}/report?format=html`)).text() : "";
-    const reportMd = bugReport?.status === "ready" ? await (await api(`/api/videos/${video.id}/report?format=md`)).text() : "";
+    const reportHtml = bugReport?.status === "ready" ? await (await api(`/api/videos/${video.id}/bug?format=html`)).text() : "";
+    const reportMd = bugReport?.status === "ready" ? await (await api(`/api/videos/${video.id}/bug?format=md`)).text() : "";
     const images = bugReport ? bugReport.steps.length + (bugReport.actualImage ? 1 : 0) : -1;
     step("bug report: steps, environment, exports", bugReport?.status === "ready" && bugReport.steps.length > 0 && bugReport.environment.length > 0 && (reportHtml.match(/data:image\/jpeg;base64/g) ?? []).length === images && /Steps to reproduce/.test(reportMd), {
       status: bugReport?.status, error: bugReport?.error, steps: bugReport?.steps?.length, title: bugReport?.title,

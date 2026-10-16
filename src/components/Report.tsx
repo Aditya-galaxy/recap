@@ -27,12 +27,12 @@ function useReport(videoId: string) {
   const [report, setReport] = useState<Report | null | undefined>(undefined);
   const [err, setErr] = useState("");
   const load = useCallback(async () => {
-    const r = await fetch(`/api/videos/${videoId}/report`, { cache: "no-store" });
+    const r = await fetch(`/api/videos/${videoId}/bug`, { cache: "no-store" });
     if (r.ok) setReport(((await r.json()) as { report: Report | null }).report);
   }, [videoId]);
   useEffect(() => {
     let alive = true;
-    fetch(`/api/videos/${videoId}/report`, { cache: "no-store" })
+    fetch(`/api/videos/${videoId}/bug`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((j: { report: Report | null } | null) => alive && j && setReport(j.report));
     return () => {
@@ -46,7 +46,7 @@ function useReport(videoId: string) {
   }, [report?.status, load]);
   async function make() {
     setErr("");
-    const r = await fetch(`/api/videos/${videoId}/report`, { method: "POST" });
+    const r = await fetch(`/api/videos/${videoId}/bug`, { method: "POST" });
     const j = await r.json().catch(() => ({}));
     if (!r.ok) return setErr(j.error ?? "Couldn't start the report.");
     setReport(j.report);
@@ -54,7 +54,7 @@ function useReport(videoId: string) {
   return { report, setReport, make, err };
 }
 
-const img = (videoId: string, name: string) => `/api/videos/${videoId}/report?image=${encodeURIComponent(name)}`;
+const img = (videoId: string, name: string) => `/api/videos/${videoId}/bug?image=${encodeURIComponent(name)}`;
 
 function markdown(r: Report) {
   const lines = [`## ${r.title}`, "", "**Steps to reproduce**", ...r.steps.map((s, i) => `${i + 1}. ${s.text || `Step ${i + 1}`}`)];
@@ -89,7 +89,7 @@ export function ReportPanel({ videoId, onSeek }: { videoId: string; onSeek: (t: 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex gap-2 border-b border-border p-3">
-        <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/report`}>open report</Link>
+        <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/bug`}>open report</Link>
         <button className="btn-ghost" disabled={report.status !== "ready"} onClick={make} title="Make it again from the recording (your edits are replaced)">remake</button>
       </div>
       <div className="space-y-3 overflow-y-auto p-4 text-[13px]">
@@ -133,7 +133,7 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
     setSaved("saving");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(async () => {
-      const r = await fetch(`/api/videos/${videoId}/report`, {
+      const r = await fetch(`/api/videos/${videoId}/bug`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: next.title, steps: next.steps.map((s) => ({ image: s.image, text: s.text })), expected: next.expected, actual: next.actual, environment: next.environment }),
@@ -196,7 +196,7 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[12px] text-muted">{saved === "saving" ? "saving…" : saved === "error" ? "couldn't save" : "saved"}</span>
           <button className="btn-ghost" onClick={copy}>{copied ? "copied ✓" : "copy as Markdown"}</button>
-          <a className="btn-primary" href={`/api/videos/${videoId}/report?format=html`} title="One file with the screenshots inside: attach it, open it in a browser, or print it to PDF.">export</a>
+          <a className="btn-primary" href={`/api/videos/${videoId}/bug?format=html`} title="One file with the screenshots inside: attach it, open it in a browser, or print it to PDF.">export</a>
         </div>
       </div>
 
@@ -204,12 +204,12 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
       <p className="mb-4 text-[13px] text-muted">bug report · edit anything, it saves as you type</p>
       <AiPolishBar
         what="report"
-        polishUrl={`/api/videos/${videoId}/report/polish`}
+        polishUrl={`/api/videos/${videoId}/bug/polish`}
         polished={!!r.polished}
         error={r.error}
         onStarted={(j) => setReport((j as { report: Report }).report)}
         onUndo={async () => {
-          const res = await fetch(`/api/videos/${videoId}/report`, {
+          const res = await fetch(`/api/videos/${videoId}/bug`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({

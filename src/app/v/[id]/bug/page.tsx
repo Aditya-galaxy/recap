@@ -8,7 +8,7 @@ import { isOwner, readMeta } from "@/lib/store";
 
 export const metadata: Metadata = { title: "Bug report · Recap", robots: { index: false, follow: false } };
 
-export default function ReportPage({ params }: PageProps<"/v/[id]/report">) {
+export default function ReportPage({ params }: PageProps<"/v/[id]/bug">) {
   return (
     <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-8 text-muted">loading…</div>}>
       <ReportLoader params={params} />
@@ -16,7 +16,7 @@ export default function ReportPage({ params }: PageProps<"/v/[id]/report">) {
   );
 }
 
-async function ReportLoader({ params }: { params: PageProps<"/v/[id]/report">["params"] }) {
+async function ReportLoader({ params }: { params: PageProps<"/v/[id]/bug">["params"] }) {
   await connection();
   const { id } = await params;
   const meta = await readMeta(id);

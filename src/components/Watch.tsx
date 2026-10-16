@@ -6,6 +6,7 @@ import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { ShareToCloud } from "@/components/CloudShare";
 import DesktopShare from "@/components/DesktopShare";
+import { GuidePanel } from "@/components/Guide";
 import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
@@ -33,11 +34,11 @@ export default function Watch({
   const [meta, setMeta] = useState(initialMeta);
   const [transcript, setTranscript] = useState(initialTranscript);
   const [version, setVersion] = useState<Version>(initialMeta.clean.status === "ready" ? "clean" : "original");
-  type Tab = "transcript" | "comments" | "clean" | "insights";
+  type Tab = "transcript" | "comments" | "clean" | "guide" | "insights";
   const [tab, setTab] = useState<Tab>("transcript");
   // Local (desktop) libraries have one person, so comments and insights only exist on servers.
-  const tabs: Tab[] = local ? ["transcript", "clean"] : owner ? ["transcript", "comments", "clean", "insights"] : ["transcript", "comments"];
-  const tabLabel: Record<Tab, string> = { transcript: "transcript", comments: "comments", clean: "clean up", insights: "insights" };
+  const tabs: Tab[] = local ? ["transcript", "clean", "guide"] : owner ? ["transcript", "comments", "clean", "guide", "insights"] : ["transcript", "comments"];
+  const tabLabel: Record<Tab, string> = { transcript: "transcript", comments: "comments", clean: "clean up", guide: "guide", insights: "insights" };
   const [opts, setOpts] = useState<CleanOptions>(initialMeta.clean.options ?? DEFAULT_CLEAN);
   const [previewing, setPreviewing] = useState(false);
   const [now, setNow] = useState(0);
@@ -126,6 +127,17 @@ export default function Watch({
     v.currentTime = target;
     v.play().catch(() => {});
   }
+
+  // ?t=12.3 (from a guide step) opens the original at that moment.
+  useEffect(() => {
+    const t = Number(new URLSearchParams(window.location.search).get("t"));
+    const v = videoRef.current;
+    if (!t || !v) return;
+    setVersion("original");
+    const go = () => (v.currentTime = t);
+    if (v.readyState >= 1) go();
+    else v.addEventListener("loadedmetadata", go, { once: true });
+  }, []);
 
   useEffect(() => {
     activeWord.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -337,6 +349,8 @@ export default function Watch({
             <InsightsPanel videoId={id} />
           ) : !ready ? (
             <p className="p-5 text-[13px] text-muted">transcript appears once processing finishes.</p>
+          ) : tab === "guide" ? (
+            <GuidePanel videoId={id} onSeek={seekOriginal} />
           ) : tab === "transcript" ? (
             <div className="overflow-y-auto p-5 text-[13px] leading-7">
               {words.length === 0 ? (

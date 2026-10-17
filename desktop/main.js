@@ -97,7 +97,7 @@ const libraryDir = () => {
   return d;
 };
 
-const webPrefs = { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false, backgroundThrottling: false };
+const webPrefs = { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, backgroundThrottling: false };
 
 function createPanel() {
   panel = new BrowserWindow({
@@ -709,7 +709,23 @@ if (process.env.RECAP_SELFTEST && process.env.RECAP_SELFTEST_FAKE_MEDIA === "1")
   app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
 }
 
+// Electron grants every web permission unless told otherwise. Recap's own recorder windows (local files) need the
+// camera, microphone and screen; the library (served by the local engine) needs the clipboard and fullscreen video.
+// Everything else (location, notifications from pages, MIDI, USB…) is refused.
+function permitted(permission, url) {
+  if (url.startsWith("file://")) return ["media", "display-capture", "clipboard-sanitized-write"].includes(permission);
+  if (engine.url && url.startsWith(engine.url)) return ["clipboard-sanitized-write", "fullscreen"].includes(permission);
+  return false;
+}
+
 app.whenReady().then(() => {
+  const { session: electronSession } = require("electron");
+  electronSession.defaultSession.setPermissionRequestHandler((wc, permission, done, details) =>
+    done(permitted(permission, details?.requestingUrl || wc.getURL())),
+  );
+  electronSession.defaultSession.setPermissionCheckHandler((wc, permission, origin, details) =>
+    permitted(permission, details?.requestingUrl || wc?.getURL() || origin || ""),
+  );
   app.setAboutPanelOptions({
     applicationName: "Recap",
     applicationVersion: app.getVersion(),

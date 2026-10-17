@@ -382,7 +382,16 @@ async function upload(file, { quiet = false } = {}) {
     if (title) headers["x-title"] = encodeURIComponent(title);
     const res = await fetch(`${server}/api/videos`, { method: "POST", headers, body: Readable.toWeb(stream), duplex: "half" });
     if (res.status === 401) throw new Error("the server rejected the token; update it under “server”");
-    if (res.status !== 201) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (res.status !== 201) {
+      const body = await res.text();
+      let message = "";
+      try {
+        message = JSON.parse(body).error ?? "";
+      } catch {
+        /* not JSON */
+      }
+      throw Object.assign(new Error(message || `HTTP ${res.status}: ${body.slice(0, 200)}`), { plain: !!message });
+    }
     const { id } = await res.json();
     if (local) {
       // The engine keeps its own processed copy; the raw recording is no longer needed.
@@ -398,7 +407,8 @@ async function upload(file, { quiet = false } = {}) {
   } catch (err) {
     if (quiet) return setPhase("idle", { progress: 0 }); // recovery: keep the file, try again next launch
     const where = local ? "the local library" : "the server";
-    setPhase("error", { error: `Couldn't add the video to ${where} (${err.cause?.code ?? err.message}). The recording is saved in ${libraryDir()}. Use “retry upload”.` });
+    const why = err.plain ? `${err.message}` : `(${err.cause?.code ?? err.message}).`;
+    setPhase("error", { error: `Couldn't add the video to ${where}. ${why} The recording is saved in ${libraryDir()}. Use “retry upload”.` });
   }
   panel?.show();
 }

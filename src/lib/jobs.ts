@@ -1,5 +1,6 @@
 import "server-only";
 import { db, now } from "./db";
+import { DISK_FULL, isDiskFull } from "./disk";
 import { makeGuide, polishGuide, readGuide, writeGuide } from "./guide";
 import { PermanentError, processVideo, renderClean } from "./pipeline";
 import { makeReport, polishReport, readReport, writeReport } from "./report";
@@ -89,16 +90,21 @@ async function runOne(): Promise<boolean> {
     db.prepare("UPDATE jobs SET status = 'done', error = NULL, updated_at = ? WHERE id = ?").run(now(), job.id);
     console.log(`[jobs] ${job.type} ${job.video_id} done in ${((Date.now() - started) / 1000).toFixed(1)}s`);
   } catch (err) {
-    const message = (err as Error).message ?? String(err);
+    const message = isDiskFull(err) ? DISK_FULL : ((err as Error).message ?? String(err));
     const permanent = err instanceof PermanentError || job.attempts >= MAX_ATTEMPTS;
-    console.error(`[jobs] ${job.type} ${job.video_id} attempt ${job.attempts} failed${permanent ? " (giving up)" : ""}:`, message);
-    if (permanent) {
-      db.prepare("UPDATE jobs SET status = 'failed', error = ?, updated_at = ? WHERE id = ?").run(message, now(), job.id);
-      await markFailed(job, message);
-    } else {
-      // Back off 15s, 60s, ...
-      const delay = 15_000 * 4 ** (job.attempts - 1);
-      db.prepare("UPDATE jobs SET status = 'queued', error = ?, run_after = ?, updated_at = ? WHERE id = ?").run(message, Date.now() + delay, now(), job.id);
+    console.error(`[jobs] ${job.type} ${job.video_id} attempt ${job.attempts} failed${permanent ? " (giving up)" : ""}:`, (err as Error).message ?? err);
+    // On a full disk these writes can fail too; the job is then picked up again on the next start.
+    try {
+      if (permanent) {
+        db.prepare("UPDATE jobs SET status = 'failed', error = ?, updated_at = ? WHERE id = ?").run(message, now(), job.id);
+        await markFailed(job, message);
+      } else {
+        // Back off 15s, 60s, ...
+        const delay = 15_000 * 4 ** (job.attempts - 1);
+        db.prepare("UPDATE jobs SET status = 'queued', error = ?, run_after = ?, updated_at = ? WHERE id = ?").run(message, Date.now() + delay, now(), job.id);
+      }
+    } catch (e) {
+      console.error(`[jobs] couldn't record the failure of ${job.type} ${job.video_id}:`, (e as Error).message);
     }
   }
   return true;
@@ -111,9 +117,15 @@ async function kick() {
   if (!w || w.busy) return;
   w.busy = true;
   try {
+    // One worker runs one job at a time, so a "running" job while it's idle is one whose result couldn't be
+    // saved (usually a full disk). Run it again in a minute, once there's hopefully room to record the outcome.
+    db.prepare("UPDATE jobs SET status = 'queued', run_after = ?, updated_at = ? WHERE status = 'running'").run(Date.now() + 60_000, now());
     while (await runOne()) {
       /* drain */
     }
+  } catch (err) {
+    // Claiming a job can fail too (disk full, database locked). Try again on the next tick.
+    console.error("[jobs] worker error:", (err as Error).message ?? err);
   } finally {
     w.busy = false;
   }

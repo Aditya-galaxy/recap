@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Code signing policy · Recap</title>
-  <meta name="description" content="How Recap's Windows releases are signed, who can approve a release, and what the app sends over the network." />
+  <title>Privacy and code signing · Recap</title>
+  <meta name="description" content="What Recap sends over the network, and how its releases are built and signed." />
   <link rel="icon" href="/favicon.png" />
   <link rel="stylesheet" href="/style.css?v=5" />
 </head>
@@ -17,26 +17,29 @@
   </header>
 
   <main class="wrap policy">
-    <h1>Code signing policy</h1>
-    <p>
-      Free code signing for Recap's Windows releases is provided by <a href="https://signpath.io">SignPath.io</a>, with a
-      certificate by <a href="https://signpath.org">SignPath Foundation</a>.
-    </p>
+    <h1>Privacy and code signing</h1>
 
-    <h2>What gets signed</h2>
+    <h2>How releases are built</h2>
     <p>
-      Every Windows release is built by GitHub Actions from the public source code at
-      <a href="https://github.com/Aditya-galaxy/recap">github.com/Aditya-galaxy/recap</a>. Only those automated builds are
-      signed: the installer, the uninstaller, the Recap app and the programs bundled with it (FFmpeg, whisper.cpp and
-      llama.cpp, each built from their published source). Nothing built on a personal computer is ever signed.
+      Every release is built by GitHub Actions from the public source code at
+      <a href="https://github.com/Aditya-galaxy/recap">github.com/Aditya-galaxy/recap</a>, together with the programs bundled
+      with it (FFmpeg, whisper.cpp and llama.cpp, each built from their published source). Nothing built on a personal
+      computer is ever published.
     </p>
+    <ul>
+      <li><b>macOS:</b> not notarized by Apple yet, so macOS asks you to confirm the first time you open it.</li>
+      <li><b>Windows, Microsoft Store (coming soon):</b> the Store version is signed by Microsoft.</li>
+      <li><b>Windows, direct download:</b> not code-signed yet, so Windows asks you to confirm the first time you open it.
+        PCs with Smart App Control turned on only run signed apps; on those, use the Microsoft Store version once it's out.</li>
+      <li><b>Linux:</b> AppImage and .deb; Linux doesn't need code signing to run them.</li>
+    </ul>
 
     <h2>Team roles</h2>
     <ul>
       <li>Committers and reviewers: <a href="https://github.com/Aditya-galaxy">Aditya-galaxy</a></li>
       <li>Approvers: <a href="https://github.com/Aditya-galaxy">Aditya-galaxy</a></li>
     </ul>
-    <p>Every release-signing request is approved by hand by an approver. Changes from other contributors are reviewed before they're merged.</p>
+    <p>Every release is approved by hand. Changes from other contributors are reviewed before they're merged.</p>
 
     <h2>Privacy</h2>
     <p>

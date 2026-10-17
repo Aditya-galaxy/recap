@@ -51,11 +51,123 @@ jobs:
         run: npm run engine
 
       - name: Package
+        if: matrix.name != 'windows' || vars.SIGNPATH_ORGANIZATION_ID == ''
         shell: bash
         working-directory: desktop
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npx electron-builder ${{ matrix.args }} --publish never
+
+      # Windows code signing through SignPath (free for open source; see docs/CODE_SIGNING.md). Off until the
+      # repository variable SIGNPATH_ORGANIZATION_ID and the secret SIGNPATH_API_TOKEN exist. Three requests:
+      # the whole app folder (Recap, its helpers, ffmpeg/whisper/llama and DLLs), then the uninstaller and the
+      # installer, which electron-builder creates mid-build (scripts/signpath-bridge.cjs hands them over).
+      - name: "Signing 1/3: build the app folder"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npx electron-builder --win --x64 --dir --publish never
+      - name: "Signing 1/3: upload the app folder"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: app-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app-unsigned
+          path: desktop/dist/win-unpacked
+          if-no-files-found: error
+      - name: "Signing 1/3: sign the app folder"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'recap' }}
+          signing-policy-slug: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-signing' || 'test-signing' }}
+          artifact-configuration-slug: windows-app
+          github-artifact-id: ${{ steps.app-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: desktop/dist/win-signed
+      - name: "Signing 1/3: use the signed app folder"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        working-directory: desktop
+        run: |
+          rm -rf dist/win-unpacked && mv dist/win-signed dist/win-unpacked
+          node scripts/signpath-bridge.cjs check dist/win-unpacked
+      - name: "Signing 2/3 and 3/3: build the installer (waits for the uninstaller and installer to be signed)"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: node scripts/signpath-bridge.cjs build --win nsis --x64 --prepackaged dist/win-unpacked --publish never "-c.win.signtoolOptions.sign=./scripts/signpath-bridge.cjs"
+      - name: "Signing 2/3: wait for the uninstaller"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: req1
+        shell: bash
+        working-directory: desktop
+        run: echo "dir=$(node scripts/signpath-bridge.cjs wait 1)" >> "$GITHUB_OUTPUT"
+      - name: "Signing 2/3: upload the uninstaller"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: req1-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-uninstaller-unsigned
+          path: ${{ steps.req1.outputs.dir }}
+          if-no-files-found: error
+      - name: "Signing 2/3: sign the uninstaller"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'recap' }}
+          signing-policy-slug: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-signing' || 'test-signing' }}
+          artifact-configuration-slug: windows-file
+          github-artifact-id: ${{ steps.req1-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: ${{ runner.temp }}/signed-1
+      - name: "Signing 2/3: hand it back"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        working-directory: desktop
+        run: node scripts/signpath-bridge.cjs accept 1 "$RUNNER_TEMP/signed-1"
+      - name: "Signing 3/3: wait for the installer"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: req2
+        shell: bash
+        working-directory: desktop
+        run: echo "dir=$(node scripts/signpath-bridge.cjs wait 2)" >> "$GITHUB_OUTPUT"
+      - name: "Signing 3/3: upload the installer"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        id: req2-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: ${{ steps.req2.outputs.dir }}
+          if-no-files-found: error
+      - name: "Signing 3/3: sign the installer"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'recap' }}
+          signing-policy-slug: ${{ startsWith(github.ref, 'refs/tags/v') && 'release-signing' || 'test-signing' }}
+          artifact-configuration-slug: windows-file
+          github-artifact-id: ${{ steps.req2-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: ${{ runner.temp }}/signed-2
+      - name: "Signing 3/3: hand it back and finish the installer"
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        working-directory: desktop
+        run: |
+          node scripts/signpath-bridge.cjs accept 2 "$RUNNER_TEMP/signed-2"
+          node scripts/signpath-bridge.cjs finish
+          node -e "const {isSigned}=require('./scripts/signpath-bridge.cjs'); if(!isSigned('dist/Recap-windows-x64-setup.exe')) { console.error('installer is not signed'); process.exit(1) }; console.log('installer signed')"
 
       # The full self-test (security, record→library→transcribe, clean cut, export, recovery, delete)
       # against the packaged app on every OS. The sample video is made with the bundled ffmpeg.
@@ -111,6 +223,12 @@ jobs:
           cat "$OUT/report.json"
           PY=$(command -v python3 || command -v python)
           "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all', len(r['steps']), 'steps passed'); sys.exit(1 if bad or not r['steps'] else 0)" "$OUT/report.json"
+
+      - name: Every installed Windows file is signed
+        if: matrix.name == 'windows' && vars.SIGNPATH_ORGANIZATION_ID != ''
+        shell: bash
+        working-directory: desktop
+        run: node scripts/signpath-bridge.cjs check "$RUNNER_TEMP/RecapInstalled"
 
       - name: Lifecycle (update notice, upgrade in place, AppImage, uninstall)
         if: matrix.name != 'macos'

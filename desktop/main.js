@@ -10,6 +10,13 @@ const { app, BrowserWindow, Tray, Menu, ShareMenu, ipcMain, desktopCapturer, scr
 const fs = require("node:fs");
 const path = require("node:path");
 const { Readable } = require("node:stream");
+
+// The self-test is configured through RECAP_SELFTEST* environment variables. An app installed from a Store
+// (MSIX) package can't be started with extra environment, so CI passes them as --recap-env=NAME=value instead.
+for (const arg of process.argv) {
+  const m = /^--recap-env=(RECAP_SELFTEST\w*)=(.*)$/.exec(arg);
+  if (m) process.env[m[1]] = m[2];
+}
 const { engine, bin } = require("./engine");
 const { execFile } = require("node:child_process");
 const execFileP = require("node:util").promisify(execFile);
@@ -406,7 +413,7 @@ function buildTrayMenu() {
       { label: hotkeyLabel ? `Start / stop recording (${hotkeyLabel})` : "Start / stop recording", click: toggle },
       { label: "Open recordings folder", click: () => shell.openPath(libraryDir()) },
       { type: "separator" },
-      ...(process.platform === "linux"
+      ...(process.platform === "linux" || storeApp
         ? []
         : [{
             label: "Open at login",
@@ -677,6 +684,8 @@ if (!app.requestSingleInstanceLock()) app.quit();
 // Windows: notifications and the taskbar need the same app ID the installer gave the Start menu shortcut,
 // otherwise notices (camera busy, mic lost…) don't show.
 if (process.platform === "win32") app.setAppUserModelId("dev.recap.desktop");
+// Microsoft Store (MSIX) install: the Store updates the app, and login items work differently there.
+const storeApp = !!process.windowsStore;
 // Started by "Open at login": stay in the tray/menu bar instead of opening the library.
 const startedHidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
 app.on("second-instance", () => (engine.state === "ready" ? openLibrary() : panel?.show()));
@@ -731,7 +740,7 @@ app.whenReady().then(() => {
     if (!process.env.RECAP_SELFTEST) setTimeout(recoverLeftovers, 2000);
   });
   // Recap lives in the menu bar for days at a time, so look again every 6 hours, not just at launch.
-  if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT) {
+  if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT && !storeApp) {
     setTimeout(checkForUpdate, 5000);
     setInterval(checkForUpdate, 6 * 60 * 60_000);
   }
@@ -755,7 +764,7 @@ app.whenReady().then(() => {
 
 async function selftest(dir, sample) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const report = { platform: `${process.platform}-${process.arch}`, version: app.getVersion(), steps: [] };
+  const report = { platform: `${process.platform}-${process.arch}`, version: app.getVersion(), store: !!process.windowsStore, steps: [] };
   const step = (name, ok, extra = {}) => report.steps.push({ name, ok: !!ok, ...extra });
   const shot = async (name) => {
     try {

@@ -282,6 +282,58 @@ jobs:
               ;;
           esac
 
+      # Microsoft Store (MSIX) package, built from the same app folder as the installer. The Store signs it on
+      # submission; here a throwaway certificate with the Store publisher's subject lets CI install it and run the
+      # full self-test inside the package, where file access and identity differ from a normal install.
+      - name: Store package (MSIX)
+        if: matrix.name == 'windows'
+        shell: bash
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: |
+          npx electron-builder --win appx --x64 --prepackaged dist/win-unpacked --publish never
+          ls -l dist/*.appx
+      - name: Install the Store package and run the self-test inside it
+        if: matrix.name == 'windows'
+        shell: pwsh
+        working-directory: desktop
+        run: |
+          $ErrorActionPreference = "Stop"
+          $appx = (Get-ChildItem dist\*.appx | Select-Object -First 1).FullName
+          $subject = "CN=2CD64894-6E27-45B1-92D6-A47B79A913FC"
+          $cert = New-SelfSignedCertificate -Type Custom -Subject $subject -KeyUsage DigitalSignature -FriendlyName "Recap CI test" -CertStoreLocation Cert:\CurrentUser\My -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          $secret = ConvertTo-SecureString -String "ci-test" -Force -AsPlainText
+          Export-PfxCertificate -Cert $cert -FilePath "$env:RUNNER_TEMP\store-test.pfx" -Password $secret | Out-Null
+          Import-PfxCertificate -FilePath "$env:RUNNER_TEMP\store-test.pfx" -CertStoreLocation Cert:\LocalMachine\TrustedPeople -Password $secret | Out-Null
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+          $test = "$env:RUNNER_TEMP\recap-store-test.appx"; Copy-Item $appx $test
+          & $signtool.FullName sign /fd SHA256 /f "$env:RUNNER_TEMP\store-test.pfx" /p ci-test $test
+          if ($LASTEXITCODE -ne 0) { throw "test signing failed" }
+          Add-AppxPackage -Path $test
+          $pkg = Get-AppxPackage Kronagent.RecapRecorder
+          "installed $($pkg.PackageFullName) at $($pkg.InstallLocation)"
+          $exe = (Get-ChildItem -Path $pkg.InstallLocation -Recurse -Filter Recap.exe | Select-Object -First 1).FullName
+          $out = "$env:RUNNER_TEMP\selftest-store"; New-Item -ItemType Directory -Force $out | Out-Null
+          $appArgs = "--recap-env=RECAP_SELFTEST=$out --recap-env=RECAP_SELFTEST_FILE=$env:RUNNER_TEMP\sample.mkv --recap-env=RECAP_SELFTEST_EXPECT_CUTS=1"
+          Invoke-CommandInDesktopPackage -PackageFamilyName $pkg.PackageFamilyName -AppId Recap -Command $exe -Args $appArgs
+          for ($i = 0; $i -lt 180 -and -not (Test-Path "$out\report.json"); $i++) { Start-Sleep 5 }
+          if (-not (Test-Path "$out\report.json")) { throw "the packaged app produced no self-test report" }
+          Start-Sleep 5
+          $r = Get-Content "$out\report.json" -Raw | ConvertFrom-Json
+          $bad = @($r.steps | Where-Object { -not $_.ok })
+          "inside the Store package: store=$($r.store), $($r.steps.Count) steps, $($bad.Count) failed"
+          $bad | ForEach-Object { "FAILED: $($_.name) $($_ | ConvertTo-Json -Compress)" }
+          if (-not $r.store) { throw "the self-test didn't run inside the package (process.windowsStore was false)" }
+          if ($bad.Count) { throw "self-test failures inside the Store package" }
+          Remove-AppxPackage $pkg.PackageFullName
+      - name: Upload the Store package
+        if: matrix.name == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: recap-windows-store
+          path: desktop/dist/*.appx
+
       - name: Upload self-test screenshots
         if: always()
         uses: actions/upload-artifact@v4

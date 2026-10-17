@@ -3,9 +3,10 @@ import { currentUser, unauthorized } from "@/lib/auth";
 import { guideHtml, guideMarkdown, IMAGE_RE, imagePath, readGuide, writeGuide, type Guide } from "@/lib/guide";
 import { enqueue } from "@/lib/jobs";
 import { canView, isOwner, readMeta } from "@/lib/store";
+import { safeFileName } from "@/lib/filename";
 
 const fileName = (title: string, ext: string) => {
-  const name = `${title.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").trim().slice(0, 120) || "Guide"} – guide.${ext}`;
+  const name = `${safeFileName(title, "Guide")} – guide.${ext}`;
   const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
 };

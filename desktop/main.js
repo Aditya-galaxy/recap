@@ -574,13 +574,18 @@ function shareFile(req, sender) {
   const version = req?.version === "clean" ? "clean" : "original";
   const src = path.join(engine.dataDir, "videos", id, version === "clean" ? "clean.mp4" : "video.mp4");
   if (!fs.existsSync(src)) throw new Error("That version of the video isn't ready.");
-  const title =
+  // Same rules as the engine's safeFileName (src/lib/filename.ts): Windows-safe, no invisible text-direction marks
+  // (which can disguise a file's extension), never a reserved device name like "nul.txt".
+  let title =
     String(req?.title ?? "")
+      .replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c]/g, "")
       .replace(/[\x00-\x1f\x7f<>:"/\\|?*]/g, " ")
       .replace(/\s+/g, " ")
       .trim()
-      .replace(/^\.+|[. ]+$/g, "")
-      .slice(0, 120) || "Recap video";
+      .replace(/^\.+/, "")
+      .slice(0, 120)
+      .replace(/[. ]+$/, "") || "Recap video";
+  if (/^(con|prn|aux|nul|com[0-9\u00b9\u00b2\u00b3]|lpt[0-9\u00b9\u00b2\u00b3]|conin\$|conout\$)$/i.test(title.split(".")[0].trim())) title = `Recap video ${title}`;
   const dir = path.join(shareDir, `${id}-${version}`);
   const out = path.join(dir, `${title}${version === "clean" ? " (cleaned)" : ""}.mp4`);
   fs.rmSync(dir, { recursive: true, force: true });

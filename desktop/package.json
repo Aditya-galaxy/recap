@@ -123,6 +123,9 @@
       ],
       "minVersion": "10.0.17763.0",
       "artifactName": "Recap-windows-x64-store.${ext}"
+    },
+    "toolsets": {
+      "appimage": "1.0.3"
     }
   },
   "devDependencies": {

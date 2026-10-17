@@ -106,6 +106,24 @@
       "enableCookieEncryption": true
     },
     "copyright": "Copyright © 2026 Aditya",
+    "appx": {
+      "identityName": "Kronagent.RecapRecorder",
+      "publisher": "CN=2CD64894-6E27-45B1-92D6-A47B79A913FC",
+      "publisherDisplayName": "Kronagent",
+      "displayName": "Recap Recorder",
+      "applicationId": "Recap",
+      "backgroundColor": "transparent",
+      "languages": [
+        "en-US"
+      ],
+      "capabilities": [
+        "runFullTrust",
+        "webcam",
+        "microphone"
+      ],
+      "minVersion": "10.0.17763.0",
+      "artifactName": "Recap-windows-x64-store.${ext}"
+    },
     "toolsets": {
       "appimage": "1.0.3"
     }

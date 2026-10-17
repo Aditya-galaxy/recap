@@ -40,6 +40,36 @@ near-continuous speech (7,277 words, 719 fillers), so it's heavier than the one 
 Known limit: the clean cut misses some fillers in natural, fast speech (around 3 in 5 in our tests); it
 never cut a real word in these runs. A precise fix needs forced alignment and is on the roadmap.
 
+## v0.8 audit (2026-10-17)
+
+Same machine, packaged engine from the `audit` branch. "Realistic" is a 10-minute screen walkthrough with
+narration (890 words); the synthetic `testsrc2` pattern changes every pixel every frame, so it is a worst case
+for the clean cut's re-encode.
+
+| Metric | Result |
+| --- | --- |
+| 10-min realistic recording → watchable + transcribed | **43 s (0.07×)** |
+| Clean cut, 10 min realistic | **83 s** (worst-case synthetic video: 158 s) |
+| Step-by-step guide, 10 min (60 steps, screenshots) | **30 s** |
+| Bug report, 10 min | **22 s** |
+| Search titles + transcripts | **67 ms** |
+| Peak memory, 10 min (engine + ffmpeg + whisper) | **605 MB** |
+| Packaged self-test (macOS) | **31/31**; engine ready 1.2 s, library loaded 1.4 s |
+| Accessibility (Lighthouse): library, video, guide, bug report, settings | **100** on every page |
+| Website (Lighthouse, desktop / mobile) | Performance 96 / 86; Accessibility, Best practices, SEO 100 |
+| `npm audit`, engine | **0** vulnerabilities |
+| Engine size | **30 MB** (sharp and libvips removed; images aren't optimized server-side) |
+
+Security: the windows run sandboxed; camera, mic and screen permissions are only granted to the app's own
+pages; the engine sends `X-Content-Type-Options`, `X-Frame-Options: DENY`, a frame-ancestors CSP,
+`Referrer-Policy` and `Permissions-Policy`, and rejects API calls without the local token (401).
+
+**Full disk.** Running the 60-minute benchmark filled the test machine's disk, which showed that the engine
+handled it badly: the job worker hit an unhandled error and the video stayed "processing" until a restart. Now
+uploads that won't fit are refused with "Your disk is full. Free up some space, then try again." (HTTP 507,
+shown as-is in the desktop app), and a job whose result can't be saved is run again a minute later. Tested on a
+1 GB disk image filled mid-job: no crash, and the video finished on its own about a minute after space was freed.
+
 ## Recording
 
 | Codec (1080p30, 8 Mbps, Electron) | CPU | Frames captured | Notes |

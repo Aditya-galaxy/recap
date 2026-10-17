@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { config } from "./config";
 import { db } from "./db";
+import { safeFileName } from "./filename";
 
 /**
  * Desktop app: the library keeps each recording in its own folder (videos/<id>/video.mp4), which means
@@ -19,13 +20,6 @@ const manifestPath = () => path.join(config.dataDir, "named-files.json");
 const source = (id: string, version: Entry["version"]) =>
   path.join(config.dataDir, "videos", id, version === "clean" ? "clean.mp4" : "video.mp4");
 
-// Windows rejects these characters and names; macOS and Linux are fine with the result too.
-const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
-function safeName(title: string) {
-  let s = title.replace(/[<>:"/\\|?*\u0000-\u001f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80).replace(/[. ]+$/, "");
-  if (!s || RESERVED.test(s)) s = "Recording";
-  return s;
-}
 
 function stamp(iso: string) {
   const d = new Date(iso);
@@ -87,7 +81,7 @@ async function sync() {
   const taken = new Set<string>();
   for (const r of rows.sort((a, b) => a.created_at.localeCompare(b.created_at))) {
     if (r.status !== "ready") continue;
-    const base = `${safeName(r.title)} – ${stamp(r.created_at)}`;
+    const base = `${safeFileName(r.title, "Recording", 80)} – ${stamp(r.created_at)}`;
     for (const version of ["original", "clean"] as const) {
       if (version === "clean" && r.clean_status !== "ready") continue;
       const suffix = version === "clean" ? " (cleaned)" : "";

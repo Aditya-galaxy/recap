@@ -2,6 +2,7 @@ import { createReadStream, promises as fs } from "node:fs";
 import { Readable } from "node:stream";
 import { currentUser } from "@/lib/auth";
 import { canView, file, readMeta } from "@/lib/store";
+import { safeFileName } from "@/lib/filename";
 
 /** Serves video.mp4 (or clean.mp4 with ?v=clean) with HTTP range support so the player can seek. */
 export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/media">) {
@@ -26,7 +27,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/medi
   };
   if (url.searchParams.has("download")) {
     // Name the export after the video ("Launch update (clean).mp4"), with an ASCII fallback for old clients.
-    const name = `${meta.title.replace(/[\\/:*?"<>|\x00-\x1f]+/g, " ").trim().slice(0, 120) || id}${clean ? " (clean)" : ""}.mp4`;
+    const name = `${safeFileName(meta.title, id)}${clean ? " (clean)" : ""}.mp4`;
     const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
     headers["Content-Disposition"] = `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
   }

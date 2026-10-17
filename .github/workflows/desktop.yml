@@ -300,3 +300,34 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.files }}
+
+  # Newer Linux desktops, as people actually run them: Ubuntu 24.04 restricts the user namespaces Chromium's sandbox
+  # uses and no longer ships libfuse2. Install the built AppImage and .deb there and run the full self-test, no flags.
+  linux-newer:
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: recap-linux
+          path: rel
+      - name: Desktop-like system
+        run: |
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=1
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb espeak-ng ffmpeg >/dev/null
+          echo "libfuse2 installed: $(ldconfig -p | grep -c 'libfuse.so.2')"
+          espeak-ng -w speech.wav "Hi team, um, quick update on the launch. So, uh, the recorder works now. Um, let me know what you think."
+          ffmpeg -y -loglevel error -f lavfi -i testsrc2=size=1280x720:rate=30 -stream_loop -1 -i speech.wav -af "apad=pad_dur=2" -t 20 -c:v libx264 -preset veryfast -c:a libopus sample.mkv
+      - name: AppImage, double-clicked on a stock system
+        run: |
+          APP=$(ls rel/*.AppImage); chmod +x "$APP"; mkdir out-appimage
+          RECAP_SELFTEST="$PWD/out-appimage" RECAP_SELFTEST_FILE="$PWD/sample.mkv" RECAP_SELFTEST_EXPECT_CUTS=1 timeout 900 xvfb-run -a -s "-screen 0 1280x800x24" "$APP" > appimage.log 2>&1 || true
+          [ -f out-appimage/report.json ] || { echo "AppImage did not start:"; head -n 20 appimage.log; exit 1; }
+          node -e "const r=require('./out-appimage/report.json');const bad=r.steps.filter(s=>!s.ok);console.log(bad.length?'FAILED: '+JSON.stringify(bad):'all '+r.steps.length+' steps passed');process.exit(bad.length?1:0)"
+      - name: .deb, installed with apt
+        run: |
+          sudo apt-get install -y -qq ./$(ls rel/*.deb) >/dev/null
+          BIN=$(dpkg -L recap-desktop | grep -E '^/opt/.+/recap-desktop$' | head -1); mkdir out-deb
+          RECAP_SELFTEST="$PWD/out-deb" RECAP_SELFTEST_FILE="$PWD/sample.mkv" RECAP_SELFTEST_EXPECT_CUTS=1 timeout 900 xvfb-run -a -s "-screen 0 1280x800x24" "$BIN" > deb.log 2>&1 || true
+          [ -f out-deb/report.json ] || { echo ".deb app did not start:"; head -n 20 deb.log; exit 1; }
+          node -e "const r=require('./out-deb/report.json');const bad=r.steps.filter(s=>!s.ok);console.log(bad.length?'FAILED: '+JSON.stringify(bad):'all '+r.steps.length+' steps passed');process.exit(bad.length?1:0)"

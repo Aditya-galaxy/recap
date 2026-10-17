@@ -105,7 +105,10 @@
       "onlyLoadAppFromAsar": true,
       "enableCookieEncryption": true
     },
-    "copyright": "Copyright © 2026 Aditya"
+    "copyright": "Copyright © 2026 Aditya",
+    "toolsets": {
+      "appimage": "1.0.3"
+    }
   },
   "devDependencies": {
     "electron": "^44.7.2",

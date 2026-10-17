@@ -261,7 +261,7 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
         <p className="font-medium">File it</p>
         <div className="flex flex-wrap items-center gap-2">
           <input className="w-56 rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong" placeholder="owner/repo" value={repo} onChange={(e) => saveRepo(e.target.value)} aria-label="GitHub repository" />
-          <a className={`btn-primary ${validRepo ? "" : "pointer-events-none opacity-40"}`} href={issueUrl || undefined} target="_blank" rel="noreferrer">open GitHub issue</a>
+          <a className={`btn-primary ${validRepo ? "" : "pointer-events-none opacity-40"}`} href={issueUrl || undefined} aria-disabled={!validRepo || undefined} target="_blank" rel="noreferrer">open GitHub issue</a>
           <a className="btn-ghost" href={`/api/videos/${videoId}/media?download`}>export recording</a>
         </div>
         <p className="text-muted">

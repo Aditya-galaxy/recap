@@ -5,6 +5,7 @@ import { pipeline } from "node:stream/promises";
 import type { ReadableStream as NodeReadableStream } from "node:stream/web";
 import { currentUser, quotaFor, storageUsed, unauthorized } from "@/lib/auth";
 import { config } from "@/lib/config";
+import { DISK_FULL, isDiskFull, tooLittleSpace } from "@/lib/disk";
 import { enqueue } from "@/lib/jobs";
 import { rateLimit } from "@/lib/ratelimit";
 import { createVideo, deleteVideo, file, listVideos, setSize } from "@/lib/store";
@@ -55,7 +56,9 @@ export async function POST(req: Request) {
     remaining < config.maxUploadBytes
       ? overQuota()
       : Response.json({ error: `Upload is larger than the ${Math.round(max / 1048576)} MB limit.` }, { status: 413 });
-  if (Number(req.headers.get("content-length") ?? 0) > max) return tooLarge();
+  const declared = Number(req.headers.get("content-length") ?? 0);
+  if (declared > max) return tooLarge();
+  if (await tooLittleSpace(config.dataDir, declared)) return Response.json({ error: DISK_FULL, code: "disk" }, { status: 507 });
 
   let title = "";
   try {
@@ -89,8 +92,9 @@ export async function POST(req: Request) {
   try {
     await pipeline(Readable.fromWeb(req.body as NodeReadableStream), limiter, createWriteStream(file(meta.id, "original")));
   } catch (err) {
-    await deleteVideo(meta.id);
+    await deleteVideo(meta.id).catch(() => {});
     if (err instanceof TooLarge) return tooLarge();
+    if (isDiskFull(err)) return Response.json({ error: DISK_FULL, code: "disk" }, { status: 507 });
     return Response.json({ error: `Upload failed: ${(err as Error).message}` }, { status: 500 });
   }
   if (bytes === 0) {

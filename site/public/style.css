@@ -149,3 +149,11 @@ h1, h2, .lede, .statement p { text-wrap: balance; }
 .shot .chrome span { background: #2a2a2a; }
 .shot .chrome p { color: #7c7c79; }
 .shot img { display: block; width: 100%; height: auto; }
+
+/* Code signing policy page */
+.policy { max-width: 720px; padding-top: 72px; padding-bottom: 72px; }
+.policy h1 { font-size: clamp(36px, 6vw, 56px); margin-bottom: 24px; }
+.policy h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 44px 0 12px; }
+.policy p, .policy li { font-size: 17px; line-height: 1.65; color: var(--muted); }
+.policy ul { padding-left: 1.2em; }
+.policy a { color: var(--text); }

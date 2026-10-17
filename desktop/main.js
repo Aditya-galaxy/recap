@@ -97,7 +97,7 @@ const libraryDir = () => {
   return d;
 };
 
-const webPrefs = { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: false, backgroundThrottling: false };
+const webPrefs = { preload: path.join(__dirname, "preload.js"), contextIsolation: true, sandbox: true, backgroundThrottling: false };
 
 function createPanel() {
   panel = new BrowserWindow({
@@ -382,7 +382,16 @@ async function upload(file, { quiet = false } = {}) {
     if (title) headers["x-title"] = encodeURIComponent(title);
     const res = await fetch(`${server}/api/videos`, { method: "POST", headers, body: Readable.toWeb(stream), duplex: "half" });
     if (res.status === 401) throw new Error("the server rejected the token; update it under “server”");
-    if (res.status !== 201) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`);
+    if (res.status !== 201) {
+      const body = await res.text();
+      let message = "";
+      try {
+        message = JSON.parse(body).error ?? "";
+      } catch {
+        /* not JSON */
+      }
+      throw Object.assign(new Error(message || `HTTP ${res.status}: ${body.slice(0, 200)}`), { plain: !!message });
+    }
     const { id } = await res.json();
     if (local) {
       // The engine keeps its own processed copy; the raw recording is no longer needed.
@@ -398,7 +407,8 @@ async function upload(file, { quiet = false } = {}) {
   } catch (err) {
     if (quiet) return setPhase("idle", { progress: 0 }); // recovery: keep the file, try again next launch
     const where = local ? "the local library" : "the server";
-    setPhase("error", { error: `Couldn't add the video to ${where} (${err.cause?.code ?? err.message}). The recording is saved in ${libraryDir()}. Use “retry upload”.` });
+    const why = err.plain ? `${err.message}` : `(${err.cause?.code ?? err.message}).`;
+    setPhase("error", { error: `Couldn't add the video to ${where}. ${why} The recording is saved in ${libraryDir()}. Use “retry upload”.` });
   }
   panel?.show();
 }
@@ -709,7 +719,23 @@ if (process.env.RECAP_SELFTEST && process.env.RECAP_SELFTEST_FAKE_MEDIA === "1")
   app.commandLine.appendSwitch("use-fake-ui-for-media-stream");
 }
 
+// Electron grants every web permission unless told otherwise. Recap's own recorder windows (local files) need the
+// camera, microphone and screen; the library (served by the local engine) needs the clipboard and fullscreen video.
+// Everything else (location, notifications from pages, MIDI, USB…) is refused.
+function permitted(permission, url) {
+  if (url.startsWith("file://")) return ["media", "display-capture", "clipboard-sanitized-write"].includes(permission);
+  if (engine.url && url.startsWith(engine.url)) return ["clipboard-sanitized-write", "fullscreen"].includes(permission);
+  return false;
+}
+
 app.whenReady().then(() => {
+  const { session: electronSession } = require("electron");
+  electronSession.defaultSession.setPermissionRequestHandler((wc, permission, done, details) =>
+    done(permitted(permission, details?.requestingUrl || wc.getURL())),
+  );
+  electronSession.defaultSession.setPermissionCheckHandler((wc, permission, origin, details) =>
+    permitted(permission, details?.requestingUrl || wc?.getURL() || origin || ""),
+  );
   app.setAboutPanelOptions({
     applicationName: "Recap",
     applicationVersion: app.getVersion(),

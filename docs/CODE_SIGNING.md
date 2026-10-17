@@ -1,8 +1,12 @@
 # Windows code signing
 
 Windows 11's **Smart App Control** blocks unsigned apps outright (no "Run anyway"), and SmartScreen warns on
-them. Recap's Windows builds are signed through [SignPath Foundation](https://signpath.org), which signs open-source
-projects for free. Public policy page: https://recap.kronagent.dev/code-signing.html
+them. Public policy page: https://recap.kronagent.dev/code-signing.html
+
+**Status (2026-10-17):** SignPath Foundation turned down Recap's application, so the direct-download `.exe` is
+unsigned. Smart App Control users are pointed to the Microsoft Store version, which Microsoft signs. The SignPath
+steps below stay in CI but are switched off (they only run when `vars.SIGNPATH_ORGANIZATION_ID` is set), so they
+can be reused if a later application is accepted.
 
 ## How it works
 

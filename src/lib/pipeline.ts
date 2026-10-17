@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { config } from "./config";
 import { CUT_FPS, cutRanges, keepRanges, snapToSilences, tagFillers, total } from "./cuts";
-import { exists, file, readMeta, readTranscript, updateMeta } from "./store";
+import { exists, file, readMeta, readTranscript, setTranscriptText, updateMeta } from "./store";
 import type { CleanOptions, Range, Transcript, Word } from "./types";
 
 const WHISPER_BIN = config.whisperBin;
@@ -220,6 +220,7 @@ export async function processVideo(id: string) {
   if (audio.status === "rejected") throw audio.reason;
 
   await fs.writeFile(file(id, "transcript.json"), JSON.stringify(audio.value));
+  setTranscriptText(id, audio.value);
   await fs.rm(src, { force: true });
   await fs.rm(provided, { force: true });
   const total = (performance.now() - started) / 1000;

@@ -148,6 +148,10 @@ const MIGRATIONS = [
   ALTER TABLE videos ADD COLUMN cloud_url TEXT;
   ALTER TABLE videos ADD COLUMN cloud_version TEXT;
   `,
+  // v5: what was said, for search (NULL until indexed; existing videos are backfilled at startup)
+  `
+  ALTER TABLE videos ADD COLUMN transcript_text TEXT;
+  `,
 ];
 
 function open() {

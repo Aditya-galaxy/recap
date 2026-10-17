@@ -38,8 +38,8 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
           <input
             name="q"
             defaultValue={q}
-            placeholder="search recordings"
-            aria-label="Search videos by title"
+            placeholder="search titles and what was said"
+            aria-label="Search recordings by title or by what was said"
             className="w-44 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] outline-none focus:border-border-strong sm:w-60"
           />
         </form>
@@ -53,7 +53,7 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {videos.map((v) => (
             <li key={v.id}>
-              <Link href={`/v/${v.id}`} className="card group block overflow-hidden transition-colors hover:border-border-strong">
+              <Link href={v.match ? `/v/${v.id}?t=${v.match.t}` : `/v/${v.id}`} className="card group block overflow-hidden transition-colors hover:border-border-strong">
                 <div className="relative aspect-video border-b border-border bg-surface-2">
                   {v.status === "ready" || v.duration ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -77,6 +77,11 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
                   <p className="truncate text-[13px] group-hover:underline">{v.title}</p>
                   <p className="shrink-0 text-[11px] text-muted">{fmtDate(v.createdAt)}</p>
                 </div>
+                {v.match && (
+                  <p className="line-clamp-2 border-t border-border px-3 py-2 text-[12px] text-muted">
+                    <span className="text-text">{fmtTime(v.match.t)}</span> · {v.match.snippet}
+                  </p>
+                )}
               </Link>
             </li>
           ))}

@@ -91,18 +91,65 @@ export async function createVideo(title: string, ownerId: string): Promise<Video
   return (await readMeta(id))!;
 }
 
-/** One page of a user's library, newest first, optionally filtered by a title search. */
+/** Where a search matched inside what was said: the moment, and a few words around it. */
+export type SearchMatch = { t: number; snippet: string };
+
+/** One page of a user's library, newest first, optionally filtered by a search of titles and what was said. */
 export async function listVideos(
   ownerId: string,
   { q = "", limit = 48, offset = 0 }: { q?: string; limit?: number; offset?: number } = {},
-): Promise<{ videos: VideoMeta[]; total: number }> {
-  const like = `%${q.trim().replace(/[\\%_]/g, (c) => "\\" + c)}%`;
-  const where = q.trim() ? "WHERE owner_id = ? AND title LIKE ? ESCAPE '\\'" : "WHERE owner_id = ?";
-  const args = q.trim() ? [ownerId, like] : [ownerId];
+): Promise<{ videos: (VideoMeta & { match?: SearchMatch })[]; total: number }> {
+  const query = q.trim();
+  const like = `%${query.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
+  const where = query
+    ? "WHERE owner_id = ? AND (title LIKE ? ESCAPE '\\' OR transcript_text LIKE ? ESCAPE '\\')"
+    : "WHERE owner_id = ?";
+  const args = query ? [ownerId, like, like] : [ownerId];
   const total = (db.prepare(`SELECT count(*) AS n FROM videos ${where}`).get(...args) as { n: number }).n;
   const rows = db.prepare(`SELECT * FROM videos ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...args, limit, offset) as Row[];
-  return { videos: rows.map(toMeta), total };
+  const videos = rows.map(toMeta) as (VideoMeta & { match?: SearchMatch })[];
+  // Matched in what was said (not the title): find the moment to jump to.
+  if (query) {
+    for (const v of videos) {
+      if (v.title.toLowerCase().includes(query.toLowerCase())) continue;
+      const m = findInTranscript(await readTranscript(v.id), query);
+      if (m) v.match = m;
+    }
+  }
+  return { videos, total };
 }
+
+/** The first place the words appear, as a timestamp and a short snippet ("…then click billing and…"). */
+export function findInTranscript(t: Transcript | null, query: string): SearchMatch | null {
+  if (!t?.words.length) return null;
+  const words = t.words.filter((w) => !w.filler);
+  let text = "";
+  const starts: number[] = [];
+  for (const w of words) {
+    starts.push(text.length);
+    text += w.text.trim() + " ";
+  }
+  const at = text.toLowerCase().indexOf(query.toLowerCase());
+  if (at < 0) return null;
+  let i = starts.findLastIndex((s) => s <= at);
+  if (i < 0) i = 0;
+  const from = Math.max(0, i - 4);
+  const to = Math.min(words.length, i + 8);
+  const snippet = (from > 0 ? "…" : "") + words.slice(from, to).map((w) => w.text.trim()).join(" ") + (to < words.length ? "…" : "");
+  return { t: words[i].start, snippet };
+}
+
+/** Index what was said, for search. */
+export function setTranscriptText(id: string, t: Transcript | null) {
+  const text = (t?.words ?? []).filter((w) => !w.filler).map((w) => w.text.trim()).join(" ");
+  db.prepare("UPDATE videos SET transcript_text = ? WHERE id = ?").run(text, id);
+}
+
+// Recordings made before search covered transcripts: index them once, in the background.
+setTimeout(async () => {
+  const ids = db.prepare("SELECT id FROM videos WHERE status = 'ready' AND transcript_text IS NULL").all() as { id: string }[];
+  for (const { id } of ids) setTranscriptText(id, await readTranscript(id));
+}, 2000).unref?.();
 
 export async function readTranscript(id: string): Promise<Transcript | null> {
   try {

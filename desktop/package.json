@@ -1,7 +1,7 @@
 {
   "name": "recap-desktop",
   "productName": "Recap",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Record your screen and camera, get a transcript, and cut the ums. Everything stays on your computer.",
   "author": "Aditya",
   "homepage": "https://github.com/Aditya-galaxy/recap",

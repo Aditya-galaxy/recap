@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Code signing policy · Recap</title>
+  <meta name="description" content="How Recap's Windows releases are signed, who can approve a release, and what the app sends over the network." />
+  <link rel="icon" href="/icon.png" />
+  <link rel="stylesheet" href="/style.css?v=4" />
+  <style>
+    .policy { max-width: 720px; padding-top: 72px; padding-bottom: 72px; }
+    .policy h1 { font-size: clamp(36px, 6vw, 56px); margin-bottom: 24px; }
+    .policy h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; margin: 44px 0 12px; }
+    .policy p, .policy li { font-size: 17px; line-height: 1.65; color: var(--muted); }
+    .policy ul { padding-left: 1.2em; }
+    .policy a { color: var(--text); }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="logo" href="/">recap</a>
+      <nav><a href="https://github.com/Aditya-galaxy/recap">GitHub</a></nav>
+    </div>
+  </header>
+
+  <main class="wrap policy">
+    <h1>Code signing policy</h1>
+    <p>
+      Free code signing for Recap's Windows releases is provided by <a href="https://signpath.io">SignPath.io</a>, with a
+      certificate by <a href="https://signpath.org">SignPath Foundation</a>.
+    </p>
+
+    <h2>What gets signed</h2>
+    <p>
+      Every Windows release is built by GitHub Actions from the public source code at
+      <a href="https://github.com/Aditya-galaxy/recap">github.com/Aditya-galaxy/recap</a>. Only those automated builds are
+      signed: the installer, the uninstaller, the Recap app and the programs bundled with it (FFmpeg, whisper.cpp and
+      llama.cpp, each built from their published source). Nothing built on a personal computer is ever signed.
+    </p>
+
+    <h2>Team roles</h2>
+    <ul>
+      <li>Committers and reviewers: <a href="https://github.com/Aditya-galaxy">Aditya-galaxy</a></li>
+      <li>Approvers: <a href="https://github.com/Aditya-galaxy">Aditya-galaxy</a></li>
+    </ul>
+    <p>Every release-signing request is approved by hand by an approver. Changes from other contributors are reviewed before they're merged.</p>
+
+    <h2>Privacy</h2>
+    <p>
+      Recap records, transcribes and edits on your computer. Your recordings, transcripts, guides and reports are never sent
+      anywhere unless you choose to share them. The app only contacts other systems in these cases:
+    </p>
+    <ul>
+      <li><b>Update check:</b> every few hours it asks GitHub for the latest release number. Nothing about you or your recordings is sent.</li>
+      <li><b>Transcription model:</b> on first run it downloads the Whisper speech model from Hugging Face.</li>
+      <li><b>On-device AI (optional):</b> only if you choose "polish", it downloads a language model from Hugging Face once.</li>
+      <li><b>Feedback:</b> only when you write and send feedback, your message is sent to recap.kronagent.dev.</li>
+      <li><b>Links you open</b>, such as a GitHub issue you file, open in your browser.</li>
+    </ul>
+  </main>
+
+  <footer class="wrap foot">
+    <span>recap · MIT licensed · <a href="https://github.com/Aditya-galaxy/recap">source</a></span>
+    <span><a href="/">home</a></span>
+  </footer>
+</body>
+</html>

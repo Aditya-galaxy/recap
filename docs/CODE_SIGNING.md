@@ -4,7 +4,8 @@ Windows 11's **Smart App Control** blocks unsigned apps outright (no "Run anyway
 them. Public policy page: https://recap.kronagent.dev/code-signing.html
 
 **Status (2026-10-17):** SignPath Foundation turned down Recap's application, so the direct-download `.exe` is
-unsigned. Smart App Control users are pointed to the Microsoft Store version, which Microsoft signs. The SignPath
+unsigned. The Microsoft Store version (product ID 9P2Z7WK8FTS7, live since 2026-10-19) is signed by Microsoft and is
+what the website offers Windows visitors first; the `.exe` stays as a fallback for PCs without the Store. The SignPath
 steps below stay in CI but are switched off (they only run when `vars.SIGNPATH_ORGANIZATION_ID` is set), so they
 can be reused if a later application is accepted.
 

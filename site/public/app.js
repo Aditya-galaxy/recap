@@ -28,6 +28,13 @@ function intelMac() {
 if (intelMac()) Object.assign(target, { os: "mac-intel", name: "", file: "" });
 const downloadUrl = target.file ? RELEASES + target.file : "https://github.com/Aditya-galaxy/recap/releases/latest";
 
+// Windows gets the Microsoft Store version: signed by Microsoft (so Smart App Control and SmartScreen let it
+// run) and updated by the Store. The installer (.exe) stays available as a fallback link.
+const STORE_ID = "9P2Z7WK8FTS7";
+const storePage = `https://apps.microsoft.com/detail/${STORE_ID}?mode=direct`;
+const storeApp = `ms-windows-store://pdp/?productid=${STORE_ID}`;
+const windows = target.os === "windows";
+
 const KEY = "recap_download_ok";
 const store = {
   get() {
@@ -48,7 +55,12 @@ const store = {
 
 function showReady(gate) {
   const ready = document.getElementById("ready").content.cloneNode(true);
-  ready.querySelector("[data-primary]").href = downloadUrl;
+  ready.querySelector("[data-primary]").href = windows ? storePage : downloadUrl;
+  if (windows) {
+    ready.querySelector(".ready-title").textContent = "Opening the Microsoft Store…";
+    ready.querySelector("[data-primary]").textContent = "Get Recap from the Microsoft Store";
+    ready.querySelector("[data-retry]").textContent = "Didn't open? ";
+  }
   // Phones and tablets can't install it: point them at their computer instead.
   if (target.os === "mac-intel") ready.querySelector(".ready-title").textContent = "You're on the list. We'll email you when Recap runs on Intel Macs.";
   else if (!target.file) ready.querySelector(".ready-title").textContent = "You're in. Open this page on your computer to install Recap.";
@@ -57,15 +69,17 @@ function showReady(gate) {
 }
 
 function startDownload() {
-  // A download link doesn't navigate away. Phones and Intel Macs get nothing to download.
-  if (target.file) location.href = downloadUrl;
+  // A download link (or the Store's own link) doesn't navigate away. Phones and Intel Macs get nothing to download.
+  if (windows) location.href = storeApp;
+  else if (target.file) location.href = downloadUrl;
 }
 
 for (const gate of document.querySelectorAll("[data-gate]")) {
   const form = gate.querySelector("form");
   const status = gate.querySelector("[data-status]");
   const button = gate.querySelector("[data-label]");
-  if (target.name) button.textContent = `Download for ${target.name}`;
+  if (target.name) button.textContent = windows ? "Get it for Windows" : `Download for ${target.name}`;
+  if (windows) status.textContent = "Free, from the Microsoft Store: signed by Microsoft and updated automatically.";
   if (target.os === "mac-intel") button.textContent = "Notify me";
   if (target.os === "mac") status.textContent = "Free and open source. For Macs with Apple silicon (M1 or newer).";
   if (target.os === "mac-intel") status.textContent = "Recap needs a Mac with Apple silicon (M1 or newer) for now. Leave your email and we'll tell you when Intel Macs are supported.";
@@ -76,7 +90,7 @@ for (const gate of document.querySelectorAll("[data-gate]")) {
     form.email.closest("form").classList.add("known");
     form.email.remove();
     form.querySelector(".hp").remove();
-    if (target.os !== "mac" && target.os !== "mac-intel") status.textContent = "Free and open source.";
+    if (target.os !== "mac" && target.os !== "mac-intel" && !windows) status.textContent = "Free and open source.";
   }
 
   form.addEventListener("submit", async (e) => {

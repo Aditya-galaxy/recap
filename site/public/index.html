@@ -109,14 +109,15 @@
       <div class="ready">
         <p class="ready-title">Your download is starting.</p>
         <p class="fine">
-          Didn't start? <a data-primary href="#">Download for your computer</a>.
+          <span data-retry>Didn't start? </span><a data-primary href="#">Download for your computer</a>.
           Other builds: <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-mac-arm64.dmg">macOS (Apple silicon)</a> ·
-          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">Windows</a> ·
+          <a href="https://apps.microsoft.com/detail/9P2Z7WK8FTS7?mode=direct">Windows (Microsoft Store)</a> ·
+          <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">Windows installer (.exe)</a> ·
           <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-x86_64.AppImage">Linux AppImage</a> ·
           <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-amd64.deb">.deb</a>
         </p>
-        <p class="fine" data-os="windows" hidden>On Windows: if Edge or Chrome says the file "isn't commonly downloaded", open your downloads (Ctrl+J), choose <b>⋯ → Keep</b>, then <b>Keep anyway</b>. When Windows shows "Windows protected your PC", click <b>More info → Run anyway</b>. If it says <b>Smart App Control</b> blocked Recap, your PC only runs signed apps: a Microsoft Store version that runs there is on the way.</p>
-        <p class="fine">Early release: builds aren't code-signed yet, so your computer will ask you to confirm on first launch. <a href="https://github.com/Aditya-galaxy/recap#desktop-app-recommended">How to open it</a>.</p>
+        <p class="fine" data-os="windows" hidden>No Microsoft Store on your PC (some work computers block it)? Use the <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">installer (.exe)</a> instead. It isn't code-signed, so choose <b>Keep anyway</b> in your browser and <b>More info → Run anyway</b> when Windows asks. PCs with Smart App Control turned on only run the Store version.</p>
+        <p class="fine" data-os="mac" hidden>Early release: the Mac build isn't notarized by Apple yet, so macOS asks you to confirm on first launch. <a href="https://github.com/Aditya-galaxy/recap#desktop-app-recommended">How to open it</a>.</p>
         <p class="fine">Recap is free and open source. If it saves you a meeting, you can <a href="https://github.com/sponsors/Aditya-galaxy">support it on GitHub Sponsors</a>.</p>
       </div>
     </template>
@@ -149,6 +150,6 @@
     <span>recap · MIT licensed · <a href="https://github.com/Aditya-galaxy/recap">source</a> · <a href="https://github.com/sponsors/Aditya-galaxy">support Recap</a> · <a href="/code-signing.html">privacy</a></span>
     <span>We only use your email to tell you about Recap.</span>
   </footer>
-  <script src="/app.js?v=4"></script>
+  <script src="/app.js?v=5"></script>
 </body>
 </html>

@@ -233,7 +233,7 @@ export default function Watch({
           <p className="px-2 text-[12px] text-muted">
             {fmtDate(meta.createdAt)}
             {meta.duration ? ` · ${fmtTime(onClean ? meta.clean.duration : meta.duration)}` : ""}
-            {onClean && meta.clean.duration ? ` (was ${fmtTime(meta.duration)})` : ""}
+            {onClean && meta.clean.duration && fmtTime(meta.clean.duration) !== fmtTime(meta.duration) ? ` (was ${fmtTime(meta.duration)})` : ""}
             {owner && !local ? ` · ${meta.views} view${meta.views === 1 ? "" : "s"}` : ""}
           </p>
         </div>

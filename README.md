@@ -27,7 +27,7 @@ Download from **https://recap.kronagent.dev**, or straight from [Releases](https
 
 | OS | File | First launch |
 | --- | --- | --- |
-| macOS 13+ (Apple silicon) | `Recap-mac-arm64.dmg` | Not notarized yet: drag Recap to Applications, then run `xattr -dr com.apple.quarantine /Applications/Recap.app` (or System Settings → Privacy & Security → "Open Anyway"). Allow Screen Recording, camera and microphone when asked. |
+| macOS 13+ (Apple silicon) | `Recap-mac-arm64.dmg` | Not notarized yet, so macOS says it "could not verify" Recap. Open it once and click **Done**, then System Settings → Privacy & Security → **Open Anyway** (once). Allow Screen Recording, camera and microphone when asked. |
 | Windows 10/11 (x64) | [Microsoft Store](https://apps.microsoft.com/detail/9P2Z7WK8FTS7) (recommended) | Signed by Microsoft, updated by the Store, runs with Smart App Control on. |
 | Windows 10/11 (x64) | `Recap-windows-x64-setup.exe` | For PCs without the Store. Not code-signed: on the SmartScreen prompt choose "More info" → "Run anyway". Smart App Control blocks it. |
 | Linux (x64) | `Recap-linux-x86_64.AppImage` or `Recap-linux-amd64.deb` | `chmod +x Recap-linux-x86_64.AppImage && ./Recap-linux-x86_64.AppImage` |

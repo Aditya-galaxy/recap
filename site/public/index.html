@@ -15,7 +15,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://recap.kronagent.dev/og.png?v=2" />
   <link rel="icon" href="/favicon.png" />
-  <link rel="stylesheet" href="/style.css?v=5" />
+  <link rel="stylesheet" href="/style.css?v=6" />
 </head>
 <body>
   <header class="top">
@@ -117,7 +117,15 @@
           <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-linux-amd64.deb">.deb</a>
         </p>
         <p class="fine" data-os="windows" hidden>No Microsoft Store on your PC (some work computers block it)? Use the <a href="https://github.com/Aditya-galaxy/recap/releases/latest/download/Recap-windows-x64-setup.exe">installer (.exe)</a> instead. It isn't code-signed, so choose <b>Keep anyway</b> in your browser and <b>More info → Run anyway</b> when Windows asks. PCs with Smart App Control turned on only run the Store version.</p>
-        <p class="fine" data-os="mac" hidden>Early release: the Mac build isn't notarized by Apple yet, so macOS asks you to confirm on first launch. <a href="https://github.com/Aditya-galaxy/recap#desktop-app-recommended">How to open it</a>.</p>
+        <div class="mac-steps" data-os="mac" hidden>
+          <p class="mac-steps-title">Opening Recap the first time</p>
+          <p>Recap isn't notarized by Apple yet, so macOS says it "could not verify" Recap. It's safe to open (the code is <a href="https://github.com/Aditya-galaxy/recap">open source</a>), but macOS hides the button:</p>
+          <ol>
+            <li>Drag Recap to Applications and open it. When the warning appears, click <b>Done</b>.</li>
+            <li>Open <b>System Settings → Privacy &amp; Security</b> and scroll down to "Recap was blocked".</li>
+            <li>Click <b>Open Anyway</b>, enter your Mac password, then click <b>Open</b>. You only do this once.</li>
+          </ol>
+        </div>
         <p class="fine">Recap is free and open source. If it saves you a meeting, you can <a href="https://github.com/sponsors/Aditya-galaxy">support it on GitHub Sponsors</a>.</p>
       </div>
     </template>

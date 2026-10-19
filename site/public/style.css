@@ -165,3 +165,19 @@ h1, h2, .lede, .statement p { text-wrap: balance; }
 .mac-steps li { margin: 6px 0; }
 .mac-steps a { color: var(--muted); }
 .mac-steps b { color: var(--text); font-weight: 500; }
+
+/* Recap for Teams */
+.btn.big { display: inline-block; padding: 18px 32px; font-size: 16px; text-decoration: none; }
+.teams-plan h2, .access h2 { font-size: 32px; font-weight: 600; letter-spacing: -0.03em; margin: 0 0 12px; }
+.soft-p { color: var(--muted); margin: 0 0 28px; }
+.plan { list-style: none; padding: 0; margin: 0 0 28px; display: grid; gap: 14px; }
+.plan li { padding-left: 22px; position: relative; color: var(--muted); }
+.plan li::before { content: "→"; position: absolute; left: 0; color: var(--soft); }
+.plan b, .price b { color: var(--text); font-weight: 500; }
+.price { color: var(--muted); padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; margin: 0; }
+.access { max-width: 560px; padding-bottom: 160px; }
+.teams-form { display: grid; gap: 16px; }
+.teams-form label { display: grid; gap: 8px; font-size: 14px; color: var(--muted); }
+.teams-form input:not(.hp), .teams-form select { font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); color: var(--text); }
+.teams-form input:focus, .teams-form select:focus { outline: none; border-color: var(--text); }
+.teams-form .btn { justify-self: start; margin-top: 8px; }

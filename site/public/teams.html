@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Recap for Teams: step-by-step guides that never leave your computers</title>
+  <meta name="description" content="Recap turns a screen recording into a step-by-step guide or a bug report, with a screenshot of every click. Everything happens on your team's own computers: nothing is uploaded." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Recap for Teams" />
+  <meta property="og:description" content="Step-by-step guides and bug reports from a screen recording. Nothing is uploaded." />
+  <meta property="og:url" content="https://recap.kronagent.dev/teams.html" />
+  <meta property="og:image" content="https://recap.kronagent.dev/og.png?v=2" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="/favicon.png" />
+  <link rel="stylesheet" href="/style.css?v=7" />
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="logo" href="/">recap</a>
+      <nav>
+        <a href="/">For individuals</a>
+        <a class="nav-cta" href="#access">Request access</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero wrap">
+      <p class="eyebrow">Recap for Teams · early access</p>
+      <h1>Guides your security team<br /><span class="soft">will actually approve.</span></h1>
+      <p class="lede">
+        Do a task once while talking. Recap writes the step-by-step guide, with a screenshot of every click.
+        It all happens on your team's computers. No screenshot is ever uploaded, not to us and not to anyone else.
+      </p>
+      <a class="btn primary big" href="#access">Request early access</a>
+    </section>
+
+    <section class="wrap showcase" aria-label="A guide made by Recap">
+      <figure class="shot">
+        <img src="/guide-1170.webp?v=1" srcset="/guide-1170.webp?v=1 1170w, /guide.webp?v=1 2340w" sizes="(max-width: 1080px) 100vw, 1032px"
+          width="1170" height="658" alt="A step-by-step guide Recap wrote from a recording: each step in words with a screenshot of the click" />
+      </figure>
+    </section>
+
+    <section class="wrap features">
+      <div>
+        <p class="num">01</p>
+        <h2>Nothing leaves the building</h2>
+        <p>Most guide tools upload every screenshot to their cloud. Recap records, transcribes and writes the guide on the computer it runs on, and works offline.</p>
+      </div>
+      <div>
+        <p class="num">02</p>
+        <h2>Guides and bug reports</h2>
+        <p>One recording becomes a how-to with a screenshot per step, or a bug report with steps to reproduce, expected and actual. Export to Confluence, Notion, Jira or GitHub.</p>
+      </div>
+      <div>
+        <p class="num">03</p>
+        <h2>Open source, auditable</h2>
+        <p>Your security team can read every line of the code. Windows installs from the Microsoft Store, signed by Microsoft.</p>
+      </div>
+    </section>
+
+    <section class="wrap compare teams-plan">
+      <h2>What Teams adds</h2>
+      <p class="soft-p">Recap stays free for individuals. Teams is in development. Early-access teams decide what gets built first.</p>
+      <ul class="plan">
+        <li><b>A shared team library</b> on your own server, so guides are one link away for everyone.</li>
+        <li><b>Automatic blurring</b> of emails, names and account numbers in screenshots.</li>
+        <li><b>Company sign-in (SSO)</b> and admin controls.</li>
+        <li><b>Managed installs</b> for IT: Intune, MDM and silent install.</li>
+        <li><b>Your templates</b>: guides that come out in your company's format.</li>
+      </ul>
+      <p class="price"><b>Planned price: $10 per person a month,</b> only for people who make guides. Everyone who reads them is free. Early-access teams get founding pricing.</p>
+    </section>
+
+    <section class="wrap access" id="access">
+      <h2>Request early access</h2>
+      <p class="soft-p">Two minutes. We'll email you, nothing else.</p>
+      <form id="teams" class="teams-form" novalidate>
+        <label>Work email<input name="email" type="email" required autocomplete="email" placeholder="you@company.com" /></label>
+        <label>Company<input name="company" maxlength="120" autocomplete="organization" placeholder="Company name" /></label>
+        <label>Team size
+          <select name="size"><option value="">Choose…</option><option value="1-10">1–10 people</option><option value="11-50">11–50</option><option value="51-250">51–250</option><option value="251+">251 or more</option></select>
+        </label>
+        <label>Your role
+          <select name="role"><option value="">Choose…</option><option value="it">IT</option><option value="ops">Operations</option><option value="support">Customer support</option><option value="qa">QA or engineering</option><option value="training">Training or HR</option><option value="other">Other</option></select>
+        </label>
+        <label>What would you use it for?
+          <select name="use"><option value="">Choose…</option><option value="guides">Step-by-step guides</option><option value="bugs">Bug reports</option><option value="both">Both</option></select>
+        </label>
+        <label>Do screen recordings have to stay on your own computers or servers?
+          <select name="onprem"><option value="">Choose…</option><option value="required">Yes, it's required</option><option value="preferred">Preferred</option><option value="no">Doesn't matter</option></select>
+        </label>
+        <label>At $10 per guide-maker a month, would your team buy it?
+          <select name="price"><option value="">Choose…</option><option value="yes">Yes</option><option value="maybe">Maybe</option><option value="too-much">Too expensive</option><option value="not-my-call">Not my decision</option></select>
+        </label>
+        <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <button type="submit" class="btn primary">Request access</button>
+        <p class="fine" id="teams-status" role="status"></p>
+      </form>
+    </section>
+  </main>
+
+  <footer class="wrap foot">
+    <span>recap · MIT licensed · <a href="https://github.com/Aditya-galaxy/recap">source</a> · <a href="/code-signing.html">privacy</a></span>
+    <span>We only use your email to talk to you about Recap for Teams.</span>
+  </footer>
+  <script src="/teams.js?v=1"></script>
+</body>
+</html>

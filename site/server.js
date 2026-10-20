@@ -95,7 +95,7 @@ async function subscribe(req, res) {
 
   const doc = {
     email,
-    interest: ["download", "desktop", "hosted", "selfhost"].includes(body.interest) ? body.interest : "desktop",
+    interest: ["download", "desktop", "hosted", "selfhost", "teams"].includes(body.interest) ? body.interest : "desktop",
     os: ["mac", "mac-intel", "windows", "linux", "other"].includes(body.os) ? body.os : undefined,
     source: clean(body.source, 80) || undefined,
     referrer: clean(req.headers.referer, 300) || undefined,
@@ -103,6 +103,18 @@ async function subscribe(req, res) {
     lastSeenAt: FieldValue.serverTimestamp(),
     signups: FieldValue.increment(1),
   };
+  // "Recap for Teams" early-access answers: fixed choices only, plus the company name.
+  if (doc.interest === "teams") {
+    const pick = (v, ok) => (ok.includes(v) ? v : undefined);
+    doc.team = {
+      company: clean(body.company, 120) || undefined,
+      size: pick(body.size, ["1-10", "11-50", "51-250", "251+"]),
+      role: pick(body.role, ["it", "ops", "support", "qa", "training", "other"]),
+      use: pick(body.use, ["guides", "bugs", "both"]),
+      onprem: pick(body.onprem, ["required", "preferred", "no"]),
+      price: pick(body.price, ["yes", "maybe", "too-much", "not-my-call"]),
+    };
+  }
   try {
     if (db) {
       // One document per address (keyed by its hash), so repeat signups just update it.
@@ -112,7 +124,7 @@ async function subscribe(req, res) {
         tx.set(ref, snap.exists ? doc : { ...doc, createdAt: FieldValue.serverTimestamp() }, { merge: true });
       });
     } else {
-      console.log("[dry-run] signup", email, doc.interest, doc.os ?? "");
+      console.log("[dry-run] signup", email, doc.interest, doc.os ?? "", doc.team ? JSON.stringify(doc.team) : "");
     }
   } catch (err) {
     console.error("signup failed", err);

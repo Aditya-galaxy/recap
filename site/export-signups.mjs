@@ -26,8 +26,10 @@ do {
 } while (pageToken);
 
 rows.sort((a, b) => val(a.createdAt).localeCompare(val(b.createdAt)));
-console.log("email,interest,os,createdAt,lastSeenAt,signups,source,referrer");
+console.log("email,interest,os,createdAt,lastSeenAt,signups,source,referrer,company,teamSize,role,use,onprem,price");
 for (const f of rows) {
-  console.log([val(f.email), val(f.interest), val(f.os), val(f.createdAt), val(f.lastSeenAt), val(f.signups), val(f.source), val(f.referrer)].map(csv).join(","));
+  const t = f.team?.mapValue?.fields ?? {};
+  console.log([val(f.email), val(f.interest), val(f.os), val(f.createdAt), val(f.lastSeenAt), val(f.signups), val(f.source), val(f.referrer),
+    val(t.company), val(t.size), val(t.role), val(t.use), val(t.onprem), val(t.price)].map(csv).join(","));
 }
 console.error(`${rows.length} signup(s)`);

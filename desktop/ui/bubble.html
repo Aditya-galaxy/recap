@@ -7,15 +7,40 @@
     html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
     /* The whole bubble is a drag handle. */
     .bubble {
-      position: absolute; inset: 4px; border-radius: 50%; overflow: hidden;
-      border: 3px solid #fff; background: #111; -webkit-app-region: drag; cursor: grab;
+      position: absolute; inset: 4px; overflow: hidden; background: #111;
+      -webkit-app-region: drag; cursor: grab;
+      border-radius: 50%; clip-path: circle(50%);
+    }
+    .rect .bubble { border-radius: 16px; clip-path: inset(0 round 16px); }
+    /* The video is clipped itself, not just by its parent: a camera video can be drawn on its own GPU
+       layer that ignores a parent's rounded clip, which showed a square camera inside a round ring. */
+    video {
+      width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; display: block;
+      border-radius: 50%; clip-path: circle(50%);
+    }
+    .rect video { border-radius: 16px; clip-path: inset(0 round 16px); }
+    /* The ring sits above the video as its own layer, so it always matches the shape. */
+    .ring {
+      position: absolute; inset: 4px; pointer-events: none; border: 3px solid #fff; border-radius: 50%;
       box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
     }
-    video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); pointer-events: none; }
+    .rect .ring { border-radius: 16px; }
+    /* Drag the corner to make the camera bigger or smaller. Only visible while the pointer is over it. */
+    .grip {
+      position: absolute; width: 26px; height: 26px; right: 14%; bottom: 14%; border-radius: 50%;
+      background: rgba(255, 255, 255, 0.92); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      -webkit-app-region: no-drag; cursor: nwse-resize; opacity: 0; transition: opacity .15s;
+      display: grid; place-items: center; touch-action: none;
+    }
+    .rect .grip { right: 10px; bottom: 10px; }
+    .grip svg { width: 12px; height: 12px; }
+    body:hover .grip, .grip.active { opacity: 1; }
   </style>
 </head>
 <body>
   <div class="bubble"><video autoplay muted playsinline></video></div>
+  <div class="ring"></div>
+  <div class="grip" aria-label="Resize camera"><svg viewBox="0 0 12 12"><path d="M2 10 L10 2 M6 10 L10 6" stroke="#111" stroke-width="1.6" stroke-linecap="round" /></svg></div>
   <script>
     const cam = new URLSearchParams(location.search).get("cam");
     // Windows can report a camera as busy for a moment after another app or window released it: retry,
@@ -45,6 +70,32 @@
     }
     window.addEventListener("beforeunload", () => video.srcObject?.getTracks().forEach((t) => t.stop()));
     connect();
+
+    window.recap?.on("state", (s) => document.body.classList.toggle("rect", s.bubbleShape === "rect"));
+    window.recap?.requestState();
+
+    // Corner grip: the new height follows the pointer (the main process keeps the shape and the limits).
+    const grip = document.querySelector(".grip");
+    let drag = null;
+    let pending = null;
+    grip.addEventListener("pointerdown", (e) => {
+      drag = { x: e.screenX, y: e.screenY, h: window.innerHeight, w: window.innerWidth };
+      grip.setPointerCapture(e.pointerId);
+      grip.classList.add("active");
+      e.preventDefault();
+    });
+    grip.addEventListener("pointermove", (e) => {
+      if (!drag) return;
+      // Whichever direction moved more (in height terms) wins, so diagonal and straight drags both work.
+      const dy = e.screenY - drag.y;
+      const dx = ((e.screenX - drag.x) * drag.h) / drag.w;
+      const height = Math.round(drag.h + (Math.abs(dx) > Math.abs(dy) ? dx : dy));
+      if (pending === null) requestAnimationFrame(() => { window.recap?.bubbleResize(pending); pending = null; });
+      pending = height;
+    });
+    const end = () => { drag = null; grip.classList.remove("active"); };
+    grip.addEventListener("pointerup", end);
+    grip.addEventListener("pointercancel", end);
   </script>
 </body>
 </html>

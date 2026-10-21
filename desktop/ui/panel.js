@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 
 // server "" = record into the local library (the default); a URL = upload to a self-hosted Recap server.
-const DEFAULTS = { mode: "screenCam", cameraId: "", micId: "", micOn: true, systemAudio: true, bubbleSize: "m", displayId: "", server: "" };
+const DEFAULTS = { mode: "screenCam", cameraId: "", micId: "", micOn: true, systemAudio: true, bubbleSize: "m", bubbleShape: "circle", bubblePx: null, displayId: "", server: "" };
 let settings = { ...DEFAULTS };
 try {
   settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem("settings") || "{}") };
@@ -28,8 +28,13 @@ function bindSeg(id, key) {
     settings[key] = v;
     save();
     render();
-    // The bubble size also applies to a recording in progress.
-    if (key === "bubbleSize") window.recap.bubbleSize(v);
+    // Size and shape also apply to a recording in progress. Picking a size replaces a dragged one.
+    if (key === "bubbleSize") {
+      settings.bubblePx = null;
+      save();
+      window.recap.bubbleSize(v);
+    }
+    if (key === "bubbleShape") window.recap.bubbleShape(v);
   });
 }
 function bindSwitch(id, key) {
@@ -47,6 +52,7 @@ function bindSelect(id, key) {
 }
 bindSeg("mode", "mode");
 bindSeg("bubbleSize", "bubbleSize");
+bindSeg("bubbleShape", "bubbleShape");
 bindSwitch("micOn", "micOn");
 bindSwitch("systemAudio", "systemAudio");
 bindSelect("display", "displayId");
@@ -103,7 +109,8 @@ navigator.mediaDevices.addEventListener("devicechange", () => {
 
 function render() {
   for (const b of $("mode").children) b.setAttribute("aria-pressed", String(b.dataset.v === settings.mode));
-  for (const b of $("bubbleSize").children) b.setAttribute("aria-pressed", String(b.dataset.v === settings.bubbleSize));
+  for (const b of $("bubbleSize").children) b.setAttribute("aria-pressed", String(!settings.bubblePx && b.dataset.v === settings.bubbleSize));
+  for (const b of $("bubbleShape").children) b.setAttribute("aria-pressed", String(b.dataset.v === settings.bubbleShape));
   $("micOn").setAttribute("aria-checked", String(settings.micOn));
   $("systemAudio").setAttribute("aria-checked", String(settings.systemAudio && platform === "win32"));
   $("mic").hidden = !settings.micOn;
@@ -219,6 +226,12 @@ window.recap.on("state", (s) => {
   const wasUploading = state.phase === "uploading";
   state = s;
   platform = s.platform;
+  // Remember a size dragged or a shape switched on the bubble itself during a recording.
+  if (s.bubbleOn && (s.bubblePx !== settings.bubblePx || s.bubbleShape !== settings.bubbleShape)) {
+    settings.bubblePx = s.bubblePx;
+    settings.bubbleShape = s.bubbleShape;
+    save();
+  }
   $("hotkey").textContent = s.hotkey;
   if (wasUploading && s.phase === "idle") $("title").value = "";
   render();

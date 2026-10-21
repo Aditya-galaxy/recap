@@ -53,8 +53,11 @@
   <p class="muted" id="sysAudioNote" style="margin:-6px 0 0;font-size:10px" hidden>On Linux, Recap records your microphone (not computer sound).</p>
 
   <div class="field" id="bubbleField">
+    <span class="label">camera shape</span>
+    <div class="seg" id="bubbleShape"><button data-v="circle">◯ circle</button><button data-v="rect">▭ rectangle</button></div>
     <span class="label">camera size</span>
     <div class="seg" id="bubbleSize"><button data-v="s">small</button><button data-v="m">medium</button><button data-v="l">large</button></div>
+    <p class="muted hint">Or drag the corner of the camera while recording.</p>
   </div>
 
   <div class="status" id="engineStatus" hidden><span id="engineText"></span><div class="bar"><div id="modelProgress"></div></div><button class="btn" id="retryModel" style="margin-top:8px" hidden>retry download</button></div>

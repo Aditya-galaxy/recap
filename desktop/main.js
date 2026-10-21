@@ -69,6 +69,8 @@ function broadcast() {
     engine: engine.status(),
     update: session.update,
     bubbleSize: session.opts?.bubbleSize ?? null,
+    bubbleShape: bubbleShape(),
+    bubblePx: session.opts?.bubblePx ?? null,
     bubbleOn: !!bubble && !bubble.isDestroyed() && session.opts?.mode !== "cam",
   };
   for (const w of [panel, bar, bubble]) if (w && !w.isDestroyed()) w.webContents.send("state", s);
@@ -166,17 +168,30 @@ function displayFor(id) {
 }
 
 const BUBBLE_SIZES = { s: 140, m: 200, l: 280 };
+const BUBBLE_MIN = 96;
+// The camera bubble is a circle or a 4:3 rounded rectangle; its "size" is the height.
+const bubbleShape = () => (session.opts?.bubbleShape === "rect" ? "rect" : "circle");
+const bubbleWidth = (h, shape = bubbleShape()) => Math.round(shape === "rect" ? (h * 4) / 3 : h);
+const bubbleMax = (area) => Math.round(Math.min(720, area.height * 0.6, (area.width * 0.6 * 3) / 4));
+
+function bubbleHeight(opts) {
+  if (opts.mode === "cam") return 320;
+  const px = Number(opts.bubblePx);
+  return Number.isFinite(px) && px >= BUBBLE_MIN ? Math.round(px) : BUBBLE_SIZES[opts.bubbleSize] ?? 200;
+}
 
 function createBubble(opts) {
   const d = displayFor(opts.displayId).workArea;
-  const size = opts.mode === "cam" ? 320 : BUBBLE_SIZES[opts.bubbleSize] ?? 200;
+  const h = Math.min(bubbleHeight(opts), bubbleMax(d));
+  const w = opts.mode === "cam" ? h : bubbleWidth(h);
   bubble = new BrowserWindow({
-    width: size,
-    height: size,
+    width: w,
+    height: h,
     x: d.x + 32,
-    y: d.y + d.height - size - 32,
+    y: d.y + d.height - h - 32,
     frame: false,
     transparent: true,
+    backgroundColor: "#00000000",
     resizable: false,
     hasShadow: false,
     skipTaskbar: true,
@@ -189,27 +204,54 @@ function createBubble(opts) {
   bubble.loadFile(path.join(__dirname, "ui", "bubble.html"), { query: { cam: opts.cameraId || "" } });
 }
 
-/** Resize the camera bubble mid-recording, keeping its centre where the person dragged it. */
-function setBubbleSize(key) {
-  if (!BUBBLE_SIZES[key]) return;
-  if (session.opts) session.opts.bubbleSize = key;
+/**
+ * Re-fit the camera bubble mid-recording. Size and shape changes keep its centre where the person
+ * dragged it; a drag-resize (anchor "corner") keeps its top-left corner still, like any window.
+ */
+function fitBubble(height, anchor = "center") {
   if (!bubble || bubble.isDestroyed() || session.opts?.mode === "cam") return;
   const b = bubble.getBounds();
-  const size = BUBBLE_SIZES[key];
   const area = screen.getDisplayMatching(b).workArea;
-  const cx = b.x + b.width / 2;
-  const cy = b.y + b.height / 2;
-  const x = Math.round(Math.min(Math.max(cx - size / 2, area.x), area.x + area.width - size));
-  const y = Math.round(Math.min(Math.max(cy - size / 2, area.y), area.y + area.height - size));
+  const h = Math.round(Math.min(Math.max(height, BUBBLE_MIN), bubbleMax(area)));
+  const w = bubbleWidth(h);
+  let x = anchor === "corner" ? b.x : b.x + b.width / 2 - w / 2;
+  let y = anchor === "corner" ? b.y : b.y + b.height / 2 - h / 2;
+  x = Math.round(Math.min(Math.max(x, area.x), area.x + area.width - w));
+  y = Math.round(Math.min(Math.max(y, area.y), area.y + area.height - h));
   bubble.setResizable(true);
-  bubble.setBounds({ x, y, width: size, height: size });
+  bubble.setBounds({ x, y, width: w, height: h });
   bubble.setResizable(false);
   broadcast();
 }
 
+function setBubbleSize(key) {
+  if (!BUBBLE_SIZES[key]) return;
+  if (session.opts) {
+    session.opts.bubbleSize = key;
+    session.opts.bubblePx = null;
+  }
+  fitBubble(BUBBLE_SIZES[key]);
+}
+
+function setBubbleShape(shape) {
+  if (!["circle", "rect"].includes(shape)) return;
+  if (session.opts) session.opts.bubbleShape = shape;
+  if (!bubble || bubble.isDestroyed()) return broadcast();
+  fitBubble(bubble.getBounds().height);
+}
+
+/** Drag-to-resize from the bubble's corner grip. */
+function resizeBubble(height) {
+  const h = Number(height);
+  if (!Number.isFinite(h) || !session.opts) return;
+  session.opts.bubblePx = Math.round(h);
+  fitBubble(h, "corner");
+  if (bubble && !bubble.isDestroyed()) session.opts.bubblePx = bubble.getBounds().height;
+}
+
 function createBar(opts) {
   const d = displayFor(opts.displayId).workArea;
-  const w = 380;
+  const w = 420;
   const h = 52;
   bar = new BrowserWindow({
     width: w,
@@ -539,12 +581,15 @@ ipcMain.on("start", (_e, opts) => start(opts));
 ipcMain.on("discard", () => discard());
 ipcMain.on("retry-upload", () => session.lastFile && upload(session.lastFile));
 ipcMain.on("bubble-size", (_e, key) => setBubbleSize(String(key)));
+ipcMain.on("bubble-shape", (_e, shape) => setBubbleShape(String(shape)));
+ipcMain.on("bubble-resize", (_e, height) => resizeBubble(height));
 ipcMain.on("control", (_e, action) => {
   if (action === "discard") return discard();
   if (action === "bubble") {
     const order = ["s", "m", "l"];
     return setBubbleSize(order[(order.indexOf(session.opts?.bubbleSize ?? "m") + 1) % order.length]);
   }
+  if (action === "bubble-shape") return setBubbleShape(bubbleShape() === "circle" ? "rect" : "circle");
   panel?.webContents.send("control", action);
 });
 ipcMain.on("recorder", (_e, ev) => {
@@ -1075,6 +1120,27 @@ async function selftest(dir, sample) {
           await wait(300);
           const l = bubble && !bubble.isDestroyed() ? bubble.getBounds().width : 0;
           step("bubble: shown and resizes live", m === 200 && l === 280, { medium: m, large: l });
+          // Shape switch, then a corner drag-resize; the camera video is clipped to the shape itself.
+          const looks = async () => {
+            if (!bubble || bubble.isDestroyed()) return {};
+            const b = bubble.getBounds();
+            const page = await bubble.webContents.executeJavaScript(`({ rect: document.body.classList.contains("rect"), clip: getComputedStyle(document.querySelector("video")).clipPath })`).catch(() => ({}));
+            return { w: b.width, h: b.height, ...page };
+          };
+          setBubbleShape("rect");
+          await wait(400);
+          const rect = await looks();
+          resizeBubble(160);
+          await wait(400);
+          const dragged = await looks();
+          setBubbleShape("circle");
+          await wait(400);
+          const circle = await looks();
+          step("bubble: rectangle, drag-resize, back to circle, video clipped to the shape",
+            rect.w === 373 && rect.h === 280 && rect.rect && /inset/.test(rect.clip ?? "") &&
+              dragged.h === 160 && dragged.w === 213 && session.opts?.bubblePx === 160 &&
+              circle.w === 160 && circle.h === 160 && !circle.rect && /circle/.test(circle.clip ?? ""),
+            { rect, dragged, circle });
           await wait(3000);
           panel.webContents.send("control", "stop");
           v = await newVideo(before);

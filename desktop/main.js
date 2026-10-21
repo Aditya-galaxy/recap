@@ -752,6 +752,9 @@ app.on("second-instance", () => (engine.state === "ready" ? openLibrary() : pane
 
 // PipeWire screen capture on Wayland.
 if (isLinux) app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
+// Windows draws camera video on a hardware overlay that ignores rounded clipping: the camera bubble
+// showed as a square inside its round ring, on screen and in the recording. Keep video in normal compositing.
+if (process.platform === "win32") app.commandLine.appendSwitch("disable-direct-composition-video-overlays");
 // macOS: keep Chromium (cookie encryption) and safeStorage out of the login keychain. Builds are only
 // ad-hoc signed, so every update looks like a new app to the keychain and would ask for the user's
 // password. The library's cookie is per-launch and local-only; the optional server token is protected
@@ -1127,6 +1130,44 @@ async function selftest(dir, sample) {
             const page = await bubble.webContents.executeJavaScript(`({ rect: document.body.classList.contains("rect"), clip: getComputedStyle(document.querySelector("video")).clipPath })`).catch(() => ({}));
             return { w: b.width, h: b.height, ...page };
           };
+          // What a screen capture (and so the recording) sees: the camera inside the bubble, and the
+          // desktop, not camera, in the corner outside the round shape.
+          const seen = async () => {
+            if (!bubble || bubble.isDestroyed()) return {};
+            const b = bubble.getBounds();
+            const d = screen.getDisplayMatching(b);
+            const f = d.scaleFactor;
+            const capture = async () => {
+              const shot = (await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: Math.round(d.bounds.width * f), height: Math.round(d.bounds.height * f) } }))
+                .find((src) => String(src.display_id) === String(d.id))?.thumbnail ?? null;
+              if (!shot || shot.isEmpty()) return null;
+              const { width } = shot.getSize();
+              const px = shot.toBitmap();
+              return (x, y) => {
+                const i = (Math.round((y - d.bounds.y) * f) * width + Math.round((x - d.bounds.x) * f)) * 4;
+                return [px[i + 2], px[i + 1], px[i]];
+              };
+            };
+            // The desktop behind the corner, with the bubble hidden for a moment, then the bubble as seen.
+            bubble.setOpacity(0);
+            await wait(400);
+            const behind = await capture();
+            bubble.setOpacity(1);
+            await wait(400);
+            const now = await capture();
+            if (!behind || !now) return {};
+            const green = ([r, g, b2]) => g > r + 40 && g > b2 + 40; // Chromium's simulated camera is green
+            const cx = b.x + 6;
+            const cy = b.y + 6;
+            const centre = now(b.x + b.width / 2, b.y + b.height * 0.3);
+            const corner = now(cx, cy);
+            const desk = behind(cx, cy);
+            const diff = Math.abs(corner[0] - desk[0]) + Math.abs(corner[1] - desk[1]) + Math.abs(corner[2] - desk[2]);
+            return { centre, corner, desktop: desk, cameraInside: green(centre), cornerShowsDesktop: diff < 60 };
+          };
+          const roundOnScreen = await seen();
+          step("bubble: round on screen (camera inside, not in the corners)",
+            !process.env.RECAP_SELFTEST_FAKE_MEDIA || (roundOnScreen.cameraInside && roundOnScreen.cornerShowsDesktop), roundOnScreen);
           setBubbleShape("rect");
           await wait(400);
           const rect = await looks();

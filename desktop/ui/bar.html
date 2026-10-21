@@ -42,7 +42,7 @@
     }
 
     window.recap.on("state", (s) => {
-      const key = `${s.phase}|${s.bubbleOn}|${s.bubbleSize}`;
+      const key = `${s.phase}|${s.bubbleOn}|${s.bubbleSize}|${s.bubbleShape}|${s.bubblePx}`;
       if (key === lastPhase && ["recording", "paused"].includes(s.phase)) {
         document.getElementById("time").textContent = fmt(s.elapsed);
         return;
@@ -64,7 +64,12 @@
         grow.className = "grow";
         bar.append(
           dot, time, grow,
-          ...(s.bubbleOn ? [btn(`◯ ${s.bubbleSize ?? "m"}`, "bubble", "", "Camera size")] : []),
+          ...(s.bubbleOn
+            ? [
+                btn(s.bubbleShape === "rect" ? "▭" : "◯", "bubble-shape", "", "Camera shape: circle or rectangle"),
+                btn(s.bubblePx ? "size" : `size ${s.bubbleSize ?? "m"}`, "bubble", "", "Camera size"),
+              ]
+            : []),
           s.phase === "recording" ? btn("pause", "pause") : btn("resume", "resume"),
           btn("stop", "stop", "primary"),
           btn("discard", "discard"),

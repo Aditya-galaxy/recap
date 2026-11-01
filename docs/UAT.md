@@ -20,6 +20,9 @@ Use a fresh install (uninstall first, and on macOS run `tccutil reset All dev.re
 | 10 | Record with the mic muted and nothing playing | Recording keeps its full length; transcript is empty, not made up |
 | 11 | Quit and relaunch | Library still there; no keychain or password prompt |
 | 12 | Unplug the network, record again | Everything works offline (after the first model download) |
-| 13 | Uninstall | App removed; library stays in your user folder unless deleted |
+| 13 | Play a video with sound, then click **library** | The sound stops |
+| 14 | Record, then quit from the tray and choose **Quit without saving** | Recap closes with no error; reopening works, and that recording doesn't come back |
+| 15 | Screen + camera on a colored background | Camera is a clean circle with no faint square around it; ◯/▭ and the corner drag work |
+| 16 | Uninstall | App removed; library stays in your user folder unless deleted |
 
 Note anything that's confusing, slow or shows technical text (paths, `$` signs, error codes).

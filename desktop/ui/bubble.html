@@ -22,7 +22,8 @@
     /* The ring sits above the video as its own layer, so it always matches the shape. */
     .ring {
       position: absolute; inset: 4px; pointer-events: none; border: 3px solid #fff; border-radius: 50%;
-      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+      /* A tight outline only: a soft shadow is cut off straight at the window's edges, which showed as a faint square. */
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.3);
     }
     .rect .ring { border-radius: 16px; }
     /* Drag the corner to make the camera bigger or smaller. Only visible while the pointer is over it. */

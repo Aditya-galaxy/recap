@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { cutRanges, keepRanges, remap, remapSpan, total } from "@/lib/cuts";
 import { fmtDate, fmtTime } from "@/lib/format";
 import { ShareToCloud } from "@/components/CloudShare";
@@ -57,6 +57,13 @@ export default function Watch({
   const id = meta.id;
   const cleanStatus = useRef(initialMeta.clean.status);
   const viewCounted = useRef(false);
+
+  // Next keeps pages alive (hidden) when you navigate away, so the video would keep playing with no player
+  // on screen. This cleanup runs when the page is hidden as well as when it goes for good.
+  useLayoutEffect(() => {
+    const pause = () => videoRef.current?.pause();
+    return pause;
+  }, []);
 
   // Poll while the server is doing work.
   const working = meta.status === "uploaded" || meta.status === "processing" || meta.clean.status === "rendering";

@@ -12,8 +12,8 @@ Transcription runs on your own machine with whisper.cpp. No account, no API keys
   Use the web app in Chrome, or the native apps for macOS, Windows and Linux (global hotkey ⌥⌘R / Ctrl+Alt+R).
 - **Share:** each video gets a page at `/v/<id>` with a seekable player, captions, a click-to-seek transcript,
   timestamped comments, emoji reactions, and (for the owner) who watched and how far.
-- **Clean up:** cut filler words (um/uh; optionally comma-delimited "like," / "you know,") and shorten long
-  pauses. You see the time saved and can preview the result before rendering. The original is kept.
+- **Edit:** trim the ends, cut filler words (um/uh; optionally comma-delimited "like," / "you know,") and shorten
+  long pauses. You see the new length and can preview the result before saving. The original is kept.
 
 Website and early access: **https://recap.kronagent.dev**
 
@@ -37,7 +37,7 @@ the Recap engine, ffmpeg and whisper.cpp. Your library lives in `Videos/Recap/li
 **Nothing is uploaded anywhere.**
 
 - Record with the **record** button or **Ctrl+Alt+R** / **⌥⌘R** from any app: screen + a floating camera bubble.
-- When you stop, the video opens in your library with a transcript; **clean up** cuts fillers and pauses.
+- When you stop, the video opens in your library with a transcript; trim the ends, and **Clean up** cuts fillers and pauses.
 - **share** a video straight from the app: drag it into Slack, Teams or an email, **copy video** and paste it
   anywhere (macOS, Windows), or use the macOS share menu (Mail, Messages, AirDrop). Or **export mp4**.
 

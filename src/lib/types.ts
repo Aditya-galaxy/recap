@@ -8,6 +8,10 @@ export interface CleanOptions {
   fillers: boolean;
   /** Also cut comma-delimited discourse fillers: "like," "you know," "basically," */
   aggressive: boolean;
+  /** Seconds trimmed off the beginning: the video starts here. Absent means no trim. */
+  trimStart?: number;
+  /** The video ends here, in seconds. Absent means no trim. */
+  trimEnd?: number;
 }
 
 export type Visibility = "unlisted" | "private";

@@ -149,16 +149,16 @@ export function ShareToCloud({ videoId, version, canClean }: { videoId: string; 
                 <button className="btn-primary" onClick={() => copy(state.url!)}>{copied ? "copied ✓" : "copy link"}</button>
                 <a className="btn-ghost" href={state.url} target="_blank" rel="noreferrer">open</a>
               </div>
-              <p className="text-muted">shared the {state.sharedVersion === "clean" ? "cleaned" : "original"} version</p>
+              <p className="text-muted">shared the {state.sharedVersion === "clean" ? "edited" : "original"} version</p>
             </div>
           )}
           {(state?.progress?.error || error) && <p className="text-muted">{state?.progress?.error || error}</p>}
           <div className="flex flex-wrap gap-2">
             <button className={state?.url ? "btn-ghost" : "btn-primary"} onClick={() => start(version)}>
-              {state?.url ? "upload again" : `upload ${version === "clean" ? "cleaned" : "original"} & get link`}
+              {state?.url ? "upload again" : `upload ${version === "clean" ? "edited" : "original"} & get link`}
             </button>
             {canClean && version === "original" && (
-              <button className="btn-ghost" onClick={() => start("clean")}>upload cleaned</button>
+              <button className="btn-ghost" onClick={() => start("clean")}>upload edited</button>
             )}
           </div>
           <p className="text-muted">Uploads to {status.email}&apos;s Recap Cloud account with the transcript from this computer.</p>

@@ -8,6 +8,7 @@ import { ShareToCloud } from "@/components/CloudShare";
 import DesktopShare from "@/components/DesktopShare";
 import { GuidePanel } from "@/components/Guide";
 import { ReportPanel } from "@/components/Report";
+import MakeVideo from "@/components/MakeVideo";
 import TrimBar from "@/components/TrimBar";
 import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
@@ -458,6 +459,12 @@ export default function Watch({
             <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || meta.clean.error}</p>
           )}
         </section>
+      )}
+
+      {owner && ready && (
+        <div className="mt-6">
+          <MakeVideo id={id} title={meta.title} hasEdit={meta.clean.status === "ready"} />
+        </div>
       )}
 
       <section className="mt-12">

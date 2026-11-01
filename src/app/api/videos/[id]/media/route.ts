@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { currentUser } from "@/lib/auth";
 import { canView, file, readMeta } from "@/lib/store";
 import { safeFileName } from "@/lib/filename";
+import { madeFile, readMade } from "@/lib/make";
 
 /** Serves video.mp4 (or clean.mp4 with ?v=clean) with HTTP range support so the player can seek. */
 export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/media">) {
@@ -11,7 +12,9 @@ export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/medi
   if (!meta || !canView(meta, await currentUser())) return new Response("not found", { status: 404 });
   const url = new URL(req.url);
   const clean = url.searchParams.get("v") === "clean";
-  const p = file(id, clean ? "clean.mp4" : "video.mp4");
+  // ?v=made: the finished video from "Make it a video".
+  const made = url.searchParams.get("v") === "made" ? await readMade(id) : null;
+  const p = file(id, made ? madeFile(made.options.format) : clean ? "clean.mp4" : "video.mp4");
 
   let size: number;
   try {
@@ -27,7 +30,7 @@ export async function GET(req: Request, ctx: RouteContext<"/api/videos/[id]/medi
   };
   if (url.searchParams.has("download")) {
     // Name the export after the video ("Launch update (clean).mp4"), with an ASCII fallback for old clients.
-    const name = `${safeFileName(meta.title, id)}${clean ? " (clean)" : ""}.mp4`;
+    const name = `${safeFileName(meta.title, id)}${made ? ` (${made.options.format})` : clean ? " (clean)" : ""}.mp4`;
     const ascii = name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "'");
     headers["Content-Disposition"] = `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(name)}`;
   }

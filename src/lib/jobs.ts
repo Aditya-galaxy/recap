@@ -1,6 +1,7 @@
 import "server-only";
 import { db, now } from "./db";
 import { DISK_FULL, isDiskFull } from "./disk";
+import { makeVideo, readMade, writeMade, type MakeOptions } from "./make";
 import { makeGuide, polishGuide, readGuide, writeGuide } from "./guide";
 import { PermanentError, processVideo, renderClean } from "./pipeline";
 import { makeReport, polishReport, readReport, writeReport } from "./report";
@@ -10,7 +11,7 @@ import type { CleanOptions } from "./types";
 // A small durable queue in SQLite. Jobs survive restarts; one worker runs them one at a time
 // (whisper and ffmpeg already use every core, so parallel jobs would only thrash).
 
-export type JobType = "process" | "clean" | "guide" | "polish" | "report" | "report-polish";
+export type JobType = "process" | "clean" | "guide" | "polish" | "report" | "report-polish" | "make";
 const MAX_ATTEMPTS = 3;
 const POLL_MS = 1000;
 
@@ -31,11 +32,17 @@ async function execute(job: JobRow) {
   if (job.type === "polish") return polishGuide(job.video_id);
   if (job.type === "report") return makeReport(job.video_id);
   if (job.type === "report-polish") return polishReport(job.video_id);
+  if (job.type === "make") return makeVideo(job.video_id, JSON.parse(job.payload ?? "{}") as MakeOptions);
   throw new PermanentError(`unknown job type ${job.type}`);
 }
 
 /** Final failure: surface it on the video so the UI can show it. */
 async function markFailed(job: JobRow, message: string) {
+  if (job.type === "make") {
+    const made = await readMade(job.video_id);
+    if (made) await writeMade(job.video_id, { ...made, status: "error", error: message }).catch(() => {});
+    return;
+  }
   if (job.type === "guide") {
     const g = await readGuide(job.video_id);
     if (g) await writeGuide(job.video_id, { ...g, status: "error", error: message }).catch(() => {});

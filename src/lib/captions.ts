@@ -14,7 +14,7 @@ const ts = (s: number) => {
  * Group words into caption cues. When `keep` is given, captions are built for the cleaned
  * cut: words that were cut are dropped and the rest are shifted onto the new timeline.
  */
-export function toVtt(words: Word[], keep?: Range[]): string {
+export function toCues(words: Word[], keep?: Range[], maxWords = 10) {
   const mapped: Word[] = [];
   for (const w of words) {
     if (!keep) {
@@ -34,11 +34,14 @@ export function toVtt(words: Word[], keep?: Range[]): string {
   };
   for (const w of mapped) {
     const prev = cur[cur.length - 1];
-    if (prev && (w.start - prev.end > 1 || cur.length >= 10)) flush();
+    if (prev && (w.start - prev.end > 1 || cur.length >= maxWords)) flush();
     cur.push(w);
     if (/[.?!]$/.test(w.text) && cur.length >= 3) flush();
   }
   flush();
+  return cues;
+}
 
-  return "WEBVTT\n\n" + cues.map((c, i) => `${i + 1}\n${ts(c.start)} --> ${ts(Math.max(c.end, c.start + 0.5))}\n${c.text}\n`).join("\n");
+export function toVtt(words: Word[], keep?: Range[]): string {
+  return "WEBVTT\n\n" + toCues(words, keep).map((c, i) => `${i + 1}\n${ts(c.start)} --> ${ts(Math.max(c.end, c.start + 0.5))}\n${c.text}\n`).join("\n");
 }

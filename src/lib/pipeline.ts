@@ -17,9 +17,9 @@ const WHISPER_PROMPT = "Um, so, uh, I was like, you know, thinking. Hmm.";
 // Bundled binaries in the desktop app; PATH lookups on servers.
 const BIN: Record<string, string> = { ffmpeg: config.ffmpegBin };
 
-function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: string }> {
+export function run(cmd: string, args: string[], cwd?: string): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const p = spawn(BIN[cmd] ?? cmd, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
+    const p = spawn(BIN[cmd] ?? cmd, args, { stdio: ["ignore", "pipe", "pipe"], windowsHide: true, cwd });
     let stdout = "";
     let stderr = "";
     p.stdout.on("data", (d) => (stdout += d));
@@ -35,7 +35,7 @@ function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: str
  * Stream and duration info from `ffmpeg -i`, so ffprobe doesn't need to ship with the desktop app.
  * ffmpeg exits non-zero here ("no output file"); the header it prints on stderr is what we read.
  */
-function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number; vcodec?: string; pixfmt?: string; rotated: boolean; image: boolean }> {
+export function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number; vcodec?: string; pixfmt?: string; rotated: boolean; image: boolean }> {
   return new Promise((resolve, reject) => {
     const proc = spawn(BIN.ffmpeg, ["-hide_banner", "-i", p], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let err = "";

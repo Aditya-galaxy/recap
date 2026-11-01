@@ -7,18 +7,20 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const BTBN = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-31-12-59";
+// Unmodified BtbN/FFmpeg-Builds archives (autobuild-2026-10-31-12-59), mirrored because upstream deletes dated
+// builds after about two weeks. To re-pin: add the new archives to this prerelease, never mark it latest.
+const MIRROR = "https://github.com/Aditya-galaxy/recap/releases/download/build-deps-ffmpeg";
 const SOURCES = {
   "darwin-arm64": {
     url: "https://ffmpeg.martin-riedl.de/download/macos/arm64/1789931890_9.0.2/ffmpeg.zip",
     sha256: "c8ed4c4e6978a03c485edbfe4e0a5dc2380f8a30bba5150531b31b094492d924",
   },
   "linux-x64": {
-    url: `${BTBN}/ffmpeg-n8.1.3-27-g8dca1586f4-linux64-gpl-8.1.tar.xz`,
+    url: `${MIRROR}/ffmpeg-n8.1.3-27-g8dca1586f4-linux64-gpl-8.1.tar.xz`,
     sha256: "41e9c565594c390622cf968d82fa4135d9e9a11d06c1515644288cbc844e3380",
   },
   "win32-x64": {
-    url: `${BTBN}/ffmpeg-n8.1.3-27-g8dca1586f4-win64-gpl-8.1.zip`,
+    url: `${MIRROR}/ffmpeg-n8.1.3-27-g8dca1586f4-win64-gpl-8.1.zip`,
     sha256: "401dffcf14c301082e1fc03b0bc876b92ea676bfc521fc56e80a1537d137034f",
   },
 };

@@ -1283,7 +1283,8 @@ async function selftest(dir, sample) {
         for (let y = Math.round(sz.height * 0.15); y < sz.height * 0.55; y++) {
           for (let x = Math.round(sz.width * 0.15); x < sz.width * 0.55; x++) {
             const i = (y * sz.width + x) * 4;
-            if (Math.abs(im[i + 1] - im[i + 5]) > 24) edges++;
+            // A real edge jumps in one pixel. A blur can still leave a steep gradient between two strong colors, which isn't detail.
+            if (Math.abs(im[i + 1] - im[i + 5]) > 60) edges++;
           }
         }
         return edges;

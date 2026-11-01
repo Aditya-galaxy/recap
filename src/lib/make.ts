@@ -2,6 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { toCues } from "./captions";
+import { remap } from "./cuts";
 import { inspect, PermanentError, readKeep, run, transcribe } from "./pipeline";
 import { file, readMeta, readTranscript } from "./store";
 import type { Word } from "./types";
@@ -33,7 +34,10 @@ export type MakeOptions = {
   blurs: BlurArea[];
   /** "voice" replaces the sound with the voice-over; "both" keeps the original quietly underneath. */
   audio: "original" | "voice" | "both";
+  /** Follow clicks (or where the cursor settled) in the main video. */
+  zoom: boolean;
 };
+type Focus = { t: number; x: number; y: number };
 export type Made = { status: "rendering" | "ready" | "error"; options: MakeOptions; error?: string; duration?: number };
 export type VoiceOver = { status: "transcribing" | "ready" | "error"; start: number; edited: boolean; duration?: number; words?: Word[]; error?: string };
 
@@ -134,6 +138,81 @@ function blurGraph(from: string, blurs: BlurArea[], width: number, height: numbe
   return { graph, out: cur };
 }
 
+export async function readFocus(id: string): Promise<Focus[]> {
+  try {
+    const t: { clicks?: Focus[]; stops?: Focus[] } = JSON.parse(await fs.readFile(file(id, "track.json"), "utf8"));
+    return t.clicks?.length ? t.clicks : t.stops ?? [];
+  } catch {
+    return [];
+  }
+}
+
+const ZOOM = 1.7;
+const ZOOM_IN = 0.6; // seconds to ease in, arriving just before the click
+const PAN = 0.5;
+const HOLD = 1.6; // seconds to stay after the last click of a run
+const ZOOM_OUT = 0.7;
+const SAME_RUN = 4; // clicks this close together pan instead of zooming out and back in
+
+type Key = { t: number; z: number; x: number; y: number };
+
+/** When to be zoomed in, and where: a list of moments, with smooth movement in between. */
+export function zoomKeys(events: Focus[], duration: number): Key[] {
+  const keys: Key[] = [];
+  const add = (t: number, z: number, x: number, y: number) => {
+    const at = Math.min(duration, Math.max(0, t));
+    const prev = keys[keys.length - 1];
+    if (!prev || at > prev.t + 0.02) keys.push({ t: at, z, x, y });
+  };
+  const sorted = [...events].sort((a, b) => a.t - b.t).filter((e, i, all) => e.t < duration && (i === 0 || e.t - all[i - 1].t >= 0.6));
+  sorted.forEach((e, i) => {
+    const prev = sorted[i - 1];
+    if (prev && e.t - prev.t <= SAME_RUN) {
+      add(e.t - PAN, ZOOM, prev.x, prev.y);
+      add(e.t - 0.05, ZOOM, e.x, e.y);
+    } else {
+      add(e.t - ZOOM_IN, 1, e.x, e.y);
+      add(e.t - 0.05, ZOOM, e.x, e.y);
+    }
+    const next = sorted[i + 1];
+    if (!next || next.t - e.t > SAME_RUN) {
+      add(e.t + HOLD, ZOOM, e.x, e.y);
+      add(e.t + HOLD + ZOOM_OUT, 1, e.x, e.y);
+    }
+  });
+  return keys;
+}
+
+/** An ffmpeg expression for one value over time. A balanced tree, so long videos can't exhaust its parser. */
+function keyExpr(keys: Key[], get: (k: Key) => number) {
+  const n = (v: number) => v.toFixed(4);
+  const seg = (a: Key, b: Key) => {
+    const [v0, v1] = [get(a), get(b)];
+    if (Math.abs(v0 - v1) < 0.0001) return n(v0);
+    const p = `((t-${a.t.toFixed(3)})/${(b.t - a.t).toFixed(3)})`;
+    return `(${n(v0)}+${n(v1 - v0)}*${p}*${p}*(3-2*${p}))`;
+  };
+  const tree = (lo: number, hi: number): string => {
+    if (lo === hi) return seg(keys[lo], keys[lo + 1]);
+    const mid = (lo + hi) >> 1;
+    return `if(lt(t,${keys[mid + 1].t.toFixed(3)}),${tree(lo, mid)},${tree(mid + 1, hi)})`;
+  };
+  return `if(lt(t,${keys[0].t.toFixed(3)}),${n(get(keys[0]))},if(gte(t,${keys[keys.length - 1].t.toFixed(3)}),${n(get(keys[keys.length - 1]))},${keys.length > 1 ? tree(0, keys.length - 2) : n(get(keys[0]))}))`;
+}
+
+function zoomGraph(from: string, keys: Key[], width: number, height: number) {
+  const z = keyExpr(keys, (k) => k.z);
+  const x = keyExpr(keys, (k) => k.x);
+  const y = keyExpr(keys, (k) => k.y);
+  // Sizes are spelled out: crop keeps reporting the first frame's size as iw/ih even though scale changes it per frame.
+  const zw = `(2*trunc(${width}*${z}/2))`;
+  const zh = `(2*trunc(${height}*${z}/2))`;
+  return [
+    `[${from}]scale=w='${zw}':h='${zh}':eval=frame:flags=bicubic,` +
+      `crop=${width}:${height}:x='min(max(0,${x}*${zw}-${width}/2),${zw}-${width})':y='min(max(0,${y}*${zh}-${height}/2),${zh}-${height})',setsar=1[zoomed]`,
+  ];
+}
+
 const ENCODE = (small: boolean) => ["-c:v", "libx264", "-preset", "faster", "-crf", small ? "27" : "20", "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-b:a", small ? "96k" : "160k"];
 
 export async function makeVideo(id: string, opts: MakeOptions) {
@@ -170,6 +249,17 @@ export async function makeVideo(id: string, opts: MakeOptions) {
       const blurred = blurGraph(video, opts.blurs, info.width, info.height);
       graph.push(...blurred.graph);
       video = blurred.out;
+    }
+    if (main && opts.zoom) {
+      const events = (await readFocus(sourceId)).flatMap((e) => {
+        const t = keep ? remap(e.t, keep) : e.t;
+        return t === null ? [] : [{ ...e, t }];
+      });
+      const keys = zoomKeys(events, dur);
+      if (keys.length) {
+        graph.push(...zoomGraph(video, keys, info.width, info.height));
+        video = "zoomed";
+      }
     }
     if (Math.abs(info.width / info.height - W / H) < 0.01) {
       graph.push(`[${video}]scale=${W}:${H}:flags=lanczos,setsar=1,fps=30,format=yuv420p[base]`);

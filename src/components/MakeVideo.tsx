@@ -205,6 +205,8 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
   const [clips, setClips] = useState<string[]>([]);
   const [blurs, setBlurs] = useState<BlurArea[]>([]);
   const [audio, setAudio] = useState<MakeOptions["audio"]>("original");
+  const [focus, setFocus] = useState(0);
+  const [zoom, setZoom] = useState(true);
   const [more, setMore] = useState<"" | "clips" | "blur" | "voice">("");
   const [rev, setRev] = useState(0);
   const [err, setErr] = useState("");
@@ -226,7 +228,9 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
       if (!live) return;
       if (v?.ok) setVoice((await v.json()).voice);
       if (m?.ok) {
-        const next: Made | null = (await m.json()).made;
+        const body = await m.json();
+        const next: Made | null = body.made;
+        if (live) setFocus(body.focus ?? 0);
         if (live) setMade((old) => {
           if (old?.status === "rendering" && next?.status === "ready") setRev(Date.now());
           return next;
@@ -248,7 +252,7 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
 
   async function make() {
     setErr("");
-    const options: MakeOptions = { format, captions, intro, introTitle, introSubtitle, endCard, endTitle, endLink, small, edited, clips, blurs, audio };
+    const options: MakeOptions = { format, captions, intro, introTitle, introSubtitle, endCard, endTitle, endLink, small, edited, clips, blurs, audio, zoom: zoom && focus > 0 };
     const r = await fetch(`/api/videos/${id}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(options) });
     if (!r.ok) return setErr((await r.json().catch(() => ({}))).error ?? "Couldn't start.");
     setMade({ status: "rendering", options });
@@ -275,6 +279,7 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Check label="Captions" value={captions} set={setCaptions} />
+          {focus > 0 && <Check label="Auto-zoom" value={zoom} set={setZoom} />}
           <Check label="Intro card" value={intro} set={setIntro} />
           <Check label="End card" value={endCard} set={setEndCard} />
           <Check label="Smaller file" value={small} set={setSmall} />

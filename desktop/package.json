@@ -18,6 +18,7 @@
   "build": {
     "appId": "dev.recap.desktop",
     "productName": "Recap",
+    "npmRebuild": false,
     "files": [
       "main.js",
       "engine.js",
@@ -131,5 +132,8 @@
   "devDependencies": {
     "electron": "^44.9.0",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "uiohook-napi": "1.5.5"
   }
 }

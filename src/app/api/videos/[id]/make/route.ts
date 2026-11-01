@@ -1,6 +1,6 @@
 import { currentUser, unauthorized } from "@/lib/auth";
 import { enqueue } from "@/lib/jobs";
-import { readMade, readVoice, writeMade, type BlurArea, type MakeFormat, type MakeOptions } from "@/lib/make";
+import { readFocus, readMade, readVoice, writeMade, type BlurArea, type MakeFormat, type MakeOptions } from "@/lib/make";
 import { isOwner, readMeta } from "@/lib/store";
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/videos/[id]/make">) {
@@ -9,7 +9,7 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/videos/[id]/mak
   if (!user) return unauthorized();
   const meta = await readMeta(id);
   if (!meta || !isOwner(meta, user)) return Response.json({ error: "not found" }, { status: 404 });
-  return Response.json({ made: await readMade(id) });
+  return Response.json({ made: await readMade(id), focus: (await readFocus(id)).length });
 }
 
 export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/make">) {
@@ -51,6 +51,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/mak
     clips,
     blurs,
     audio,
+    zoom: b.zoom === true,
   };
   await writeMade(id, { status: "rendering", options });
   enqueue("make", id, options);

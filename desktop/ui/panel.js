@@ -3,7 +3,7 @@
 const $ = (id) => document.getElementById(id);
 
 // server "" = record into the local library (the default); a URL = upload to a self-hosted Recap server.
-const DEFAULTS = { mode: "screenCam", cameraId: "", micId: "", micOn: true, systemAudio: true, bubbleSize: "m", bubbleShape: "circle", bubblePx: null, displayId: "", server: "" };
+const DEFAULTS = { mode: "screenCam", cameraId: "", micId: "", micOn: true, systemAudio: true, bubbleSize: "m", bubbleShape: "circle", bubblePx: null, clickHighlight: false, displayId: "", server: "" };
 let settings = { ...DEFAULTS };
 try {
   settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem("settings") || "{}") };
@@ -55,6 +55,7 @@ bindSeg("bubbleSize", "bubbleSize");
 bindSeg("bubbleShape", "bubbleShape");
 bindSwitch("micOn", "micOn");
 bindSwitch("systemAudio", "systemAudio");
+bindSwitch("clickHighlight", "clickHighlight");
 bindSelect("display", "displayId");
 bindSelect("camera", "cameraId");
 bindSelect("mic", "micId");
@@ -113,6 +114,9 @@ function render() {
   for (const b of $("bubbleShape").children) b.setAttribute("aria-pressed", String(b.dataset.v === settings.bubbleShape));
   $("micOn").setAttribute("aria-checked", String(settings.micOn));
   $("systemAudio").setAttribute("aria-checked", String(settings.systemAudio && platform === "win32"));
+  $("clickHighlight").setAttribute("aria-checked", String(settings.clickHighlight));
+  $("clicksRow").hidden = settings.mode === "cam";
+  $("clicksNote").hidden = settings.mode === "cam" || !settings.clickHighlight || platform !== "darwin";
   $("mic").hidden = !settings.micOn;
   $("cameraField").hidden = settings.mode === "screen";
   $("bubbleField").hidden = settings.mode !== "screenCam";

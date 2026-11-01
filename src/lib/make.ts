@@ -126,7 +126,10 @@ function blurGraph(from: string, blurs: BlurArea[], width: number, height: numbe
     const y = px(b.y, height);
     const w = Math.max(4, Math.min(px(b.w, width), width - x));
     const h = Math.max(4, Math.min(px(b.h, height), height - y));
-    const small = (n: number) => Math.max(2, Math.round(n / 24));
+    // Each blur cell is at least half the area's height, so text filling the area loses even its word shapes,
+    // which a fixed-size blur leaves readable on a big headline. Small areas still get a strong minimum.
+    const cell = Math.max((32 * height) / 1080, Math.min(w, h) / 2);
+    const small = (n: number) => Math.max(2, Math.round(n / cell));
     graph.push(`[${cur}]split=2[keep${i}][area${i}]`);
     graph.push(`[area${i}]crop=${w}:${h}:${x}:${y},scale=${small(w)}:${small(h)}:flags=area,scale=${w}:${h}:flags=bicubic[blur${i}]`);
     graph.push(`[keep${i}][blur${i}]overlay=${x}:${y}:enable='between(t,${b.start.toFixed(3)},${b.end.toFixed(3)})'[after${i}]`);

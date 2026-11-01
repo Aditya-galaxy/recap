@@ -35,7 +35,7 @@ function run(cmd: string, args: string[]): Promise<{ stdout: string; stderr: str
  * Stream and duration info from `ffmpeg -i`, so ffprobe doesn't need to ship with the desktop app.
  * ffmpeg exits non-zero here ("no output file"); the header it prints on stderr is what we read.
  */
-function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number; vcodec?: string }> {
+function inspect(p: string): Promise<{ duration: number; width?: number; height?: number; video: number; audio: number; vcodec?: string; pixfmt?: string; rotated: boolean; image: boolean }> {
   return new Promise((resolve, reject) => {
     const proc = spawn(BIN.ffmpeg, ["-hide_banner", "-i", p], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let err = "";
@@ -48,6 +48,9 @@ function inspect(p: string): Promise<{ duration: number; width?: number; height?
       const d = err.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
       resolve({
         vcodec: videoLines[0]?.match(/: Video: (\w+)/)?.[1],
+        pixfmt: videoLines[0]?.match(/: Video: [^,]*, ([a-z0-9]+)/)?.[1],
+        rotated: Number(err.match(/rotation of (-?[\d.]+) degrees/)?.[1] ?? 0) !== 0,
+        image: /Input #0, (\w+_pipe|image2)\b/.test(err),
         duration: d ? Number(d[1]) * 3600 + Number(d[2]) * 60 + Number(d[3]) : 0,
         width: size ? Number(size[1]) : undefined,
         height: size ? Number(size[2]) : undefined,
@@ -157,7 +160,8 @@ export async function processVideo(id: string) {
   // After a crash the upload may already have become video.mp4; carry on from there.
   if (!haveSrc && !(await exists(mp4))) throw new PermanentError("Upload is missing.");
   const srcInfo = haveSrc ? await inspect(src).catch(() => null) : null;
-  if (haveSrc && !srcInfo?.video) throw new PermanentError("That file isn't a video Recap can read.");
+  if (srcInfo?.image) throw new PermanentError("That's a picture, not a video. Recap can import video files.");
+  if (haveSrc && !srcInfo?.video) throw new PermanentError(srcInfo?.audio ? "That file only has sound, with no picture. Recap can import video files." : "That file isn't a video Recap can read.");
   const provided = file(id, "transcript.provided.json");
   const transcribing = srcInfo?.audio !== 0 && config.serverTranscribe && !(await exists(provided));
   await updateMeta(id, (m) => { m.status = "processing"; m.stage = transcribing ? "Processing + transcribing" : "Processing video"; });
@@ -171,7 +175,10 @@ export async function processVideo(id: string) {
   const videoTrack = async () => {
     if (haveSrc && srcInfo) {
       const even = !!srcInfo.width && !!srcInfo.height && srcInfo.width % 2 === 0 && srcInfo.height % 2 === 0;
-      const remux = srcInfo.vcodec === "h264" && even;
+      // Copy only what every player handles. Imported files can be 10-bit or 4:4:4 H.264, which browsers can't
+      // play, or phone videos with a rotation flag that the clean cut and screenshots would otherwise have to honour.
+      const playable = !srcInfo.pixfmt || /^yuvj?420p$/.test(srcInfo.pixfmt);
+      const remux = srcInfo.vcodec === "h264" && even && playable && !srcInfo.rotated;
       // CRF 20 / faster: ~49 dB PSNR on scrolling 1080p UI text (vs 45 dB at CRF 23).
       const videoArgs = remux
         ? ["-c:v", "copy", "-video_track_timescale", "90000"]

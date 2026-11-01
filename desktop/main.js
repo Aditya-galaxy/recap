@@ -1185,6 +1185,54 @@ async function selftest(dir, sample) {
       step("share", false, { error: String(err?.message ?? err) });
     }
 
+    // Import: a file dropped on the window goes through to a video page, named after the file. A 10-bit file
+    // is converted (browsers can't play it), a phone video's rotation is applied, a picture is refused in plain words.
+    try {
+      const made = async (name, ...args) => {
+        const out = path.join(dir, name);
+        await execFileP(bin("ffmpeg"), ["-y", "-loglevel", "error", ...args, out]);
+        return out;
+      };
+      const src = ["-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30", "-f", "lavfi", "-i", "sine=frequency=300", "-t", "2"];
+      const clip = await made("import-clip.mp4", ...src, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac");
+      const b64 = fs.readFileSync(clip).toString("base64");
+      await library.webContents.executeJavaScript(`(() => {
+        const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0));
+        const dt = new DataTransfer();
+        dt.items.add(new File([bytes], "Dropped clip ✓.mp4", { type: "video/mp4" }));
+        window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+      })()`);
+      let dropped = null;
+      for (let i = 0; i < 120 && dropped?.status !== "ready"; i++) {
+        await wait(500);
+        dropped = (await (await api("/api/videos")).json()).find((x) => x.title === "Dropped clip ✓");
+      }
+      const opened = await library.webContents.executeJavaScript("location.pathname").catch(() => "");
+      step("import: a dropped file opens as a video", dropped?.status === "ready" && opened === `/v/${dropped?.id}`, { status: dropped?.status, opened });
+      const importAs = async (title, file) => {
+        const res = await api("/api/videos", { method: "POST", headers: { "x-title": title }, body: fs.readFileSync(file) });
+        const { id } = await res.json();
+        let meta = null;
+        for (let i = 0; i < 120 && !["ready", "error"].includes(meta?.status); i++) {
+          await wait(500);
+          meta = (await (await api(`/api/videos/${id}`)).json()).meta;
+        }
+        const media = await api(`/api/videos/${id}/media`);
+        const info = meta?.status === "ready" ? path.join(dir, `${id}.mp4`) : null;
+        if (info) fs.writeFileSync(info, Buffer.from(await media.arrayBuffer()));
+        const out = info ? await execFileP(bin("ffmpeg"), ["-hide_banner", "-i", info]).catch((err) => err.stderr ?? "") : "";
+        return { meta, about: String(out.stderr ?? out) };
+      };
+      const tenBit = await importAs("10-bit", await made("import-10bit.mp4", ...src, "-c:v", "libx264", "-pix_fmt", "yuv420p10le", "-profile:v", "high10", "-c:a", "aac"));
+      step("import: 10-bit video is converted to play everywhere", tenBit.meta?.status === "ready" && /yuv420p[(,]/.test(tenBit.about) && !/yuv420p10/.test(tenBit.about), { status: tenBit.meta?.status });
+      const turned = await importAs("Phone", await made("import-phone.mp4", "-display_rotation", "90", "-i", clip, "-c", "copy"));
+      step("import: a phone video's rotation is applied", turned.meta?.status === "ready" && turned.meta.width === 360 && turned.meta.height === 640 && !/rotation of/.test(turned.about), { width: turned.meta?.width, height: turned.meta?.height });
+      const pic = await importAs("Picture", await made("import-pic.png", "-f", "lavfi", "-i", "color=c=gray:s=320x240", "-frames:v", "1"));
+      step("import: a picture is refused in plain words", pic.meta?.status === "error" && /picture/.test(pic.meta.error ?? ""), { error: pic.meta?.error });
+    } catch (err) {
+      step("import", false, { error: err.message });
+    }
+
     // Background noise must not turn into words: the voice-activity model ships with the app on every
     // platform and whisper skips non-speech audio.
     try {

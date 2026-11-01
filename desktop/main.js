@@ -1146,7 +1146,11 @@ async function selftest(dir, sample) {
     openLibrary(`/v/${video.id}`);
     await pageText(/launch/i);
     // The video page as a person sees it: transcript words, clean-up, and the share button (desktop bridge).
-    const share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
+    let share = false;
+    for (let i = 0; i < 40 && !share; i++) {
+      share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
+      if (!share) await wait(250); // the page was just reloaded and may still be starting
+    }
     step("video page: transcript, clean up and share", /launch/i.test(watchText) && /clean up/i.test(watchText) && share, { share, text: watchText.slice(0, 160) });
     openLibrary("/?q=Self%20test");
     await wait(500);

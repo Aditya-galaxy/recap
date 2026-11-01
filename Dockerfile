@@ -33,10 +33,10 @@ FROM debian:bookworm-slim AS ffmpeg
 ARG TARGETARCH
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates xz-utils && rm -rf /var/lib/apt/lists/*
 RUN set -eu; \
-    base=https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2026-10-13-13-05; \
+    base=https://github.com/Aditya-galaxy/recap/releases/download/build-deps-ffmpeg; \
     case "$TARGETARCH" in \
-      amd64) f=ffmpeg-n8.1.3-18-g46d899d7a0-linux64-gpl-8.1.tar.xz;    sum=b3506f47a71a2f8cff8c0775112bf02a8a49035e3994232aa5f218058328e0e7 ;; \
-      arm64) f=ffmpeg-n8.1.3-18-g46d899d7a0-linuxarm64-gpl-8.1.tar.xz; sum=bb5477906594f7b02f84fedaa2dc3d503bb14166fc4acb2f3175be0488967e43 ;; \
+      amd64) f=ffmpeg-n8.1.3-27-g8dca1586f4-linux64-gpl-8.1.tar.xz;    sum=41e9c565594c390622cf968d82fa4135d9e9a11d06c1515644288cbc844e3380 ;; \
+      arm64) f=ffmpeg-n8.1.3-27-g8dca1586f4-linuxarm64-gpl-8.1.tar.xz; sum=a08c0ee6e1c4e02139344b303002dcc7c37cf125d639f1fbd15dabee40fcb525 ;; \
       *) echo "unsupported arch $TARGETARCH"; exit 1 ;; \
     esac; \
     curl -fsSL -o /tmp/ff.tar.xz "$base/$f"; \

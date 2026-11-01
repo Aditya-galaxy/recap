@@ -37,7 +37,7 @@ the Recap engine, ffmpeg and whisper.cpp. Your library lives in `Videos/Recap/li
 **Nothing is uploaded anywhere.**
 
 - Record with the **record** button or **Ctrl+Alt+R** / **⌥⌘R** from any app: screen + a floating camera bubble.
-- **Make it a video:** a finished video in wide, square or vertical, with captions burned in and an end card.
+- **Make it a video:** a finished video in wide, square or vertical, with captions burned in, intro and end cards, joined clips, voice-over and blurred areas.
 - **Import** any video with the import button, or drop files on the window. It gets everything a recording does.
 - When you stop, the video opens in your library with a transcript; trim the ends, and **Clean up** cuts fillers and pauses.
 - **share** a video straight from the app: drag it into Slack, Teams or an email, **copy video** and paste it

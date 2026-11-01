@@ -82,7 +82,7 @@ async function detectSilences(wav: string, duration: number): Promise<Range[]> {
   return out;
 }
 
-async function transcribe(id: string, wav: string): Promise<Word[]> {
+export async function transcribe(id: string, wav: string): Promise<Word[]> {
   const outBase = file(id, "whisper");
   // -nfa: whisper.cpp enables flash attention by default, which badly skews token timestamps
   // around pauses. -ojf gives per-token offsets, which are tighter than its word-split mode.

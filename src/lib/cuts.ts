@@ -74,6 +74,8 @@ function merge(ranges: Range[]): Range[] {
 
 export function cutRanges(t: Transcript, opts: CleanOptions, duration: number): Range[] {
   const cuts: Range[] = [];
+  if (opts.trimStart) cuts.push({ start: 0, end: opts.trimStart });
+  if (opts.trimEnd !== undefined) cuts.push({ start: opts.trimEnd, end: duration });
   if (opts.silences) {
     for (const s of t.silences) {
       if (s.end - s.start < opts.minSilence) continue;

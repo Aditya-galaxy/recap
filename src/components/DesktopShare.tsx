@@ -69,7 +69,7 @@ export default function DesktopShare({ video }: { video: Video }) {
             title="Drag this into another app"
           >
             <p>drag into Slack, Teams or an email</p>
-            <p className="text-[11px] text-muted">{video.version === "clean" ? "cleaned version" : "original version"} · mp4</p>
+            <p className="text-[11px] text-muted">{video.version === "clean" ? "edited version" : "original version"} · mp4</p>
           </div>
           {mac && (
             <button className={item} onClick={() => run("menu")}>

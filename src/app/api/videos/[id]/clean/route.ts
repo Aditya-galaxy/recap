@@ -14,11 +14,14 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/cle
   if (meta.clean.status === "rendering") return Response.json({ error: "Already rendering." }, { status: 409 });
 
   const b = await req.json().catch(() => ({}));
+  const seconds = (v: unknown) => (typeof v === "number" && v > 0 && v < (meta.duration ?? 0) ? v : undefined);
   const opts: CleanOptions = {
     silences: typeof b.silences === "boolean" ? b.silences : DEFAULT_CLEAN.silences,
     minSilence: Math.min(5, Math.max(0.4, Number(b.minSilence) || DEFAULT_CLEAN.minSilence)),
     fillers: typeof b.fillers === "boolean" ? b.fillers : DEFAULT_CLEAN.fillers,
     aggressive: b.aggressive === true,
+    trimStart: seconds(b.trimStart),
+    trimEnd: seconds(b.trimEnd),
   };
   try {
     await prepareClean(id, opts);

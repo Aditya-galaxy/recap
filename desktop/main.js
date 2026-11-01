@@ -1043,8 +1043,8 @@ async function selftest(dir, sample) {
     const detail = await until((m) => m.status === "ready" || m.status === "error", 300);
     // Regression guard: v0.3.0/0.3.1 silently truncated uploads over 10 MB. The stored video must be as
     // long as the recording that went in.
-    const srcDuration = await new Promise((resolve) => {
-      const p = require("node:child_process").spawn(bin("ffmpeg"), ["-hide_banner", "-i", sample]);
+    const mediaSeconds = (file) => new Promise((resolve) => {
+      const p = require("node:child_process").spawn(bin("ffmpeg"), ["-hide_banner", "-i", file]);
       let err = "";
       p.stderr.on("data", (d) => (err += d));
       p.on("close", () => {
@@ -1052,6 +1052,7 @@ async function selftest(dir, sample) {
         resolve(m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) : 0);
       });
     });
+    const srcDuration = await mediaSeconds(sample);
     step("upload not truncated (duration matches source)", srcDuration > 0 && Math.abs((detail.meta.duration ?? 0) - srcDuration) < 1, {
       source: srcDuration,
       stored: detail.meta.duration,
@@ -1075,6 +1076,12 @@ async function selftest(dir, sample) {
       const strict = process.env.RECAP_SELFTEST_EXPECT_CUTS === "1";
       step("clean cut rendered", !strict && clean.status === 400, { note: "nothing to cut in this sample", status: clean.status });
     }
+    // Trim: the same render, cutting the ends. Measured from the file, not from what the render says it did.
+    const untrimmed = detail.meta.duration;
+    const trim = await api(`/api/videos/${video.id}/clean`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ fillers: false, silences: false, trimStart: 1, trimEnd: untrimmed - 1 }) });
+    const trimmed = trim.status === 202 ? await until((m) => m.clean.status === "ready" || m.clean.status === "error", 300) : null;
+    const trimmedLength = await mediaSeconds(path.join(engine.dataDir, "videos", video.id, "clean.mp4"));
+    step("trim cuts the ends", trimmed?.meta.clean.status === "ready" && Math.abs(trimmedLength - (untrimmed - 2)) < 0.2, { status: trim.status, error: trimmed?.meta.clean.error, untrimmed, trimmed: trimmedLength });
     const dl = await api(`/api/videos/${video.id}/media?download`, { method: "HEAD" });
     step("export named after the title", /Self%20test/.test(dl.headers.get("content-disposition") ?? ""));
 
@@ -1145,13 +1152,15 @@ async function selftest(dir, sample) {
     step("leaving a video stops its sound", left.playing && left.paused && left.url === "/", left);
     openLibrary(`/v/${video.id}`);
     await pageText(/launch/i);
-    // The video page as a person sees it: transcript words, clean-up, and the share button (desktop bridge).
+    // The video page as a person sees it: transcript words, the trim bar, clean-up, and the share button (desktop bridge).
     let share = false;
-    for (let i = 0; i < 40 && !share; i++) {
+    let trimHandles = 0;
+    for (let i = 0; i < 40 && !(share && trimHandles === 2); i++) {
       share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
-      if (!share) await wait(250); // the page was just reloaded and may still be starting
+      trimHandles = await library.webContents.executeJavaScript(`document.querySelectorAll("[data-trim-bar] [role=slider]").length`).catch(() => 0);
+      if (!(share && trimHandles === 2)) await wait(250); // the page was just reloaded and may still be starting
     }
-    step("video page: transcript, clean up and share", /launch/i.test(watchText) && /clean up/i.test(watchText) && share, { share, text: watchText.slice(0, 160) });
+    step("video page: transcript, trim, clean up and share", /launch/i.test(watchText) && /clean up/i.test(watchText) && trimHandles === 2 && share, { share, trimHandles, text: watchText.slice(0, 160) });
     openLibrary("/?q=Self%20test");
     await wait(500);
     const found = await pageText(/Recordings[\s\S]*Self test/);

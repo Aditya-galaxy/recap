@@ -8,6 +8,7 @@ import { ShareToCloud } from "@/components/CloudShare";
 import DesktopShare from "@/components/DesktopShare";
 import { GuidePanel } from "@/components/Guide";
 import { ReportPanel } from "@/components/Report";
+import TrimBar from "@/components/TrimBar";
 import { CommentsPanel, InsightsPanel, ReactionsBar, ReportButton, type Viewer } from "@/components/Social";
 import { DEFAULT_CLEAN, type CleanOptions, type Range, type Transcript, type VideoMeta } from "@/lib/types";
 
@@ -35,12 +36,13 @@ export default function Watch({
   const [meta, setMeta] = useState(initialMeta);
   const [transcript, setTranscript] = useState(initialTranscript);
   const [version, setVersion] = useState<Version>(initialMeta.clean.status === "ready" ? "clean" : "original");
-  type Tab = "transcript" | "comments" | "clean" | "guide" | "report" | "insights";
+  type Tab = "transcript" | "comments" | "guide" | "report" | "insights";
   const [tab, setTab] = useState<Tab>("transcript");
   // Local (desktop) libraries have one person, so comments and insights only exist on servers.
-  const tabs: Tab[] = local ? ["transcript", "clean", "guide", "report"] : owner ? ["transcript", "comments", "clean", "guide", "report", "insights"] : ["transcript", "comments"];
-  const tabLabel: Record<Tab, string> = { transcript: "transcript", comments: "comments", clean: "clean up", guide: "guide", report: "bug", insights: "insights" };
+  const tabs: Tab[] = local ? ["transcript", "guide", "report"] : owner ? ["transcript", "comments", "guide", "report", "insights"] : ["transcript", "comments"];
+  const tabLabel: Record<Tab, string> = { transcript: "transcript", comments: "comments", guide: "guide", report: "bug report", insights: "insights" };
   const [opts, setOpts] = useState<CleanOptions>(initialMeta.clean.options ?? DEFAULT_CLEAN);
+  const [fineTune, setFineTune] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [now, setNow] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -50,6 +52,8 @@ export default function Watch({
   const [rev, setRev] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const activeWord = useRef<HTMLSpanElement>(null);
+  const transcriptBox = useRef<HTMLDivElement>(null);
+  const pendingSeek = useRef<number | null>(null);
   const id = meta.id;
   const cleanStatus = useRef(initialMeta.clean.status);
   const viewCounted = useRef(false);
@@ -85,6 +89,8 @@ export default function Watch({
   // What the current panel settings would cut (live estimate + preview playback).
   const draftCuts = useMemo(() => (transcript && duration ? cutRanges(transcript, opts, duration) : []), [transcript, opts, duration]);
   const draftSaved = total(draftCuts);
+  const trimStart = opts.trimStart ?? 0;
+  const trimEnd = opts.trimEnd ?? duration;
 
   // The timeline of the rendered clean cut, to map transcript words onto it.
   const renderedKeep = useMemo<Range[] | null>(() => {
@@ -147,9 +153,34 @@ export default function Watch({
     else v.addEventListener("loadedmetadata", go, { once: true });
   }, []);
 
+  // Follow along inside the transcript box only; the page itself must not move while the video plays.
   useEffect(() => {
-    activeWord.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const w = activeWord.current;
+    const box = transcriptBox.current;
+    if (!w || !box) return;
+    if (w.offsetTop < box.scrollTop || w.offsetTop > box.scrollTop + box.clientHeight - 48) box.scrollTo({ top: w.offsetTop - 48, behavior: "smooth" });
   }, [Math.floor(origNow)]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The bar works on the original timeline, so moving a trim handle shows the original at that moment.
+  function showOriginalAt(t: number) {
+    const v = videoRef.current;
+    v?.pause();
+    setPreviewing(false);
+    setNow(t);
+    if (version === "original") {
+      if (v) v.currentTime = t;
+    } else {
+      pendingSeek.current = t;
+      setVersion("original");
+    }
+  }
+
+  function setTrim(start: number, end: number, moved: number) {
+    const s = Math.round(start * 10) / 10;
+    const e = Math.round(end * 10) / 10;
+    setOpts({ ...opts, trimStart: s > 0 ? s : undefined, trimEnd: duration - e > 0.15 ? e : undefined });
+    showOriginalAt(moved);
+  }
 
   async function saveTitle(t: string) {
     setEditing(false);
@@ -204,18 +235,19 @@ export default function Watch({
     setTimeout(() => setCopied(false), 1500);
   }
 
+  const saved = meta.clean.status === "ready" && !!meta.clean.options && sameEdit(opts, meta.clean.options);
   const q = version === "clean" ? "?v=clean" : "";
   const ready = meta.status === "ready";
   const words = transcript?.words ?? [];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6">
+    <div className="mx-auto max-w-4xl px-6 py-8">
       {meta.disabled && (
         <p className="mb-4 rounded-lg border border-border-strong px-3 py-2 text-[12px]">
           This video was taken down after a report. Only {owner ? "you" : "its owner"} and admins can open it.
         </p>
       )}
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           {owner && editing ? (
             <input
@@ -264,144 +296,129 @@ export default function Watch({
           {local && ready && <DesktopShare video={{ id, version, title: meta.title }} />}
           {ready && (
             <a className="btn-ghost" href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
-              {local ? `export ${version === "clean" ? "cleaned " : ""}mp4` : "download"}
+              {local ? "export mp4" : "download"}
             </a>
           )}
-          {owner && <button className="btn-danger" onClick={remove}>delete</button>}
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-3">
-          <div className="card overflow-hidden">
-            {ready ? (
-              <video
-                key={`${version}-${rev}`}
-                ref={videoRef}
-                controls
-                playsInline
-                preload="metadata"
-                poster={`/api/videos/${id}/thumb`}
-                onTimeUpdate={onTime}
-                onPlay={onPlay}
-                onPause={() => pingView(true)}
-                onEnded={() => pingView(true)}
-                onSeeked={onTime}
-                className="aspect-video w-full bg-black"
-                src={`/api/videos/${id}/media${q}${rev ? `${q ? "&" : "?"}r=${rev}` : ""}`}
-              >
-                {words.length > 0 && (
-                  <track kind="captions" srcLang="en" label="English" default src={`/api/videos/${id}/captions${q}`} />
-                )}
-              </video>
+      <div className="card overflow-hidden">
+        {ready ? (
+          <video
+            key={`${version}-${rev}`}
+            ref={videoRef}
+            controls
+            playsInline
+            preload="metadata"
+            poster={`/api/videos/${id}/thumb`}
+            onTimeUpdate={onTime}
+            onPlay={onPlay}
+            onPause={() => pingView(true)}
+            onEnded={() => pingView(true)}
+            onSeeked={onTime}
+            onLoadedMetadata={(e) => {
+              setNow(0);
+              if (pendingSeek.current === null) return;
+              e.currentTarget.currentTime = pendingSeek.current;
+              pendingSeek.current = null;
+            }}
+            className="aspect-video max-h-[50vh] w-full bg-black"
+            src={`/api/videos/${id}/media${q}${rev ? `${q ? "&" : "?"}r=${rev}` : ""}`}
+          >
+            {words.length > 0 && (
+              <track kind="captions" srcLang="en" label="English" default src={`/api/videos/${id}/captions${q}`} />
+            )}
+          </video>
+        ) : (
+          <div className="grid aspect-video max-h-[50vh] w-full place-items-center bg-surface-2 text-center">
+            {meta.status === "error" ? (
+              <div className="max-w-md p-6">
+                <p className="font-medium">processing failed</p>
+                <p className="mt-2 break-words font-mono text-xs text-muted">{meta.error}</p>
+              </div>
             ) : (
-              <div className="grid aspect-video place-items-center bg-surface-2 text-center">
-                {meta.status === "error" ? (
-                  <div className="max-w-md p-6">
-                    <p className="font-medium">processing failed</p>
-                    <p className="mt-2 break-words font-mono text-xs text-muted">{meta.error}</p>
-                  </div>
-                ) : (
-                  <div className="w-56 space-y-3">
-                    <p className="text-[13px] text-muted">{meta.stage ?? "Processing"}…</p>
-                    <div className="working-bar" aria-hidden="true" />
-                  </div>
-                )}
+              <div className="w-56 space-y-3">
+                <p className="text-[13px] text-muted">{meta.stage ?? "Processing"}…</p>
+                <div className="working-bar" aria-hidden="true" />
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          {ready && !local && <ReactionsBar videoId={id} now={origNow} duration={duration} />}
-          {!owner && !local && <ReportButton videoId={id} />}
-          {meta.clean.status === "ready" && (
-            <div className="inline-grid grid-cols-2 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
-              {(["clean", "original"] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => {
-                    setVersion(v);
-                    setPreviewing(false);
-                  }}
-                  className={`rounded-lg px-3 py-1.5 ${version === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
-                >
-                  {v === "clean" ? `cleaned · ${fmtTime(meta.clean.duration)}` : `original · ${fmtTime(meta.duration)}`}
-                </button>
-              ))}
-            </div>
-          )}
+      {ready && !local && <div className="mt-3"><ReactionsBar videoId={id} now={origNow} duration={duration} /></div>}
+      {!owner && !local && <div className="mt-3"><ReportButton videoId={id} /></div>}
+      {meta.clean.status === "ready" && (
+        <div className="mt-4 inline-grid grid-cols-2 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
+          {(["clean", "original"] as const).map((v) => (
+            <button
+              key={v}
+              onClick={() => {
+                setVersion(v);
+                setPreviewing(false);
+              }}
+              className={`rounded-lg px-3 py-1.5 ${version === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
+            >
+              {v === "clean" ? `edited · ${fmtTime(meta.clean.duration)}` : `original · ${fmtTime(meta.duration)}`}
+            </button>
+          ))}
         </div>
+      )}
 
-        <aside className="card flex max-h-[min(80vh,640px)] flex-col overflow-hidden">
-          <div className="grid border-b border-border text-[13px]" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
-            {tabs.map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                className={`border-b py-2.5 text-[12px] uppercase tracking-[0.12em] ${tab === t ? "border-border-strong text-text" : "border-transparent text-muted hover:text-text"}`}
-              >
-                {tabLabel[t]}
-              </button>
-            ))}
+      {owner && ready && duration > 0 && (
+        <section className="mt-6 space-y-5 text-[13px]" aria-label="Edit">
+          <div className="space-y-2">
+            <TrimBar duration={duration} start={trimStart} end={trimEnd} cuts={draftCuts} now={origNow} onSeek={showOriginalAt} onTrim={setTrim} />
+            <div className="flex justify-between text-[12px] tabular-nums text-muted">
+              <span>{fmtTime(trimStart)} – {fmtTime(trimEnd)}</span>
+              <span>
+                {draftSaved > 0 ? `${fmtTime(duration - draftSaved)} long, ${fmtTime(draftSaved)} shorter` : `${fmtTime(duration)} long`}
+              </span>
+            </div>
           </div>
 
-          {tab === "comments" ? (
-            <CommentsPanel
-              videoId={id}
-              viewer={viewer}
-              owner={owner}
-              now={origNow}
-              onSeek={seekOriginal}
-              loginHref={`/login?next=${encodeURIComponent(`/v/${id}`)}`}
-            />
-          ) : tab === "insights" ? (
-            <InsightsPanel videoId={id} />
-          ) : !ready ? (
-            <p className="p-5 text-[13px] text-muted">transcript appears once processing finishes.</p>
-          ) : tab === "guide" ? (
-            <GuidePanel videoId={id} onSeek={seekOriginal} />
-          ) : tab === "report" ? (
-            <ReportPanel videoId={id} onSeek={seekOriginal} />
-          ) : tab === "transcript" ? (
-            <div className="overflow-y-auto p-5 text-[13px] leading-7">
-              {words.length === 0 ? (
-                <p className="text-[13px] text-muted">no speech detected.</p>
-              ) : (
-                words.map((w, i) => {
-                  const active = origNow >= w.start && origNow < w.end;
-                  const cutInClean = onClean && renderedKeep && remapSpan(w, renderedKeep) === null;
-                  return (
-                    <span key={i}>
-                      <span
-                        ref={active ? activeWord : undefined}
-                        onClick={() => seekOriginal(onClean ? (w.start + w.end) / 2 : w.start)}
-                        title={fmtTime(w.start)}
-                        className={[
-                          "cursor-pointer px-0.5 hover:bg-accent-soft",
-                          active ? "bg-accent text-accent-text hover:bg-accent" : "",
-                          w.filler && !active ? "text-muted underline decoration-dotted underline-offset-4" : "",
-                          cutInClean ? "line-through opacity-50" : "",
-                        ].join(" ")}
-                      >
-                        {w.text}
-                      </span>{" "}
-                    </span>
-                  );
-                })
-              )}
+          <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+            <div className="flex min-w-64 flex-1 items-center gap-5">
+              <div className="flex-1">
+                <Toggle
+                  label="Clean up"
+                  hint={`${counts.hesitation} um/uh, ${counts.pauses} long pauses`}
+                  checked={opts.fillers || opts.silences}
+                  onChange={(v) => setOpts({ ...opts, fillers: v, silences: v })}
+                />
+              </div>
+              <button className="text-[12px] text-muted hover:text-text" aria-expanded={fineTune} onClick={() => setFineTune((o) => !o)}>
+                options
+              </button>
             </div>
-          ) : (
-            <div className="space-y-5 overflow-y-auto p-5 text-[13px]">
-              <p className="text-muted">
-                removes hesitations and dead air using word timestamps and pause detection. Your original stays
-                untouched.
-              </p>
+            <div className="flex gap-2">
+              <button
+                className="btn-ghost"
+                disabled={!draftCuts.length}
+                onClick={() => {
+                  if (previewing) return setPreviewing(false);
+                  setVersion("original");
+                  setPreviewing(true);
+                  setTimeout(() => {
+                    const v = videoRef.current;
+                    if (v) {
+                      v.currentTime = 0;
+                      v.play().catch(() => {});
+                    }
+                  }, 50);
+                }}
+              >
+                {previewing ? "stop preview" : "preview"}
+              </button>
+              <button className="btn-primary" disabled={busy || saved || !draftCuts.length || meta.clean.status === "rendering"} onClick={render}>
+                {meta.clean.status === "rendering" ? "saving…" : saved ? "saved" : "save edit"}
+              </button>
+            </div>
+          </div>
 
-              <Toggle
-                label="Remove filler words"
-                hint={`${counts.hesitation} um/uh found`}
-                checked={opts.fillers}
-                onChange={(v) => setOpts({ ...opts, fillers: v })}
-              />
+          {fineTune && (
+            <div className="space-y-5 rounded-lg border border-border p-5">
+              <Toggle label="Remove filler words" hint={`${counts.hesitation} um/uh found`} checked={opts.fillers} onChange={(v) => setOpts({ ...opts, fillers: v })} />
               {opts.fillers && (
                 <Toggle
                   label="Also cut “like,” “you know,” “basically,”"
@@ -433,54 +450,97 @@ export default function Watch({
                   />
                 </label>
               )}
+              <p className="text-[12px] text-muted">Your original stays untouched.</p>
+            </div>
+          )}
 
-              <div className="rounded-lg border border-dashed border-border p-4">
-                <p className="text-2xl font-light tabular-nums">−{fmtTime(draftSaved)}</p>
-                <p className="text-muted">
-                  {duration ? `${Math.round((draftSaved / duration) * 100)}% shorter · ` : ""}
-                  new length {fmtTime(duration - draftSaved)}
-                </p>
-              </div>
+          {(err || meta.clean.status === "error") && (
+            <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || meta.clean.error}</p>
+          )}
+        </section>
+      )}
 
-              <div className="flex gap-2">
-                <button
-                  className="btn-ghost flex-1"
-                  disabled={!draftCuts.length}
-                  onClick={() => {
-                    setVersion("original");
-                    setPreviewing(true);
-                    setTimeout(() => {
-                      const v = videoRef.current;
-                      if (v) {
-                        v.currentTime = 0;
-                        v.play().catch(() => {});
-                      }
-                    }, 50);
-                  }}
-                >
-                  {previewing ? "previewing…" : "preview"}
-                </button>
-                <button
-                  className="btn-primary flex-1"
-                  disabled={busy || !draftCuts.length || meta.clean.status === "rendering"}
-                  onClick={render}
-                >
-                  {meta.clean.status === "rendering" ? "rendering…" : meta.clean.status === "ready" ? "re-render" : "render clean cut"}
-                </button>
-              </div>
-              {previewing && (
-                <button className="text-xs text-accent underline" onClick={() => setPreviewing(false)}>
-                  stop skipping cuts
-                </button>
-              )}
-              {(err || meta.clean.status === "error") && (
-                <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || meta.clean.error}</p>
+      <section className="mt-12">
+        <div className="mb-4 flex gap-6">
+          {tabs.map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`border-b pb-1.5 text-[12px] uppercase tracking-[0.12em] ${tab === t ? "border-border-strong text-text" : "border-transparent text-muted hover:text-text"}`}
+            >
+              {tabLabel[t]}
+            </button>
+          ))}
+        </div>
+
+        <div className="card flex max-h-[min(70vh,560px)] flex-col overflow-hidden">
+          {tab === "comments" ? (
+            <CommentsPanel
+              videoId={id}
+              viewer={viewer}
+              owner={owner}
+              now={origNow}
+              onSeek={seekOriginal}
+              loginHref={`/login?next=${encodeURIComponent(`/v/${id}`)}`}
+            />
+          ) : tab === "insights" ? (
+            <InsightsPanel videoId={id} />
+          ) : !ready ? (
+            <p className="p-5 text-[13px] text-muted">transcript appears once processing finishes.</p>
+          ) : tab === "guide" ? (
+            <GuidePanel videoId={id} onSeek={seekOriginal} />
+          ) : tab === "report" ? (
+            <ReportPanel videoId={id} onSeek={seekOriginal} />
+          ) : (
+            <div ref={transcriptBox} className="relative overflow-y-auto p-6 text-[14px] leading-8">
+              {words.length === 0 ? (
+                <p className="text-[13px] text-muted">no speech detected.</p>
+              ) : (
+                words.map((w, i) => {
+                  const active = origNow >= w.start && origNow < w.end;
+                  const cutInClean = onClean && renderedKeep && remapSpan(w, renderedKeep) === null;
+                  return (
+                    <span key={i}>
+                      <span
+                        ref={active ? activeWord : undefined}
+                        onClick={() => seekOriginal(onClean ? (w.start + w.end) / 2 : w.start)}
+                        title={fmtTime(w.start)}
+                        className={[
+                          "cursor-pointer px-0.5 hover:bg-accent-soft",
+                          active ? "bg-accent text-accent-text hover:bg-accent" : "",
+                          w.filler && !active ? "text-muted underline decoration-dotted underline-offset-4" : "",
+                          cutInClean ? "line-through opacity-50" : "",
+                        ].join(" ")}
+                      >
+                        {w.text}
+                      </span>{" "}
+                    </span>
+                  );
+                })
               )}
             </div>
           )}
-        </aside>
-      </div>
+        </div>
+      </section>
+
+      {owner && (
+        <button className="mt-12 text-[12px] text-muted hover:text-text" onClick={remove}>
+          delete this video
+        </button>
+      )}
     </div>
+  );
+}
+
+/** Would rendering these options produce the same video? */
+function sameEdit(a: CleanOptions, b: CleanOptions) {
+  return (
+    a.fillers === b.fillers &&
+    a.silences === b.silences &&
+    a.minSilence === b.minSilence &&
+    a.aggressive === b.aggressive &&
+    a.trimStart === b.trimStart &&
+    a.trimEnd === b.trimEnd
   );
 }
 

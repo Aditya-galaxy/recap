@@ -28,9 +28,11 @@ export default function EmptyLibrary() {
           </li>
         ))}
       </ol>
-      <div className="mt-10">
+      <div className="mt-10 flex flex-wrap items-center gap-3">
         <RecordButton />
+        <button className="btn-ghost" onClick={() => window.dispatchEvent(new Event("recap:import"))}>import a video</button>
       </div>
+      <p className="mt-3 text-[12px] text-muted">Or drop video files anywhere in this window.</p>
     </div>
   );
 }

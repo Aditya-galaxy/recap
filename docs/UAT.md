@@ -23,6 +23,8 @@ Use a fresh install (uninstall first, and on macOS run `tccutil reset All dev.re
 | 13 | Play a video with sound, then click **library** | The sound stops |
 | 14 | Record, then quit from the tray and choose **Quit without saving** | Recap closes with no error; reopening works, and that recording doesn't come back |
 | 15 | Screen + camera on a colored background | Camera is a clean circle with no faint square around it; ◯/▭ and the corner drag work |
-| 16 | Uninstall | App removed; library stays in your user folder unless deleted |
+| 16 | Drop a phone video (or any .mov/.mp4) on the window, then a few at once | One file opens as a video; several appear in the library and finish on their own. Upright, plays, gets a transcript |
+| 17 | Drop a picture or a text file | A plain message says why; nothing else breaks |
+| 18 | Uninstall | App removed; library stays in your user folder unless deleted |
 
 Note anything that's confusing, slow or shows technical text (paths, `$` signs, error codes).

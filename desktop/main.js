@@ -889,19 +889,23 @@ if (process.env.RECAP_SELFTEST && process.env.RECAP_SELFTEST_FAKE_MEDIA === "1")
 // Electron grants every web permission unless told otherwise. Recap's own recorder windows (local files) need the
 // camera, microphone and screen; the library (served by the local engine) needs the clipboard and fullscreen video.
 // Everything else (location, notifications from pages, MIDI, USB…) is refused.
-function permitted(permission, url) {
+function permitted(permission, url, details) {
   if (url.startsWith("file://")) return ["media", "display-capture", "clipboard-sanitized-write"].includes(permission);
-  if (engine.url && url.startsWith(engine.url)) return ["clipboard-sanitized-write", "fullscreen"].includes(permission);
+  if (engine.url && url.startsWith(engine.url)) {
+    // The library records voice-overs: microphone only, never the camera.
+    if (permission === "media") return details?.mediaTypes ? details.mediaTypes.every((t) => t === "audio") : details?.mediaType === "audio";
+    return ["clipboard-sanitized-write", "fullscreen"].includes(permission);
+  }
   return false;
 }
 
 app.whenReady().then(() => {
   const { session: electronSession } = require("electron");
   electronSession.defaultSession.setPermissionRequestHandler((wc, permission, done, details) =>
-    done(permitted(permission, details?.requestingUrl || wc.getURL())),
+    done(permitted(permission, details?.requestingUrl || wc.getURL(), details)),
   );
   electronSession.defaultSession.setPermissionCheckHandler((wc, permission, origin, details) =>
-    permitted(permission, details?.requestingUrl || wc?.getURL() || origin || ""),
+    permitted(permission, details?.requestingUrl || wc?.getURL() || origin || "", details),
   );
   app.setAboutPanelOptions({
     applicationName: "Recap",
@@ -1235,6 +1239,7 @@ async function selftest(dir, sample) {
 
     // Make it a video: right shape, captions actually on the picture, end card at the end.
     try {
+      let madeCount = 0;
       const make = async (body) => {
         await api(`/api/videos/${video.id}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
         let made = null;
@@ -1242,7 +1247,7 @@ async function selftest(dir, sample) {
           await wait(500);
           made = (await (await api(`/api/videos/${video.id}/make`)).json()).made;
         }
-        const out = path.join(dir, `made-${body.captions ? "with" : "without"}.mp4`);
+        const out = path.join(dir, `made-${++madeCount}.mp4`);
         if (made?.status === "ready") fs.writeFileSync(out, Buffer.from(await (await api(`/api/videos/${video.id}/media?v=made`)).arrayBuffer()));
         return { made, out };
       };
@@ -1265,7 +1270,41 @@ async function selftest(dir, sample) {
       let bright = 0;
       for (let i = 0; i < p3.length; i += 4) if (p3[i + 1] > 90) bright++;
       const lit = bright / (p3.length / 4);
-      step("make a video: ends on the end card", a.made?.status === "ready" && lit > 0.0005 && lit < 0.05 && Math.abs((a.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3.1) < 0.4, { lit, withCard: a.made?.duration, without: b.made?.duration });
+      // Join, intro, blur and voice-over: lengths add up, and the blurred region really loses its detail.
+      const c = await make({ format: "wide", small: true, captions: false, endCard: false, intro: true, introTitle: "Intro", clips: [(await (await api("/api/videos")).json()).find((x) => x.title === "Dropped clip ✓")?.id] });
+      step("make a video: intro card and a joined clip add up", c.made?.status === "ready" && Math.abs((c.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3 - 2) < 1, { status: c.made?.status, error: c.made?.error, duration: c.made?.duration, video: b.made?.duration });
+      const box = { x: 0.1, y: 0.1, w: 0.5, h: 0.5, start: 0, end: 9999 };
+      const plain = await make({ format: "wide", small: true, captions: false, endCard: false });
+      const hidden = await make({ format: "wide", small: true, captions: false, endCard: false, blurs: [box] });
+      const detail = async (f) => {
+        const im = (await frame(f, 1)).toBitmap();
+        const sz = (await frame(f, 1)).getSize();
+        let edges = 0;
+        for (let y = Math.round(sz.height * 0.15); y < sz.height * 0.55; y++) {
+          for (let x = Math.round(sz.width * 0.15); x < sz.width * 0.55; x++) {
+            const i = (y * sz.width + x) * 4;
+            if (Math.abs(im[i + 1] - im[i + 5]) > 24) edges++;
+          }
+        }
+        return edges;
+      };
+      const [sharp, soft] = [await detail(plain.out), await detail(hidden.out)];
+      step("make a video: a blurred area loses its detail", hidden.made?.status === "ready" && sharp > 200 && soft < sharp / 20, { sharp, soft, error: hidden.made?.error });
+      const take = path.join(dir, "voice-take.webm");
+      await execFileP(bin("ffmpeg"), ["-y", "-loglevel", "error", "-f", "lavfi", "-i", "sine=frequency=500:duration=3", "-c:a", "libopus", take]);
+      await api(`/api/videos/${video.id}/voice?start=1`, { method: "POST", body: fs.readFileSync(take) });
+      let vo = null;
+      for (let i = 0; i < 120 && vo?.status !== "ready"; i++) {
+        await wait(500);
+        vo = (await (await api(`/api/videos/${video.id}/voice`)).json()).voice;
+      }
+      const dubbed = await make({ format: "wide", small: true, captions: false, endCard: false, audio: "voice" });
+      const levels = await execFileP(bin("ffmpeg"), ["-hide_banner", "-t", "0.8", "-i", dubbed.out, "-af", "volumedetect", "-f", "null", "-"]).then((r) => r.stderr, (e) => e.stderr ?? "");
+      const during = await execFileP(bin("ffmpeg"), ["-hide_banner", "-ss", "1.5", "-t", "1", "-i", dubbed.out, "-af", "volumedetect", "-f", "null", "-"]).then((r) => r.stderr, (e) => e.stderr ?? "");
+      const db = (s) => Number(String(s).match(/mean_volume: (-?[\d.]+)/)?.[1] ?? -99);
+      step("make a video: voice-over replaces the sound, in the right place", dubbed.made?.status === "ready" && db(during) > db(levels) + 15, { before: db(levels), during: db(during), error: dubbed.made?.error });
+      await api(`/api/videos/${video.id}/voice`, { method: "DELETE" });
+      step("make a video: ends on the end card", a.made?.status === "ready" && lit > 0.0005 && lit < 0.05 && Math.abs((a.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3.5) < 0.4, { lit, withCard: a.made?.duration, without: b.made?.duration });
     } catch (err) {
       step("make a video", false, { error: err.message });
     }

@@ -25,6 +25,7 @@ Use a fresh install (uninstall first, and on macOS run `tccutil reset All dev.re
 | 15 | Screen + camera on a colored background | Camera is a clean circle with no faint square around it; ◯/▭ and the corner drag work |
 | 16 | Drop a phone video (or any .mov/.mp4) on the window, then a few at once | One file opens as a video; several appear in the library and finish on their own. Upright, plays, gets a transcript |
 | 17 | Drop a picture or a text file | A plain message says why; nothing else breaks |
-| 18 | Uninstall | App removed; library stays in your user folder unless deleted |
+| 18 | Open **Make it a video**, choose **Vertical**, keep captions and end card, **make video**, play it | Whole picture visible over a blurred backdrop; captions readable and in time; ends on your end card; **export mp4** saves it. Your recording is unchanged |
+| 19 | Uninstall | App removed; library stays in your user folder unless deleted |
 
 Note anything that's confusing, slow or shows technical text (paths, `$` signs, error codes).

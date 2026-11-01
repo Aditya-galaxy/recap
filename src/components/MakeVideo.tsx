@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { Made, MakeFormat } from "@/lib/make";
 
 const FORMATS: { value: MakeFormat; label: string; hint: string }[] = [
@@ -21,6 +21,13 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
   const [useEdit, setUseEdit] = useState(hasEdit);
   const [rev, setRev] = useState(0);
   const [err, setErr] = useState("");
+
+  // Next keeps pages alive when you navigate away; without this the preview would keep playing, unseen.
+  const player = useRef<HTMLVideoElement>(null);
+  useLayoutEffect(() => {
+    const pause = () => player.current?.pause();
+    return pause;
+  }, []);
 
   const rendering = made?.status === "rendering";
   useEffect(() => {
@@ -97,7 +104,8 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
         {(err || made?.status === "error") && <p className="text-[12px]"><span className="text-muted">error: </span>{err || made?.error}</p>}
         {made?.status === "ready" && (
           <div className="space-y-2">
-            <video key={rev} controls playsInline preload="metadata" src={`/api/videos/${id}/media?v=made${rev ? `&r=${rev}` : ""}`} className="max-h-[50vh] w-full rounded-lg bg-black" />
+            <p className="text-[12px] text-muted">{FORMATS.find((f) => f.value === made.options.format)?.label} video{made.duration ? `, ${Math.round(made.duration)} seconds` : ""}</p>
+            <video ref={player} key={rev} controls playsInline preload="metadata" src={`/api/videos/${id}/media?v=made${rev ? `&r=${rev}` : ""}`} className="max-h-[50vh] w-full rounded-lg bg-black" />
             <a className="btn-ghost inline-flex" href={`/api/videos/${id}/media?v=made&download`}>export mp4</a>
           </div>
         )}

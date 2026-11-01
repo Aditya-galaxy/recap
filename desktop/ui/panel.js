@@ -380,14 +380,21 @@ window.recap.on("begin", async (o) => {
       rec.stop();
     });
 
+    // Discarded while the camera or microphone was still starting: don't begin recording after all.
+    if (discarding) {
+      cleanup();
+      rec = null;
+      return;
+    }
     rec.start(1000);
     accumulated = 0;
     segStart = performance.now();
     ticker = setInterval(() => window.recap.recorder({ type: "elapsed", value: elapsed() }), 250);
     window.recap.recorder({ type: "started" });
   } catch (err) {
+    const discarded = discarding;
     cleanup();
-    window.recap.recorder({ type: "error", message: captureError(err) });
+    if (!discarded) window.recap.recorder({ type: "error", message: captureError(err) });
   }
 });
 

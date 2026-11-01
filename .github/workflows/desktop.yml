@@ -111,6 +111,14 @@ jobs:
           cat "$OUT/report.json"
           PY=$(command -v python3 || command -v python)
           "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); bad=[s for s in r['steps'] if not s['ok']]; print('FAILED:', bad) if bad else print('all', len(r['steps']), 'steps passed'); sys.exit(1 if bad or not r['steps'] else 0)" "$OUT/report.json"
+          # "Quit without saving" during a save: the app must exit by itself, log no errors, leave no raw file behind.
+          QUIT="$RUNNER_TEMP/selftest-quit"; mkdir -p "$QUIT"; code=0
+          if command -v timeout >/dev/null; then QLIMIT=(timeout 120); else QLIMIT=(perl -e 'alarm shift; exec @ARGV' 120); fi
+          RECAP_SELFTEST="$QUIT" RECAP_SELFTEST_QUIT=1 RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.mkv" "${QLIMIT[@]}" "${APP[@]}" || code=$?
+          echo "quit test: exit $code, $(cat "$QUIT/quit-test.json" 2>/dev/null)"
+          cat "$QUIT/recap.log" 2>/dev/null || true
+          [ "$code" = 0 ] && [ ! -s "$QUIT/recap.log" ]
+          "$PY" -c "import json,sys; r=json.load(open(sys.argv[1])); sys.exit(0 if r['phase']=='uploading' and r['rawGone'] else 1)" "$QUIT/quit-test.json"
 
       - name: Lifecycle (update notice, upgrade in place, AppImage, uninstall)
         if: matrix.name != 'macos'

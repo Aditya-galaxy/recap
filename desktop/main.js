@@ -6,7 +6,7 @@
 //   panel  – recorder settings + start; also hosts the MediaRecorder (kept alive while hidden)
 //   bubble – circular camera window, always on top, captured with the screen on purpose
 //   bar    – timer / pause / stop / discard, always on top, excluded from capture where the OS allows
-const { app, BrowserWindow, Tray, Menu, ShareMenu, ipcMain, desktopCapturer, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage, dialog, Notification } = require("electron");
+const { app, BrowserWindow, Tray, Menu, ShareMenu, ipcMain, desktopCapturer, crashReporter, screen, globalShortcut, shell, clipboard, nativeImage, systemPreferences, safeStorage, dialog, Notification } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
 const { Readable } = require("node:stream");
@@ -77,6 +77,54 @@ function broadcast() {
   tray?.setToolTip(s.phase === "recording" ? `Recap: recording ${fmt(s.elapsed)}` : "Recap");
 }
 
+// ---- errors -----------------------------------------------------------------------
+// Nothing should reach the OS as a crash dialog or leave a hidden process holding the single-instance lock.
+// Errors go to a log the person can send us (tray → "Open logs folder"); the app keeps running if it can.
+
+const logPath = () => (process.env.RECAP_SELFTEST ? path.join(process.env.RECAP_SELFTEST, "recap.log") : path.join(app.getPath("userData"), "logs", "recap.log"));
+const unexpectedErrors = [];
+let started = false;
+
+function logError(where, err) {
+  const text = `${new Date().toISOString()} ${where}: ${err?.stack ?? err}\n`;
+  console.error(text);
+  try {
+    const file = logPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    if (fs.existsSync(file) && fs.statSync(file).size > 1024 * 1024) fs.renameSync(file, `${file}.old`);
+    fs.appendFileSync(file, text);
+  } catch {
+    /* logging must never be the thing that fails */
+  }
+}
+
+function onUnexpected(where, err) {
+  logError(where, err);
+  unexpectedErrors.push(`${where}: ${err?.message ?? err}`);
+  if (quitting) return app.exit(0); // already on the way out: finish now rather than hang
+  if (started) return;
+  // Startup failed before any window exists: say so and leave, so that reopening can work.
+  if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT) {
+    try {
+      dialog.showErrorBox("Recap couldn't start", `${err?.message ?? err}\n\nDetails are in ${logPath()}`);
+    } catch {}
+  }
+  app.exit(1);
+}
+process.on("uncaughtException", (err) => onUnexpected("uncaught exception", err));
+process.on("unhandledRejection", (err) => onUnexpected("unhandled rejection", err));
+
+/** Delete a file or folder; something else holding it open (Windows) is not worth failing over. */
+function safeRm(target) {
+  try {
+    fs.rmSync(target, { recursive: true, force: true, maxRetries: 2, retryDelay: 100 });
+    return true;
+  } catch (err) {
+    logError(`couldn't remove ${target}`, err);
+    return false;
+  }
+}
+
 const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, "0")}`;
 
 function setPhase(phase, extra = {}) {
@@ -122,6 +170,23 @@ function createPanel() {
       panel.hide();
     }
   });
+  panel.on("closed", () => (panel = null));
+  // The recorder lives in this window. If it dies, keep what was written so far and offer it back.
+  panel.webContents.on("render-process-gone", (_e, details) => {
+    logError("panel renderer gone", details.reason);
+    if (quitting || !panel) return;
+    const f = session.file;
+    session.file = null;
+    session.runId++;
+    closeOverlays();
+    panel.loadFile(path.join(__dirname, "ui", "panel.html"));
+    if (f) {
+      f.stream.end();
+      session.lastFile = f.path;
+      setPhase("error", { error: "The recorder stopped unexpectedly. What was recorded so far is saved. Use “retry upload”." });
+      panel.show();
+    }
+  });
 }
 
 // The library is the engine's web UI. The one-time /__local URL hands the window its session cookie.
@@ -159,6 +224,10 @@ function openLibrary(pathname = "/") {
     }
   });
   library.on("closed", () => (library = null));
+  library.webContents.on("render-process-gone", (_e, details) => {
+    logError("library renderer gone", details.reason);
+    if (!quitting && library && !library.isDestroyed() && details.reason !== "clean-exit") library.reload();
+  });
 }
 
 const isLocal = (opts) => !opts?.server || !String(opts.server).trim();
@@ -274,7 +343,14 @@ function createBar(opts) {
 }
 
 function closeOverlays() {
-  for (const w of [bubble, bar]) if (w && !w.isDestroyed()) w.destroy();
+  // Hide now and destroy a moment later: the click that got us here may still be running in that window.
+  for (const w of [bubble, bar]) {
+    if (!w || w.isDestroyed()) continue;
+    w.hide();
+    setTimeout(() => {
+      if (!w.isDestroyed()) w.destroy();
+    }, 50);
+  }
   bubble = null;
   bar = null;
 }
@@ -321,6 +397,21 @@ async function checkConnection(server) {
 // ---- recording flow ----------------------------------------------------------
 
 async function start(opts) {
+  try {
+    await beginRecording(opts);
+  } catch (err) {
+    logError("couldn't start recording", err);
+    session.runId++;
+    closeOverlays();
+    const f = session.file;
+    session.file = null;
+    if (f) f.stream.end(() => safeRm(f.path));
+    setPhase("error", { error: `Couldn't start recording (${err.message}).` });
+    panel?.show();
+  }
+}
+
+async function beginRecording(opts) {
   if (!["idle", "error"].includes(session.phase)) return;
   if (isLocal(opts)) {
     if (engine.state !== "ready") {
@@ -365,7 +456,7 @@ async function start(opts) {
   });
   session.file = { path: file, stream };
 
-  panel.hide();
+  panel?.hide();
   if (opts.mode !== "screen") createBubble(opts);
   createBar(opts);
 
@@ -374,7 +465,7 @@ async function start(opts) {
     await new Promise((r) => setTimeout(r, 1000));
     if (run !== session.runId) return; // discarded during countdown
   }
-  panel.webContents.send("begin", { ...opts, sourceId, systemAudio: opts.systemAudio && isWin });
+  panel?.webContents.send("begin", { ...opts, sourceId, systemAudio: opts.systemAudio && isWin });
 }
 
 function discard() {
@@ -406,11 +497,15 @@ async function upload(file, { quiet = false } = {}) {
   const server = local ? engine.url : String(session.opts.server).trim().replace(/\/+$/, "");
   const token = local ? engine.token : readToken();
   setPhase("uploading", { progress: 0 });
+  const abort = new AbortController();
+  session.uploadAbort = abort;
+  session.uploadingFile = file;
   try {
     const size = fs.statSync(file).size;
     let sent = 0;
     let last = 0;
     const stream = fs.createReadStream(file);
+    stream.on("error", () => {}); // surfaces through fetch below
     stream.on("data", (c) => {
       sent += c.length;
       const p = sent / size;
@@ -422,7 +517,7 @@ async function upload(file, { quiet = false } = {}) {
     const headers = { "Content-Type": "video/webm", "Content-Length": String(size), Authorization: `Bearer ${token}` };
     const title = (session.opts?.title || "").trim();
     if (title) headers["x-title"] = encodeURIComponent(title);
-    const res = await fetch(`${server}/api/videos`, { method: "POST", headers, body: Readable.toWeb(stream), duplex: "half" });
+    const res = await fetch(`${server}/api/videos`, { method: "POST", headers, body: Readable.toWeb(stream), duplex: "half", signal: abort.signal });
     if (res.status === 401) throw new Error("the server rejected the token; update it under “server”");
     if (res.status !== 201) {
       const body = await res.text();
@@ -437,9 +532,9 @@ async function upload(file, { quiet = false } = {}) {
     const { id } = await res.json();
     if (local) {
       // The engine keeps its own processed copy; the raw recording is no longer needed.
-      await fs.promises.rm(file, { force: true });
+      await fs.promises.rm(file, { force: true }).catch((err) => logError("couldn't remove the raw recording", err));
       setPhase("idle", { lastLink: "", lastFile: "", progress: 0 });
-      if (!quiet) openLibrary(`/v/${id}`);
+      if (!quiet && !quitting) openLibrary(`/v/${id}`);
       return;
     }
     const link = `${server}/v/${id}`;
@@ -447,12 +542,19 @@ async function upload(file, { quiet = false } = {}) {
     shell.openExternal(link);
     setPhase("idle", { lastLink: link, progress: 0 });
   } catch (err) {
+    if (abort.signal.aborted || quitting) return; // quitting without saving: nothing left to tell anyone
+    logError("upload failed", err);
     if (quiet) return setPhase("idle", { progress: 0 }); // recovery: keep the file, try again next launch
     const where = local ? "the local library" : "the server";
     const why = err.plain ? `${err.message}` : `(${err.cause?.code ?? err.message}).`;
     setPhase("error", { error: `Couldn't add the video to ${where}. ${why} The recording is saved in ${libraryDir()}. Use “retry upload”.` });
+  } finally {
+    if (session.uploadAbort === abort) {
+      session.uploadAbort = null;
+      session.uploadingFile = null;
+    }
   }
-  panel?.show();
+  if (!quitting) panel?.show();
 }
 
 function buildTrayMenu() {
@@ -461,9 +563,10 @@ function buildTrayMenu() {
     Menu.buildFromTemplate([
       ...(session.update ? [{ label: `Update available: ${session.update.version}…`, click: () => shell.openExternal(session.update.url) }, { type: "separator" }] : []),
       { label: "Open library", click: () => openLibrary() },
-      { label: "New recording…", click: () => panel.show() },
+      { label: "New recording…", click: () => panel?.show() },
       { label: hotkeyLabel ? `Start / stop recording (${hotkeyLabel})` : "Start / stop recording", click: toggle },
       { label: "Open recordings folder", click: () => shell.openPath(libraryDir()) },
+      { label: "Open logs folder", click: () => shell.openPath(path.dirname(logPath())) },
       { type: "separator" },
       ...(process.platform === "linux" || storeApp
         ? []
@@ -524,12 +627,16 @@ async function recoverLeftovers() {
   }
   for (const f of files) {
     const p = path.join(libraryDir(), f);
-    if (fs.statSync(p).size < 4096) {
-      fs.rmSync(p, { force: true }); // nothing usable was recorded
-      continue;
+    try {
+      if (fs.statSync(p).size < 4096) {
+        safeRm(p); // nothing usable was recorded
+        continue;
+      }
+      session.opts = { server: "", title: `Recovered recording (${f.replace(/^Recap |\.webm$/g, "")})` };
+      await upload(p, { quiet: true });
+    } catch (err) {
+      logError(`couldn't recover ${f}`, err); // one bad file mustn't stop the rest
     }
-    session.opts = { server: "", title: `Recovered recording (${f.replace(/^Recap |\.webm$/g, "")})` };
-    await upload(p, { quiet: true });
   }
 }
 
@@ -748,7 +855,19 @@ if (process.platform === "win32") app.setAppUserModelId("dev.recap.desktop");
 const storeApp = !!process.windowsStore;
 // Started by "Open at login": stay in the tray/menu bar instead of opening the library.
 const startedHidden = process.argv.includes("--hidden") || (process.platform === "darwin" && app.getLoginItemSettings().wasOpenedAtLogin);
-app.on("second-instance", () => (engine.state === "ready" ? openLibrary() : panel?.show()));
+app.on("second-instance", () => {
+  // Reopening must always work: if this copy is on its way out or lost its window, hand over to a fresh one.
+  if (quitting || !panel) {
+    app.relaunch();
+    return app.exit(0);
+  }
+  return engine.state === "ready" ? openLibrary() : panel.show();
+});
+// Native crashes (GPU, renderer) leave a report on this computer only; nothing is uploaded.
+crashReporter.start({ uploadToServer: false });
+app.on("child-process-gone", (_e, details) => {
+  if (details.reason !== "clean-exit" && !quitting) logError(`${details.type} process gone`, `${details.reason} (exit code ${details.exitCode})`);
+});
 
 // PipeWire screen capture on Wayland.
 if (isLinux) app.commandLine.appendSwitch("enable-features", "WebRTCPipeWireCapturer");
@@ -793,7 +912,7 @@ app.whenReady().then(() => {
     credits: "Free and open source. Recordings and transcripts stay on this computer. Uses FFmpeg and whisper.cpp.",
     iconPath: path.join(__dirname, "build", "icon.png"),
   });
-  fs.rmSync(shareDir, { recursive: true, force: true }); // leftovers from a quit that skipped will-quit (e.g. a crash)
+  safeRm(shareDir); // leftovers from a quit that skipped will-quit (e.g. a crash)
   createPanel();
   engine.on("status", broadcast);
   // After an engine crash it restarts on a new port; point an open library window at it, keeping the page.
@@ -815,8 +934,11 @@ app.whenReady().then(() => {
   engine.start().then(() => {
     milestones.engineReady = Date.now() - T0;
     if (engine.state === "ready" && !startedHidden && !process.env.RECAP_SNAPSHOT && !process.env.RECAP_SELFTEST) openLibrary();
-    else if (engine.state !== "ready") panel.show();
-    if (!process.env.RECAP_SELFTEST) setTimeout(recoverLeftovers, 2000);
+    else if (engine.state !== "ready") panel?.show();
+    if (!process.env.RECAP_SELFTEST) setTimeout(() => recoverLeftovers().catch((err) => logError("recovery", err)), 2000);
+  }).catch((err) => {
+    logError("engine start", err);
+    panel?.show();
   });
   // Recap lives in the menu bar for days at a time, so look again every 6 hours, not just at launch.
   if (!process.env.RECAP_SELFTEST && !process.env.RECAP_SNAPSHOT && !storeApp) {
@@ -833,13 +955,14 @@ app.whenReady().then(() => {
     hotkeyLabel = "";
   }
   buildTrayMenu();
-  tray.on("click", () => (panel.isVisible() ? panel.hide() : panel.show()));
+  tray.on("click", () => (panel?.isVisible() ? panel.hide() : panel?.show()));
+  started = true;
 
   // Dev aid: RECAP_SNAPSHOT=dir renders the panel and the overlays to PNGs, then quits.
   if (process.env.RECAP_SNAPSHOT) snapshot(process.env.RECAP_SNAPSHOT);
   // Dev aid: RECAP_SELFTEST=dir RECAP_SELFTEST_FILE=video pushes a file through the local pipeline.
   if (process.env.RECAP_SELFTEST) selftest(process.env.RECAP_SELFTEST, process.env.RECAP_SELFTEST_FILE);
-});
+}).catch((err) => onUnexpected("startup", err));
 
 async function selftest(dir, sample) {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -852,6 +975,20 @@ async function selftest(dir, sample) {
   };
   try {
     for (let i = 0; i < 300 && engine.state !== "ready"; i++) await wait(100);
+    if (process.env.RECAP_SELFTEST_QUIT) {
+      // The "Quit without saving" path while a save is in flight: the process must exit cleanly by itself
+      // (CI checks that, and that the log stays empty), with the raw file gone so it can't come back next launch.
+      const raw = path.join(libraryDir(), "Recap quit-test.webm");
+      for (let i = 0; i < 30; i++) fs.appendFileSync(raw, fs.readFileSync(sample)); // big enough to still be saving
+      session.opts = { server: "", title: "Quit test" };
+      upload(raw);
+      for (let i = 0; i < 200 && !(session.progress > 0); i++) await wait(5);
+      const phase = session.phase;
+      abandonForQuit();
+      fs.writeFileSync(path.join(dir, "quit-test.json"), JSON.stringify({ phase, rawGone: !fs.existsSync(raw) }));
+      quitting = true;
+      return app.quit();
+    }
     step("engine ready", engine.state === "ready", { error: engine.error || undefined });
     // Like a normal launch: open the library as soon as the engine is up, to time a cold start.
     openLibrary("/");
@@ -995,6 +1132,19 @@ async function selftest(dir, sample) {
     // "launch" rather than an exact phrase: Linux CI's synthetic voice (espeak) comes out as "quick up, date".
     const watchText = await pageText(/launch/i);
     await shot("library-video.png");
+    // Leaving a video page must stop its sound: Next keeps the page alive, hidden.
+    const left = await library.webContents.executeJavaScript(`(async () => {
+      const v = document.querySelector("video");
+      v.muted = true;
+      await v.play();
+      const playing = !v.paused;
+      [...document.querySelectorAll("a")].find((a) => a.textContent.trim() === "library").click();
+      await new Promise((r) => setTimeout(r, 1500));
+      return { playing, paused: v.paused, url: location.pathname };
+    })()`, true).catch((err) => ({ error: err.message }));
+    step("leaving a video stops its sound", left.playing && left.paused && left.url === "/", left);
+    openLibrary(`/v/${video.id}`);
+    await pageText(/launch/i);
     // The video page as a person sees it: transcript words, clean-up, and the share button (desktop bridge).
     const share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
     step("video page: transcript, clean up and share", /launch/i.test(watchText) && /clean up/i.test(watchText) && share, { share, text: watchText.slice(0, 160) });
@@ -1238,6 +1388,7 @@ async function selftest(dir, sample) {
   };
   step("cold start: engine ready < 10 s", (milestones.engineReady ?? Infinity) < 10_000, { ms: milestones.engineReady });
   report.passed = report.steps.every((s) => s.ok);
+  step("no unexpected errors", unexpectedErrors.length === 0, { errors: unexpectedErrors });
   fs.writeFileSync(path.join(dir, "report.json"), JSON.stringify(report, null, 2));
   quitting = true;
   app.quit();
@@ -1265,6 +1416,18 @@ async function snapshot(dir) {
   app.quit();
 }
 
+/** "Quit without saving": stop everything in flight and remove the raw file, so it doesn't come back next launch. */
+function abandonForQuit() {
+  session.runId++;
+  session.uploadAbort?.abort();
+  const f = session.file;
+  session.file = null;
+  f?.stream.destroy();
+  panel?.webContents.send("control", "discard");
+  closeOverlays();
+  for (const p of [f?.path, session.uploadingFile]) if (p) safeRm(p);
+}
+
 // Quitting mid-recording or mid-save would lose (or orphan) the video: ask first.
 app.on("before-quit", (e) => {
   const busy = ["countdown", "recording", "paused", "finishing", "uploading"].includes(session.phase);
@@ -1285,14 +1448,17 @@ app.on("before-quit", (e) => {
       else if (session.phase === "countdown") discard();
       return; // quits when the save finishes (see setPhase)
     }
+    abandonForQuit();
   }
   quitting = true;
   engine.stop();
+  // A hung shutdown would hold the single-instance lock and stop Recap from reopening.
+  setTimeout(() => app.exit(0), 5000);
 });
 
 app.on("activate", () => (engine.state === "ready" ? openLibrary() : panel?.show()));
 app.on("will-quit", () => {
   globalShortcut.unregisterAll();
-  fs.rmSync(shareDir, { recursive: true, force: true }); // hard links: the library copies are untouched
+  safeRm(shareDir); // hard links: the library copies are untouched
 });
 app.on("window-all-closed", (e) => e.preventDefault());

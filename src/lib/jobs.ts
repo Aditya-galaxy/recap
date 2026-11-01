@@ -4,7 +4,7 @@ import { DISK_FULL, isDiskFull } from "./disk";
 import { makeGuide, polishGuide, readGuide, writeGuide } from "./guide";
 import { PermanentError, processVideo, renderClean } from "./pipeline";
 import { makeReport, polishReport, readReport, writeReport } from "./report";
-import { updateMeta } from "./store";
+import { deleteVideo, updateMeta } from "./store";
 import type { CleanOptions } from "./types";
 
 // A small durable queue in SQLite. Jobs survive restarts; one worker runs them one at a time
@@ -138,6 +138,9 @@ export function startWorker() {
   // Anything "running" when the process died was interrupted; run it again.
   const n = db.prepare("UPDATE jobs SET status = 'queued', run_after = 0, updated_at = ? WHERE status = 'running'").run(now()).changes;
   if (n) console.log(`[jobs] resuming ${n} interrupted job(s)`);
+  // An upload cut off by a crash or a quit never got a job. It would sit in the library "processing" forever.
+  const orphans = db.prepare("SELECT id FROM videos WHERE status = 'uploaded' AND id NOT IN (SELECT video_id FROM jobs)").all() as { id: string }[];
+  for (const { id } of orphans) deleteVideo(id).catch((err) => console.error("[jobs] couldn't remove unfinished upload", id, err));
   g.__recapWorker.timer = setInterval(kick, POLL_MS);
   g.__recapWorker.timer.unref?.();
   kick();

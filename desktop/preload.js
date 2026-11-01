@@ -21,7 +21,7 @@ contextBridge.exposeInMainWorld("recap", {
   retryModel: () => ipcRenderer.send("model:retry"),
   setStorage: (server) => ipcRenderer.send("storage", server),
   on: (channel, fn) => {
-    if (!["state", "begin", "control", "hotkey"].includes(channel)) return;
+    if (!["state", "begin", "control", "hotkey", "annotate"].includes(channel)) return;
     ipcRenderer.on(channel, (_e, data) => fn(data));
   },
 });

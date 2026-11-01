@@ -34,6 +34,7 @@ const isLinux = process.platform === "linux";
 let panel = null;
 let library = null;
 let bubble = null;
+let overlay = null;
 let bar = null;
 let tray = null;
 let quitting = false;
@@ -72,6 +73,8 @@ function broadcast() {
     bubbleShape: bubbleShape(),
     bubblePx: session.opts?.bubblePx ?? null,
     bubbleOn: !!bubble && !bubble.isDestroyed() && session.opts?.mode !== "cam",
+    canDraw: session.opts?.mode !== undefined && session.opts.mode !== "cam",
+    drawing: !!session.drawing,
   };
   for (const w of [panel, bar, bubble]) if (w && !w.isDestroyed()) w.webContents.send("state", s);
   tray?.setToolTip(s.phase === "recording" ? `Recap: recording ${fmt(s.elapsed)}` : "Recap");
@@ -320,7 +323,7 @@ function resizeBubble(height) {
 
 function createBar(opts) {
   const d = displayFor(opts.displayId).workArea;
-  const w = 420;
+  const w = 510;
   const h = 52;
   bar = new BrowserWindow({
     width: w,
@@ -342,9 +345,143 @@ function createBar(opts) {
   bar.loadFile(path.join(__dirname, "ui", "bar.html"));
 }
 
+// ---- drawing, click highlights and the focus track ----------------------------------------------------
+
+/** A see-through full-screen layer, captured with the screen on purpose. Only exists once something needs it. */
+function ensureOverlay() {
+  if (overlay && !overlay.isDestroyed()) return overlay;
+  const { bounds } = displayFor(session.opts?.displayId);
+  overlay = new BrowserWindow({
+    ...bounds,
+    frame: false,
+    transparent: true,
+    backgroundColor: "#00000000",
+    resizable: false,
+    movable: false,
+    hasShadow: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    enableLargerThanScreen: true,
+    webPreferences: webPrefs,
+  });
+  overlay.setBounds(bounds);
+  overlay.setAlwaysOnTop(true, "screen-saver");
+  overlay.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlay.setIgnoreMouseEvents(true);
+  overlay.loadFile(path.join(__dirname, "ui", "annotate.html"));
+  // The camera and the bar stay above it, and stay clickable while drawing.
+  for (const w of [bubble, bar]) if (w && !w.isDestroyed()) w.moveTop();
+  return overlay;
+}
+
+const toOverlay = (m) => {
+  if (!overlay || overlay.isDestroyed()) return;
+  if (overlay.webContents.isLoading()) overlay.webContents.once("did-finish-load", () => !overlay?.isDestroyed() && overlay?.webContents.send("annotate", m));
+  else overlay.webContents.send("annotate", m);
+};
+
+function setDrawing(on) {
+  session.drawing = on;
+  if (on) ensureOverlay();
+  if (overlay && !overlay.isDestroyed()) {
+    overlay.setIgnoreMouseEvents(!on);
+    toOverlay({ type: "drawing", on });
+    if (!on) toOverlay({ type: "clear" });
+  }
+  broadcast();
+}
+
+/** Recording time, excluding pauses: the same clock as the video. */
+const trackNow = () => {
+  const t = session.track;
+  if (!t?.startedAt) return null;
+  return ((t.pausedAt ?? Date.now()) - t.startedAt - t.pausedTotal) / 1000;
+};
+
+/** Where the cursor is, as fractions of the recorded screen, or null if it's on another screen. */
+function cursorOnScreen() {
+  const { bounds } = displayFor(session.opts?.displayId);
+  const p = screen.getCursorScreenPoint();
+  const x = (p.x - bounds.x) / bounds.width;
+  const y = (p.y - bounds.y) / bounds.height;
+  return x < 0 || y < 0 || x > 1 || y > 1 ? null : { x, y, px: p.x - bounds.x, py: p.y - bounds.y };
+}
+
+function noteClick() {
+  const t = trackNow();
+  const p = cursorOnScreen();
+  if (t === null || !p) return;
+  session.track.clicks.push({ t, x: p.x, y: p.y });
+  toOverlay({ type: "click", x: p.px, y: p.py });
+}
+
+// Clicks come from a system-wide hook, loaded only if the person turned this on. It only ever listens for mouse
+// presses, and takes the position from Electron, so screen scaling needs no conversion.
+let hook = null;
+function startClickHook() {
+  if (process.platform === "darwin" && !systemPreferences.isTrustedAccessibilityClient(true)) {
+    return "Click highlights need Accessibility permission: System Settings → Privacy & Security → Accessibility. This recording won't show them.";
+  }
+  if (process.platform === "linux" && process.env.XDG_SESSION_TYPE === "wayland") return "Click highlights aren't available on Wayland. This recording won't show them.";
+  try {
+    if (!hook) {
+      hook = require("uiohook-napi").uIOhook;
+      hook.on("mousedown", noteClick);
+    }
+    hook.start();
+    session.hookOn = true;
+  } catch (err) {
+    logError("click hook", err);
+    return "Click highlights aren't available on this computer. This recording won't show them.";
+  }
+  return null;
+}
+function stopClickHook() {
+  if (!session.hookOn) return;
+  session.hookOn = false;
+  try {
+    hook?.stop();
+  } catch (err) {
+    logError("click hook stop", err);
+  }
+}
+
+/** Starts the clock and watches for the cursor moving somewhere and settling, which is what auto-zoom follows. */
+function startTrack() {
+  if (session.opts?.mode === "cam") return;
+  const track = { startedAt: Date.now(), pausedTotal: 0, pausedAt: null, clicks: [], stops: [] };
+  session.track = track;
+  let anchor = null; // where the cursor last settled
+  let still = null; // where it is now, and since when
+  track.timer = setInterval(() => {
+    if (track.pausedAt) return;
+    const p = cursorOnScreen();
+    if (!p) return;
+    if (!still || Math.hypot(p.px - still.px, p.py - still.py) > 6) {
+      still = { ...p, since: Date.now() };
+      return;
+    }
+    const { bounds } = displayFor(session.opts?.displayId);
+    const far = !anchor || Math.hypot(p.px - anchor.px, p.py - anchor.py) > bounds.width * 0.08;
+    if (far && Date.now() - still.since > 500) {
+      anchor = p;
+      track.stops.push({ t: Math.max(0, trackNow() - 0.5), x: p.x, y: p.y });
+    }
+  }, 100);
+}
+function endTrack() {
+  stopClickHook();
+  const t = session.track;
+  if (t) clearInterval(t.timer);
+  session.track = null;
+  return t ? { clicks: t.clicks, stops: t.stops } : null;
+}
+
 function closeOverlays() {
+  session.drawing = false;
   // Hide now and destroy a moment later: the click that got us here may still be running in that window.
-  for (const w of [bubble, bar]) {
+  for (const w of [bubble, bar, overlay]) {
     if (!w || w.isDestroyed()) continue;
     w.hide();
     setTimeout(() => {
@@ -352,6 +489,7 @@ function closeOverlays() {
     }, 50);
   }
   bubble = null;
+  overlay = null;
   bar = null;
 }
 
@@ -469,6 +607,7 @@ async function beginRecording(opts) {
 }
 
 function discard() {
+  endTrack();
   session.runId++;
   panel?.webContents.send("control", "discard");
   closeOverlays();
@@ -482,6 +621,7 @@ function discard() {
 }
 
 async function finish() {
+  session.lastTrack = endTrack();
   closeOverlays();
   const f = session.file;
   session.file = null;
@@ -530,6 +670,13 @@ async function upload(file, { quiet = false } = {}) {
       throw Object.assign(new Error(message || `HTTP ${res.status}: ${body.slice(0, 200)}`), { plain: !!message });
     }
     const { id } = await res.json();
+    // Clicks and where the cursor settled, for auto-zoom. Without it the video is still fine.
+    const track = session.lastTrack;
+    session.lastTrack = null;
+    if (track && !quiet) {
+      await fetch(`${server}/api/videos/${id}/track`, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify(track) })
+        .catch((err) => logError("saving the focus track", err));
+    }
     if (local) {
       // The engine keeps its own processed copy; the raw recording is no longer needed.
       await fs.promises.rm(file, { force: true }).catch((err) => logError("couldn't remove the raw recording", err));
@@ -696,14 +843,32 @@ ipcMain.on("control", (_e, action) => {
     const order = ["s", "m", "l"];
     return setBubbleSize(order[(order.indexOf(session.opts?.bubbleSize ?? "m") + 1) % order.length]);
   }
+  if (action === "draw") return setDrawing(!session.drawing);
+  if (action === "draw-clear") return toOverlay({ type: "clear" });
   if (action === "bubble-shape") return setBubbleShape(bubbleShape() === "circle" ? "rect" : "circle");
   panel?.webContents.send("control", action);
 });
 ipcMain.on("recorder", (_e, ev) => {
   // Events from the MediaRecorder living in the panel.
-  if (ev.type === "started") setPhase("recording");
-  else if (ev.type === "paused") setPhase("paused");
-  else if (ev.type === "resumed") setPhase("recording");
+  if (ev.type === "started") {
+    startTrack();
+    if (session.opts?.clickHighlight && session.opts.mode !== "cam") {
+      ensureOverlay();
+      const problem = startClickHook();
+      if (problem && Notification.isSupported()) new Notification({ title: "Recap", body: problem }).show();
+    }
+    setPhase("recording");
+  } else if (ev.type === "paused") {
+    if (session.track) session.track.pausedAt = Date.now();
+    setPhase("paused");
+  } else if (ev.type === "resumed") {
+    const t = session.track;
+    if (t?.pausedAt) {
+      t.pausedTotal += Date.now() - t.pausedAt;
+      t.pausedAt = null;
+    }
+    setPhase("recording");
+  }
   else if (ev.type === "elapsed") {
     session.elapsed = ev.value;
     broadcast();
@@ -714,6 +879,7 @@ ipcMain.on("recorder", (_e, ev) => {
     if (Notification.isSupported()) new Notification({ title: "Recap", body: String(ev.message ?? "") }).show();
   }
   else if (ev.type === "error") {
+    endTrack();
     closeOverlays();
     session.file?.stream.end();
     session.file = null;
@@ -1237,6 +1403,15 @@ async function selftest(dir, sample) {
       step("import", false, { error: err.message });
     }
 
+    // The click hook is a native module: it has to load from the installed app, even though it stays off by default.
+    try {
+      require("uiohook-napi");
+      step("click hook module loads", true);
+    } catch (err) {
+      // Linux needs system X libraries for it; there the feature just reports itself as unavailable.
+      step("click hook module loads", process.platform === "linux", { error: err.message });
+    }
+
     // Make it a video: right shape, captions actually on the picture, end card at the end.
     try {
       let madeCount = 0;
@@ -1270,6 +1445,38 @@ async function selftest(dir, sample) {
       let bright = 0;
       for (let i = 0; i < p3.length; i += 4) if (p3[i + 1] > 90) bright++;
       const lit = bright / (p3.length / 4);
+      // Auto-zoom: leaves the picture alone before a click, and is zoomed in on it just after.
+      const clickAt = 8;
+      await api(`/api/videos/${video.id}/track`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clicks: [{ t: clickAt, x: 0.72, y: 0.5 }], stops: [] }) });
+      const focused = (await (await api(`/api/videos/${video.id}/make`)).json()).focus;
+      const flat = await make({ format: "wide", small: true, captions: false, endCard: false });
+      const zoomed = await make({ format: "wide", small: true, captions: false, endCard: false, zoom: true });
+      const moved = async (t) => {
+        const [x, y] = [(await frame(flat.out, t)).toBitmap(), (await frame(zoomed.out, t)).toBitmap()];
+        let n = 0;
+        for (let i = 0; i < x.length; i += 4) if (Math.abs(x[i + 1] - y[i + 1]) > 40) n++;
+        return n / (x.length / 4);
+      };
+      const [before, after, later] = [await moved(clickAt - 3), await moved(clickAt + 0.5), await moved(clickAt + 5)];
+      // Where it went, not just that it moved: the middle of the zoomed picture is what was at the click.
+      const hold = clickAt + 1;
+      const [flatFrame, zoomFrame] = [await frame(flat.out, hold), await frame(zoomed.out, hold)];
+      const { width: fw, height: fh } = flatFrame.getSize();
+      const [fp, zp] = [flatFrame.toBitmap(), zoomFrame.toBitmap()];
+      const color = (buf, u, v) => {
+        const i = (Math.round(v * fh) * fw + Math.round(u * fw)) * 4;
+        return [buf[i], buf[i + 1], buf[i + 2]];
+      };
+      let matches = 0;
+      const offsets = [-0.2, -0.1, 0, 0.1, 0.2];
+      for (const du of offsets) {
+        for (const dv of offsets) {
+          const a = color(zp, 0.5 + du * 1.7, 0.5 + dv * 1.7);
+          const b = color(fp, 0.72 + du, 0.5 + dv);
+          if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 45) matches++;
+        }
+      }
+      step("make a video: auto-zoom goes to the click and returns", zoomed.made?.status === "ready" && focused === 1 && before < 0.01 && after > 0.1 && later < 0.01 && matches >= 18, { before, after, later, matches, error: zoomed.made?.error });
       // Join, intro, blur and voice-over: lengths add up, and the blurred region really loses its detail.
       const c = await make({ format: "wide", small: true, captions: false, endCard: false, intro: true, introTitle: "Intro", clips: [(await (await api("/api/videos")).json()).find((x) => x.title === "Dropped clip ✓")?.id] });
       step("make a video: intro card and a joined clip add up", c.made?.status === "ready" && Math.abs((c.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3 - 2) < 1, { status: c.made?.status, error: c.made?.error, duration: c.made?.duration, video: b.made?.duration });
@@ -1464,6 +1671,41 @@ async function selftest(dir, sample) {
           setBubbleShape("circle");
           await wait(400);
           const circle = await looks();
+          // Drawing and click highlights, as a screen capture (and so the recording) sees them.
+          const reds = async () => {
+            const d = displayFor(session.opts?.displayId);
+            const f = d.scaleFactor;
+            const shot = (await desktopCapturer.getSources({ types: ["screen"], thumbnailSize: { width: Math.round(d.bounds.width * f), height: Math.round(d.bounds.height * f) } }))
+              .find((src) => String(src.display_id) === String(d.id))?.thumbnail;
+            if (!shot || shot.isEmpty()) return -1;
+            const px = shot.toBitmap();
+            let n = 0;
+            for (let i = 0; i < px.length; i += 4) if (px[i + 2] > 200 && px[i + 1] < 110 && px[i] < 110) n++;
+            return n;
+          };
+          const redBefore = await reds();
+          setDrawing(true);
+          await wait(800);
+          await overlay.webContents.executeJavaScript(`(() => {
+            const c = document.querySelector("canvas");
+            const ev = (t, x, y) => c.dispatchEvent(new PointerEvent(t, { bubbles: true, pointerId: 1, clientX: x, clientY: y }));
+            c.setPointerCapture = () => {};
+            ev("pointerdown", 300, 300);
+            for (let i = 1; i <= 40; i++) ev("pointermove", 300 + i * 8, 300 + i * 3);
+            ev("pointerup", 620, 420);
+            return 1;
+          })()`);
+          await wait(500);
+          const redDrawn = await reds();
+          setDrawing(false);
+          await wait(500);
+          const redCleared = await reds();
+          step("drawing: shows in the capture and clears", redDrawn > redBefore + 300 && redCleared < redBefore + 100, { redBefore, redDrawn, redCleared });
+          noteClick();
+          step("focus track: a click is recorded on the recording's clock", session.track?.clicks.length === 1 && session.track.clicks[0].t >= 0, { clicks: session.track?.clicks });
+          const hookProblem = process.platform === "win32" ? startClickHook() : null;
+          if (process.platform === "win32") step("click hook starts on Windows", !hookProblem && session.hookOn, { hookProblem });
+          stopClickHook();
           step("bubble: rectangle, drag-resize, back to circle, video clipped to the shape",
             rect.w === 373 && rect.h === 280 && rect.rect && /inset/.test(rect.clip ?? "") &&
               dragged.h === 160 && dragged.w === 213 && session.opts?.bubblePx === 160 &&
@@ -1555,6 +1797,7 @@ async function snapshot(dir) {
 
 /** "Quit without saving": stop everything in flight and remove the raw file, so it doesn't come back next launch. */
 function abandonForQuit() {
+  endTrack();
   session.runId++;
   session.uploadAbort?.abort();
   const f = session.file;

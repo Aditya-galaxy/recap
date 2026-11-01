@@ -10,6 +10,7 @@ Recap itself is MIT licensed. The desktop app also ships these programs as separ
 | Silero VAD (`ggml-silero-v5.1.2.bin`, bundled) | v5.1.2, ggml conversion | MIT | https://github.com/snakers4/silero-vad · https://huggingface.co/ggml-org/whisper-vad |
 | llama.cpp (`bin/llama-completion`) | v0.6.0 | MIT | https://github.com/ggml-org/llama.cpp |
 | Qwen2.5 1.5B Instruct, Q4_K_M GGUF (downloaded only if you choose AI polish) | official GGUF | Apache-2.0 | https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF |
+| uiohook-napi (only loaded if you turn on "highlight my clicks"; listens for mouse presses only) | 1.5.5 | MIT | https://github.com/SnosMe/uiohook-napi |
 | Electron, Chromium, Node.js | Electron 44 | MIT / BSD and others | https://github.com/electron/electron |
 
 FFmpeg's macOS build sources are available from the macOS build link above.

@@ -29,6 +29,9 @@ Use a fresh install (uninstall first, and on macOS run `tccutil reset All dev.re
 | 19 | In Make it a video: add an intro card and join a second clip | Plays intro, video, clip, end card in order, in sync |
 | 20 | Voice-over: pause partway, record a few seconds, **Voice-over only**, make | Mic prompt appears once; your voice starts at that point, in time with the picture; captions follow what you said |
 | 21 | Blur areas: drag over some text, make | That text is unreadable in the finished video for the chosen time; the recording itself is unchanged |
-| 22 | Uninstall | App removed; library stays in your user folder unless deleted |
+| 22 | Turn on **highlight my clicks**, record, click around | A ring shows at each click, on screen and in the video. macOS asks for Accessibility first. Typing is unaffected |
+| 23 | During a recording, **draw**, sketch over the screen, **done** | The sketch shows in the video and disappears on **done**; camera and bar stay clickable; apps work normally once done |
+| 24 | Make it a video with **Auto-zoom** on | Zooms smoothly to where you clicked (or where the cursor settled), then back out. Picture stays sharp and steady |
+| 25 | Uninstall | App removed; library stays in your user folder unless deleted |
 
 Note anything that's confusing, slow or shows technical text (paths, `$` signs, error codes).

@@ -104,7 +104,8 @@ async function runOne(): Promise<boolean> {
     try {
       if (permanent) {
         db.prepare("UPDATE jobs SET status = 'failed', error = ?, updated_at = ? WHERE id = ?").run(message, now(), job.id);
-        await markFailed(job, message);
+        // The details are in the log above; a wall of ffmpeg output helps nobody looking at the video page.
+      await markFailed(job, job.type === "process" && /^ffmpeg exited/.test(message) ? "Recap couldn't process this file. It may be damaged or in an unusual format." : message);
       } else {
         // Back off 15s, 60s, ...
         const delay = 15_000 * 4 ** (job.attempts - 1);

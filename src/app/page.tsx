@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AutoRefresh from "@/components/AutoRefresh";
 import EmptyLibrary from "@/components/EmptyLibrary";
 import { connection } from "next/server";
 import { Suspense } from "react";
@@ -30,6 +31,7 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10">
+      <AutoRefresh active={videos.some((v) => v.status === "uploaded" || v.status === "processing")} />
       <div className="mb-6 flex items-baseline justify-between gap-4 border-b border-border pb-3">
         <h1 className="text-lg font-medium">
           Recordings {total > 0 && <span className="text-muted">{total}</span>}

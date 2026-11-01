@@ -1185,6 +1185,91 @@ async function selftest(dir, sample) {
       step("share", false, { error: String(err?.message ?? err) });
     }
 
+    // Import: a file dropped on the window goes through to a video page, named after the file. A 10-bit file
+    // is converted (browsers can't play it), a phone video's rotation is applied, a picture is refused in plain words.
+    try {
+      const made = async (name, ...args) => {
+        const out = path.join(dir, name);
+        await execFileP(bin("ffmpeg"), ["-y", "-loglevel", "error", ...args, out]);
+        return out;
+      };
+      const src = ["-f", "lavfi", "-i", "testsrc2=size=640x360:rate=30", "-f", "lavfi", "-i", "sine=frequency=300", "-t", "2"];
+      const clip = await made("import-clip.mp4", ...src, "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac");
+      const b64 = fs.readFileSync(clip).toString("base64");
+      await library.webContents.executeJavaScript(`(() => {
+        const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0));
+        const dt = new DataTransfer();
+        dt.items.add(new File([bytes], "Dropped clip ✓.mp4", { type: "video/mp4" }));
+        window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+      })()`);
+      let dropped = null;
+      for (let i = 0; i < 120 && dropped?.status !== "ready"; i++) {
+        await wait(500);
+        dropped = (await (await api("/api/videos")).json()).find((x) => x.title === "Dropped clip ✓");
+      }
+      const opened = await library.webContents.executeJavaScript("location.pathname").catch(() => "");
+      step("import: a dropped file opens as a video", dropped?.status === "ready" && opened === `/v/${dropped?.id}`, { status: dropped?.status, opened });
+      const importAs = async (title, file) => {
+        const res = await api("/api/videos", { method: "POST", headers: { "x-title": title }, body: fs.readFileSync(file) });
+        const { id } = await res.json();
+        let meta = null;
+        for (let i = 0; i < 120 && !["ready", "error"].includes(meta?.status); i++) {
+          await wait(500);
+          meta = (await (await api(`/api/videos/${id}`)).json()).meta;
+        }
+        const media = await api(`/api/videos/${id}/media`);
+        const info = meta?.status === "ready" ? path.join(dir, `${id}.mp4`) : null;
+        if (info) fs.writeFileSync(info, Buffer.from(await media.arrayBuffer()));
+        const out = info ? await execFileP(bin("ffmpeg"), ["-hide_banner", "-i", info]).catch((err) => err.stderr ?? "") : "";
+        return { meta, about: String(out.stderr ?? out) };
+      };
+      const tenBit = await importAs("10-bit", await made("import-10bit.mp4", ...src, "-c:v", "libx264", "-pix_fmt", "yuv420p10le", "-profile:v", "high10", "-c:a", "aac"));
+      step("import: 10-bit video is converted to play everywhere", tenBit.meta?.status === "ready" && /yuv420p[(,]/.test(tenBit.about) && !/yuv420p10/.test(tenBit.about), { status: tenBit.meta?.status });
+      const turned = await importAs("Phone", await made("import-phone.mp4", "-display_rotation", "90", "-i", clip, "-c", "copy"));
+      step("import: a phone video's rotation is applied", turned.meta?.status === "ready" && turned.meta.width === 360 && turned.meta.height === 640 && !/rotation of/.test(turned.about), { width: turned.meta?.width, height: turned.meta?.height });
+      const pic = await importAs("Picture", await made("import-pic.png", "-f", "lavfi", "-i", "color=c=gray:s=320x240", "-frames:v", "1"));
+      step("import: a picture is refused in plain words", pic.meta?.status === "error" && /picture/.test(pic.meta.error ?? ""), { error: pic.meta?.error });
+    } catch (err) {
+      step("import", false, { error: err.message });
+    }
+
+    // Make it a video: right shape, captions actually on the picture, end card at the end.
+    try {
+      const make = async (body) => {
+        await api(`/api/videos/${video.id}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        let made = null;
+        for (let i = 0; i < 240 && !["ready", "error"].includes(made?.status); i++) {
+          await wait(500);
+          made = (await (await api(`/api/videos/${video.id}/make`)).json()).made;
+        }
+        const out = path.join(dir, `made-${body.captions ? "with" : "without"}.mp4`);
+        if (made?.status === "ready") fs.writeFileSync(out, Buffer.from(await (await api(`/api/videos/${video.id}/media?v=made`)).arrayBuffer()));
+        return { made, out };
+      };
+      const frame = async (file, at) => {
+        const png = path.join(dir, `frame-${Date.now()}.png`);
+        await execFileP(bin("ffmpeg"), ["-y", "-loglevel", "error", "-ss", String(at), "-i", file, "-frames:v", "1", png]);
+        return nativeImage.createFromPath(png);
+      };
+      const base = { format: "vertical", small: true, endCard: true, endTitle: "Thanks ✓", endLink: "example.com" };
+      const a = await make({ ...base, captions: true });
+      const b = await make({ ...base, captions: false, endCard: false });
+      const words = (await (await api(`/api/videos/${video.id}`)).json()).transcript.words;
+      const at = words[Math.floor(words.length / 2)].start + 0.1;
+      const [one, two, last] = [await frame(a.out, at), await frame(b.out, at), await frame(a.out, Math.max(0, (a.made?.duration ?? 2) - 1))];
+      const { width, height } = one.getSize();
+      const [p1, p2, p3] = [one.toBitmap(), two.toBitmap(), last.toBitmap()];
+      let changed = 0;
+      for (let i = 0; i < p1.length; i += 4) if (Math.abs(p1[i] - p2[i]) + Math.abs(p1[i + 1] - p2[i + 1]) + Math.abs(p1[i + 2] - p2[i + 2]) > 60) changed++;
+      step("make a video: vertical, with captions on the picture", a.made?.status === "ready" && width === 720 && height === 1280 && changed > 300, { status: a.made?.status, error: a.made?.error, width, height, changed });
+      let bright = 0;
+      for (let i = 0; i < p3.length; i += 4) if (p3[i + 1] > 90) bright++;
+      const lit = bright / (p3.length / 4);
+      step("make a video: ends on the end card", a.made?.status === "ready" && lit > 0.0005 && lit < 0.05 && Math.abs((a.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3.1) < 0.4, { lit, withCard: a.made?.duration, without: b.made?.duration });
+    } catch (err) {
+      step("make a video", false, { error: err.message });
+    }
+
     // Background noise must not turn into words: the voice-activity model ships with the app on every
     // platform and whisper skips non-speech audio.
     try {

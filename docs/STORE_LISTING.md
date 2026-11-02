@@ -21,7 +21,9 @@ Recap is a free screen and camera recorder that turns what you record into somet
 • Step-by-step guides: do a task once and say what you're doing. Recap writes each step and takes a screenshot at every click. Export to Notion, Google Docs, Confluence or PDF.
 • Bug reports: reproduce a bug while describing it. Recap writes the steps to reproduce with screenshots, what should happen, what happened instead, and your setup. Copy it into GitHub, Linear or Jira.
 • Transcripts: every recording is transcribed on your computer, with search across everything you've said.
-• Clean cuts: remove the "um"s and long pauses in one click. Your original stays untouched.
+• Clean cuts and trim: remove the "um"s and long pauses in one click, and cut the ends. Your original stays untouched.
+• Make it a video: a finished video in wide, square or vertical, with captions, intro and end cards, joined clips, voice-over, blurred areas and auto-zoom.
+• Import any video to get all of this, or draw on your screen and highlight your clicks while recording.
 
 Private by design: recording, transcription and editing happen on your PC. No account, and your recordings are never uploaded. Optional on-device AI can polish guides and reports without sending anything anywhere.
 
@@ -35,6 +37,11 @@ Step-by-step guides with a screenshot of every step
 Bug reports with steps to reproduce, expected vs actual, and screenshots
 Search titles and everything you said
 Remove ums and long pauses in one click
+Trim, and join clips with intro and end cards
+Burned-in captions in wide, square or vertical
+Voice-over, blurred areas and auto-zoom on clicks
+Draw on screen and highlight clicks while recording
+Import any video
 Export guides to Notion, Google Docs, Confluence or PDF
 Optional on-device AI polish (nothing is uploaded)
 Global shortcut to start and stop recording
@@ -63,4 +70,4 @@ doesn't collect personal data. Answer "No" throughout. Expected rating: 3+ / Eve
 
 Recap is a desktop (full-trust) app. It records the screen, camera and microphone when the user presses Record,
 transcribes locally with a bundled speech model (downloaded once on first run from Hugging Face), and can optionally
-download a local language model when the user chooses "polish". No account or sign-in is needed to test.
+download a local language model when the user chooses "polish". No account or sign-in is needed to test. The optional "highlight my clicks" setting (off by default) uses a system-wide mouse hook to detect mouse presses during a recording, only to show a ring at the click and zoom to it later. It does not listen to the keyboard, and nothing leaves the PC.

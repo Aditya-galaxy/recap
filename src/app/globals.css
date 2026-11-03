@@ -56,15 +56,34 @@
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-accent-text: var(--accent-text);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, monospace;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  letter-spacing: -0.005em;
+  /* Inter at text sizes: its contextual alternates and a slightly tighter fit read as one family with the
+     headings, which get the display cut automatically through optical sizing. */
+  font-feature-settings: "calt", "kern";
+  font-optical-sizing: auto;
+  letter-spacing: -0.006em;
+  line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+h1, h2, h3 {
+  letter-spacing: -0.018em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+/* Times and counts don't jitter as they change. */
+time, .tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 ::selection {
@@ -74,22 +93,28 @@ body {
 
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-2 rounded-full px-4 py-2 text-[13px] font-medium transition disabled:opacity-40 disabled:cursor-not-allowed;
+  @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-medium whitespace-nowrap transition-colors duration-150 select-none disabled:pointer-events-none disabled:opacity-40;
 }
+/* One strong action per area. */
 @utility btn-primary {
-  @apply btn border border-accent bg-accent text-accent-text hover:opacity-85;
+  @apply btn bg-accent text-accent-text hover:opacity-90;
 }
+/* Everything else: a quiet outline that firms up on hover. */
 @utility btn-ghost {
-  @apply btn border border-border bg-surface text-text hover:border-border-strong;
+  @apply btn border border-border bg-surface text-text shadow-[0_1px_0_rgb(0_0_0/0.03)] hover:border-[color-mix(in_srgb,var(--text)_28%,var(--border))];
+}
+/* Navigation and minor actions: no frame until you point at it. */
+@utility btn-quiet {
+  @apply btn text-muted hover:bg-accent-soft hover:text-text;
 }
 @utility btn-danger {
-  @apply btn border border-border bg-surface text-muted hover:border-border-strong hover:text-text hover:line-through;
+  @apply btn border border-border bg-surface text-muted hover:border-[color-mix(in_srgb,var(--text)_28%,var(--border))] hover:text-text;
 }
 @utility card {
   @apply rounded-xl border border-border bg-surface;
 }
 @utility label {
-  @apply font-mono text-[11px] uppercase tracking-[0.14em] text-muted;
+  @apply text-[12px] font-medium text-muted;
 }
 
 /* Calm indeterminate progress (processing, rendering). */

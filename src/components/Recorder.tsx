@@ -484,7 +484,7 @@ export default function Recorder() {
             className={`absolute inset-0 h-full w-full -scale-x-100 object-cover ${live || !wantsCam ? "invisible" : ""}`}
           />
           {!live && !wantsCam && (
-            <div className="absolute inset-0 grid place-items-center text-[13px] text-white/60">screen only · no camera</div>
+            <div className="absolute inset-0 grid place-items-center text-[13px] text-white/60">Screen only · no camera</div>
           )}
           {/* While recording: the exact composited frame that's being recorded. */}
           <canvas
@@ -502,7 +502,7 @@ export default function Recorder() {
           {phase === "uploading" && (
             <div className="absolute inset-0 grid place-items-center bg-black/70 text-white">
               <div className="w-64 text-center">
-                <p className="mb-3 text-[13px]">uploading… {Math.round(progress * 100)}%</p>
+                <p className="mb-3 text-[13px]">Uploading… {Math.round(progress * 100)}%</p>
                 <div className="h-px overflow-hidden bg-white/20">
                   <div className="h-full bg-white transition-all" style={{ width: `${progress * 100}%` }} />
                 </div>
@@ -516,10 +516,10 @@ export default function Recorder() {
             <div className="flex items-center gap-2">
               {pipSupported && !pip && phase !== "countdown" && (
                 <button className="btn-ghost" onClick={popOut} title="Float the camera and controls above other apps">
-                  pop out
+                  Pop out
                 </button>
               )}
-              <button className="btn-danger" onClick={() => stop(true)}>discard</button>
+              <button className="btn-danger" onClick={() => stop(true)}>Discard</button>
             </div>
           </div>
         )}
@@ -527,9 +527,9 @@ export default function Recorder() {
 
       <aside className="card h-fit space-y-5 p-5">
         <div>
-          <h1 className="text-[15px] font-medium">new recording</h1>
+          <h1 className="text-[15px] font-medium">New recording</h1>
           <p className="mt-1 text-[13px] text-muted">
-            {mode === "screen-cam" && "drag the camera bubble on the preview to move it."}
+            {mode === "screen-cam" && "Drag the camera bubble on the preview to move it."}
             {mode === "screen" && "records the screen, window, or tab you pick."}
             {mode === "cam" && "full-frame camera recording."}
           </p>
@@ -538,9 +538,9 @@ export default function Recorder() {
         <fieldset disabled={live || phase === "uploading"} className="space-y-5 disabled:opacity-60">
           <div className="grid grid-cols-3 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
             {([
-              ["screen-cam", "screen+cam"],
-              ["screen", "screen"],
-              ["cam", "cam"],
+              ["screen-cam", "Screen + camera"],
+              ["screen", "Screen"],
+              ["cam", "Camera"],
             ] as const).map(([m, label]) => (
               <button
                 key={m}
@@ -553,24 +553,24 @@ export default function Recorder() {
           </div>
 
           <label className="block text-[13px]">
-            <span className="label mb-1.5 block">title</span>
+            <span className="label mb-1.5 block">Title</span>
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="untitled recording"
+              placeholder="Untitled recording"
               className="w-full rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-accent"
             />
           </label>
 
           {wantsCam && (
             <label className="block text-[13px]">
-              <span className="label mb-1.5 block">camera</span>
+              <span className="label mb-1.5 block">Camera</span>
               <select
                 value={camId}
                 onChange={(e) => setCamId(e.target.value)}
                 className="w-full rounded-lg border border-border bg-surface px-3 py-2"
               >
-                <option value="">default camera</option>
+                <option value="">Default camera</option>
                 {cams.map((c) => (
                   <option key={c.deviceId} value={c.deviceId}>{c.label || "Camera"}</option>
                 ))}
@@ -580,7 +580,7 @@ export default function Recorder() {
 
           <div className="text-[13px]">
             <div className="mb-1 flex items-center justify-between">
-              <span className="label">microphone</span>
+              <span className="label">Microphone</span>
               <button
                 role="switch"
                 aria-checked={micOn}
@@ -597,7 +597,7 @@ export default function Recorder() {
                   onChange={(e) => setMicId(e.target.value)}
                   className="w-full rounded-lg border border-border bg-surface px-3 py-2"
                 >
-                  <option value="">default microphone</option>
+                  <option value="">Default microphone</option>
                   {mics.map((m) => (
                     <option key={m.deviceId} value={m.deviceId}>{m.label || "Microphone"}</option>
                   ))}
@@ -611,7 +611,7 @@ export default function Recorder() {
 
           {mode === "screen-cam" && (
             <div className="text-[13px]">
-              <span className="label mb-1.5 block">bubble</span>
+              <span className="label mb-1.5 block">Bubble</span>
               <div className="grid grid-cols-3 gap-0.5 rounded-lg border border-border p-0.5 text-[12px]">
                 {(["s", "m", "l"] as const).map((s) => (
                   <button
@@ -627,16 +627,16 @@ export default function Recorder() {
           )}
         </fieldset>
 
-        {error && <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{error}</p>}
+        {error && <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">Error: </span>{error}</p>}
         {failed && phase === "error" && (
           <div className="grid grid-cols-2 gap-2">
-            <button className="btn-primary" onClick={() => upload(failed)}>retry upload</button>
-            <button className="btn-ghost" onClick={saveFailed}>save to computer</button>
+            <button className="btn-primary" onClick={() => upload(failed)}>Retry upload</button>
+            <button className="btn-ghost" onClick={saveFailed}>Save to computer</button>
             <button
-              className="col-span-2 text-[11px] text-muted underline"
+              className="col-span-2 text-[12px] text-muted underline"
               onClick={() => confirm("Discard this recording? It hasn't been uploaded.") && (setFailed(null), setError(""), setPhase("idle"))}
             >
-              discard and record again
+              Discard and record again
             </button>
           </div>
         )}
@@ -647,8 +647,8 @@ export default function Recorder() {
           </button>
         )}
         {mode !== "cam" && (
-          <p className="text-[11px] leading-5 text-muted">
-            tip: pick a Chrome tab and tick “Share tab audio” to include its sound. System audio for full-screen
+          <p className="text-[12px] leading-5 text-muted">
+            Tip: pick a Chrome tab and tick “Share tab audio” to include its sound. System audio for full-screen
             capture depends on your OS.
           </p>
         )}

@@ -6,14 +6,14 @@
   <title>Recap</title>
   <link rel="stylesheet" href="style.css" />
   <style>
-    body { padding: 16px; display: flex; flex-direction: column; gap: 14px; min-height: 100vh; }
+    body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
     header { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; }
     .field { display: flex; flex-direction: column; gap: 6px; }
     .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .error { border: 1px solid var(--strong); border-radius: 3px; padding: 8px; font-size: 11px; line-height: 1.5; }
+    .error { border: 1px solid var(--strong); border-radius: 8px; padding: 9px 10px; font-size: 12px; line-height: 1.5; }
     .start { width: 100%; padding: 10px; display: flex; gap: 8px; justify-content: center; align-items: center; }
     .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
-    .status { border: 1px dashed var(--border); border-radius: 3px; padding: 10px; }
+    .status { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
     .bar { height: 1px; background: var(--border); margin-top: 8px; }
     .bar > div { height: 100%; background: var(--strong); width: 0; }
     .last { display: flex; gap: 6px; align-items: center; }
@@ -24,70 +24,70 @@
 </head>
 <body>
   <header>
-    <span class="brand">recap</span>
+    <span class="brand">Recap</span>
     <span class="label" id="hotkey"></span>
   </header>
 
-  <div class="status" id="update" hidden><span id="updateText"></span> <button class="btn" id="updateLink">download</button></div>
+  <div class="status" id="update" hidden><span id="updateText"></span> <button class="btn" id="updateLink">Download</button></div>
 
   <div class="seg" id="mode">
-    <button data-v="screenCam">screen + cam</button>
-    <button data-v="screen">screen</button>
-    <button data-v="cam">camera</button>
+    <button data-v="screenCam">Screen + cam</button>
+    <button data-v="screen">Screen</button>
+    <button data-v="cam">Camera</button>
   </div>
 
-  <label class="field"><span class="label">title</span><input type="text" id="title" placeholder="untitled recording" /></label>
+  <label class="field"><span class="label">Title</span><input type="text" id="title" placeholder="Untitled recording" /></label>
 
-  <label class="field" id="displayField"><span class="label">display</span><select id="display"></select></label>
-  <label class="field" id="cameraField"><span class="label">camera</span><select id="camera"></select></label>
+  <label class="field" id="displayField"><span class="label">Display</span><select id="display"></select></label>
+  <label class="field" id="cameraField"><span class="label">Camera</span><select id="camera"></select></label>
 
   <div class="field">
-    <div class="row"><span class="label">microphone</span><button class="switch" id="micOn" role="switch"></button></div>
+    <div class="row"><span class="label">Microphone</span><button class="switch" id="micOn" role="switch"></button></div>
     <select id="mic"></select>
   </div>
 
   <div class="row" id="sysAudioRow">
-    <span class="label">computer sound</span>
+    <span class="label">Computer sound</span>
     <button class="switch" id="systemAudio" role="switch"></button>
   </div>
-  <p class="muted" id="sysAudioNote" style="margin:-6px 0 0;font-size:10px" hidden>On Linux, Recap records your microphone (not computer sound).</p>
+  <p class="muted" id="sysAudioNote" style="margin:-6px 0 0;font-size:11px" hidden>On Linux, Recap records your microphone (not computer sound).</p>
 
   <div class="row" id="clicksRow">
-    <span class="label">highlight my clicks</span>
+    <span class="label">Highlight my clicks</span>
     <button class="switch" id="clickHighlight" role="switch"></button>
   </div>
   <p class="muted hint" id="clicksNote" hidden>macOS will ask for Accessibility permission. Recap only notices clicks, never what you type.</p>
 
   <div class="field" id="bubbleField">
-    <span class="label">camera shape</span>
-    <div class="seg" id="bubbleShape"><button data-v="circle">◯ circle</button><button data-v="rect">▭ rectangle</button></div>
-    <span class="label">camera size</span>
-    <div class="seg" id="bubbleSize"><button data-v="s">small</button><button data-v="m">medium</button><button data-v="l">large</button></div>
+    <span class="label">Camera shape</span>
+    <div class="seg" id="bubbleShape"><button data-v="circle">Circle</button><button data-v="rect">Rectangle</button></div>
+    <span class="label">Camera size</span>
+    <div class="seg" id="bubbleSize"><button data-v="s">Small</button><button data-v="m">Medium</button><button data-v="l">Large</button></div>
     <p class="muted hint">Or drag the corner of the camera while recording.</p>
   </div>
 
-  <div class="status" id="engineStatus" hidden><span id="engineText"></span><div class="bar"><div id="modelProgress"></div></div><button class="btn" id="retryModel" style="margin-top:8px" hidden>retry download</button></div>
+  <div class="status" id="engineStatus" hidden><span id="engineText"></span><div class="bar"><div id="modelProgress"></div></div><button class="btn" id="retryModel" style="margin-top:8px" hidden>Retry download</button></div>
   <div class="error" id="error" hidden></div>
   <div class="status" id="status" hidden><span id="statusText"></span><div class="bar"><div id="progress"></div></div></div>
 
-  <button class="btn primary start" id="start"><span class="dot"></span>start recording</button>
+  <button class="btn primary start" id="start"><span class="dot"></span>Start recording</button>
 
   <div class="field" id="lastField" hidden>
-    <span class="label">last recording</span>
-    <div class="last"><code id="lastLink"></code><button class="btn" id="copy">copy</button><button class="btn" id="openLink">open</button></div>
+    <span class="label">Last recording</span>
+    <div class="last"><code id="lastLink"></code><button class="btn" id="copy">Copy</button><button class="btn" id="openLink">Open</button></div>
   </div>
 
   <div class="field" id="serverField" hidden>
-    <label class="field"><span class="label">save recordings to</span><input type="text" id="server" placeholder="this computer (leave empty)" /></label>
-    <p class="muted" style="margin:-4px 0 0;font-size:10px">empty = local library. Or a Recap server URL to get share links.</p>
-    <label class="field" id="tokenField"><span class="label">api token</span><input type="password" id="token" placeholder="rcp_…  (Settings → create token)" autocomplete="off" /></label>
-    <div class="row"><button class="btn" id="check">check connection</button><span class="muted" id="connStatus" style="font-size:10px;text-align:right"></span></div>
+    <label class="field"><span class="label">Save recordings to</span><input type="text" id="server" placeholder="This computer (leave empty)" /></label>
+    <p class="muted" style="margin:-4px 0 0;font-size:11px">Leave empty to keep recordings on this computer, or enter a Recap server URL to get share links.</p>
+    <label class="field" id="tokenField"><span class="label">API token</span><input type="password" id="token" placeholder="rcp_…  (Settings → create token)" autocomplete="off" /></label>
+    <div class="row"><button class="btn" id="check">Check connection</button><span class="muted" id="connStatus" style="font-size:11px;text-align:right"></span></div>
   </div>
 
   <footer>
-    <button class="btn" id="library">library</button>
-    <button class="btn" id="folder">folder</button>
-    <button class="btn" id="toggleServer">advanced</button>
+    <button class="btn" id="library">Library</button>
+    <button class="btn" id="folder">Folder</button>
+    <button class="btn" id="toggleServer">Advanced</button>
   </footer>
 
   <script src="panel.js"></script>

@@ -1,5 +1,23 @@
 import type { NextConfig } from "next";
 
+// Scripts only from Recap itself: nothing loaded from elsewhere and no eval (Next's dev server needs eval for hot
+// reload, so development keeps it). Inline scripts stay allowed because Next's page bootstrap is inline. Connections
+// may go to HTTPS hosts: the feedback box and Recap Cloud are configured per install.
+const CSP = [
+  "default-src 'self'",
+  `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""}`,
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "media-src 'self' blob:",
+  "font-src 'self' data:",
+  "connect-src 'self' https:",
+  "worker-src 'self' blob:",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "object-src 'none'",
+  "form-action 'self'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   // Self-contained server bundle, only for the Docker image (plain `npm start` doesn't use it).
   output: process.env.RECAP_STANDALONE ? "standalone" : undefined,
@@ -20,7 +38,7 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Content-Security-Policy", value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'" },
+          { key: "Content-Security-Policy", value: CSP },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "Permissions-Policy", value: "camera=(self), microphone=(self), display-capture=(self), geolocation=(), payment=(), usb=()" },
         ],

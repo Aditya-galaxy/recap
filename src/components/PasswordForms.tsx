@@ -22,10 +22,10 @@ export function ForgotForm() {
   return (
     <form onSubmit={submit} className="card mt-6 space-y-4 p-5">
       <label className="block">
-        <span className="label mb-1.5 block">email</span>
+        <span className="label mb-1.5 block">Email</span>
         <input name="email" type="email" required autoComplete="email" className={input} />
       </label>
-      <button className="btn-primary w-full py-2.5" disabled={busy}>{busy ? "…" : "send reset link"}</button>
+      <button className="btn-primary w-full py-2.5" disabled={busy}>{busy ? "…" : "Send reset link"}</button>
     </form>
   );
 }
@@ -48,17 +48,17 @@ export function ResetForm({ token }: { token: string }) {
   return (
     <form onSubmit={submit} className="card mt-6 space-y-4 p-5">
       <label className="block">
-        <span className="label mb-1.5 block">new password</span>
+        <span className="label mb-1.5 block">New password</span>
         <input name="password" type="password" required minLength={10} autoComplete="new-password" className={input} />
-        <span className="mt-1 block text-[11px] text-muted">at least 10 characters</span>
+        <span className="mt-1 block text-[12px] text-muted">At least 10 characters</span>
       </label>
       {error && (
         <p className="rounded-lg border border-border-strong p-2.5 text-[12px]">
-          <span className="text-muted">error: </span>
-          {error} {error.includes("expired") && <Link href="/forgot" className="underline">request a new link</Link>}
+          <span className="text-muted">Error: </span>
+          {error} {error.includes("expired") && <Link href="/forgot" className="underline">Request a new link</Link>}
         </p>
       )}
-      <button className="btn-primary w-full py-2.5" disabled={busy}>{busy ? "…" : "set password"}</button>
+      <button className="btn-primary w-full py-2.5" disabled={busy}>{busy ? "…" : "Set password"}</button>
     </form>
   );
 }

@@ -27,7 +27,7 @@ export default function Moderation({ initial }: { initial: Data }) {
   return (
     <div className="mx-auto max-w-3xl space-y-10 px-4 py-8">
       <section className="space-y-3">
-        <h1 className="label">open reports</h1>
+        <h1 className="label">Open reports</h1>
         {error && <p className="text-[12px] text-muted">{error}</p>}
         {data.open.length === 0 && <p className="text-[13px] text-muted">Nothing to review.</p>}
         {data.open.map((g) => (
@@ -36,8 +36,8 @@ export default function Moderation({ initial }: { initial: Data }) {
               <Link href={`/v/${g.videoId}`} target="_blank" className="font-medium underline">
                 {g.title}
               </Link>
-              <span className="text-[11px] text-muted">
-                {g.owner || "no owner"}
+              <span className="text-[12px] text-muted">
+                {g.owner || "No owner"}
                 {g.disabled ? " · taken down" : ""}
               </span>
             </div>
@@ -51,10 +51,10 @@ export default function Moderation({ initial }: { initial: Data }) {
             </ul>
             <div className="flex gap-2">
               <button className="btn-danger" disabled={busy === g.videoId} onClick={() => act(g.videoId, "takedown")}>
-                take down
+                Take down
               </button>
               <button className="btn-ghost" disabled={busy === g.videoId} onClick={() => act(g.videoId, "dismiss")}>
-                dismiss
+                Dismiss
               </button>
             </div>
           </div>
@@ -62,16 +62,16 @@ export default function Moderation({ initial }: { initial: Data }) {
       </section>
 
       <section className="space-y-3">
-        <h2 className="label">taken down</h2>
+        <h2 className="label">Taken down</h2>
         {data.takenDown.length === 0 && <p className="text-[13px] text-muted">None.</p>}
         {data.takenDown.map((v) => (
           <div key={v.videoId} className="card flex flex-wrap items-center justify-between gap-3 p-3 text-[13px]">
             <span>
               <Link href={`/v/${v.videoId}`} target="_blank" className="underline">{v.title}</Link>
-              <span className="ml-2 text-[11px] text-muted">{v.owner}</span>
+              <span className="ml-2 text-[12px] text-muted">{v.owner}</span>
             </span>
             <button className="btn-ghost" disabled={busy === v.videoId} onClick={() => act(v.videoId, "restore")}>
-              restore
+              Restore
             </button>
           </div>
         ))}

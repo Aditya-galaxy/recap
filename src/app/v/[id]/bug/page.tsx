@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Bug report · Recap", robots: { inde
 
 export default function ReportPage({ params }: PageProps<"/v/[id]/bug">) {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-8 text-muted">loading…</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-8 text-muted">Loading…</div>}>
       <ReportLoader params={params} />
     </Suspense>
   );

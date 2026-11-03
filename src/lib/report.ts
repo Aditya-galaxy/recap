@@ -98,7 +98,7 @@ export function bugTitle(actual: string, lastStep: string) {
   const quote = actual.match(/["\u201c]([^"\u201d]{3,80})["\u201d]/)?.[1]?.replace(/[.!?]+$/, "");
   const action = lastStep.match(/\b(click|tap|press|choose|select|open|submit|save|upload|send)\w*\s+(?:on\s+)?(?:the\s+)?([^.,;]{2,40})/i);
   const ing = (v: string) => ({ click: "clicking", tap: "tapping", press: "pressing", choose: "choosing", select: "selecting", open: "opening", submit: "submitting", save: "saving", upload: "uploading", send: "sending" })[v.toLowerCase()] ?? v;
-  if (quote) return `"${quote}" error${action ? ` after ${ing(action[1])} ${action[2].trim()}` : ""}`;
+  if (quote) return `“${quote}” error${action ? ` after ${ing(action[1])} ${action[2].trim()}` : ""}`;
   const t = actual.replace(/^(and|then|so|now|instead|but)[,\s]+/i, "").replace(/[.?!]+$/, "").slice(0, 90);
   return t[0].toUpperCase() + t.slice(1);
 }

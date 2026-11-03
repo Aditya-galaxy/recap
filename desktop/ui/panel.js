@@ -153,7 +153,7 @@ function render() {
       const b = document.createElement("button");
       b.className = "btn";
       b.style.marginTop = "8px";
-      b.textContent = "retry upload";
+      b.textContent = "Retry upload";
       b.onclick = () => window.recap.retryUpload();
       $("error").append(b);
     }
@@ -436,3 +436,10 @@ const ensureDevices = () => {
 document.addEventListener("visibilitychange", ensureDevices);
 ensureDevices();
 window.recap.requestState();
+
+// Size the window to the content: the last element's bottom edge plus the page padding.
+const fit = () => {
+  const last = [...document.body.children].filter((el) => !el.hidden && el.tagName !== "SCRIPT" && el.offsetParent !== null).at(-1);
+  if (last) window.recap.fitHeight?.(Math.ceil(last.getBoundingClientRect().bottom + window.scrollY + 16));
+};
+new ResizeObserver(fit).observe(document.body);

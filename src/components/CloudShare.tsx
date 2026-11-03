@@ -46,7 +46,7 @@ export function CloudLinkCard() {
     refresh();
   }
 
-  if (!status) return <div className="card p-4 text-[13px] text-muted">checking…</div>;
+  if (!status) return <div className="card p-4 text-[13px] text-muted">Checking…</div>;
   const host = status.url ? new URL(status.url).host : "";
   return (
     <div className="card space-y-3 p-4 text-[13px]">
@@ -54,11 +54,11 @@ export function CloudLinkCard() {
         <>
           <p>
             Connected to <span className="text-text">{host}</span> as <span className="text-text">{status.email}</span>. Open a video and use{" "}
-            <span className="text-text">share link</span>. Videos upload with the transcript made on this computer.
+            <span className="text-text">Share link</span>. Videos upload with the transcript made on this computer.
           </p>
           <div className="flex gap-2">
-            <a className="btn-ghost" href={status.url} target="_blank" rel="noreferrer">open {host}</a>
-            <button className="btn-ghost" onClick={disconnect}>disconnect</button>
+            <a className="btn-ghost" href={status.url} target="_blank" rel="noreferrer">Open {host}</a>
+            <button className="btn-ghost" onClick={disconnect}>Disconnect</button>
           </div>
         </>
       ) : status.state === "pending" ? (
@@ -69,7 +69,7 @@ export function CloudLinkCard() {
             Browser didn&apos;t open? Go to{" "}
             <a className="underline" href={status.verifyUrl} target="_blank" rel="noreferrer">{host}/connect</a>. Waiting for approval…
           </p>
-          <button className="btn-ghost" onClick={disconnect}>cancel</button>
+          <button className="btn-ghost" onClick={disconnect}>Cancel</button>
         </>
       ) : (
         <>
@@ -78,7 +78,7 @@ export function CloudLinkCard() {
             Only the videos you choose to share get uploaded.
           </p>
           {status.error && <p className="text-[12px] text-muted">{status.error}</p>}
-          <button className="btn-primary" disabled={busy} onClick={connect}>{busy ? "…" : "connect Recap Cloud"}</button>
+          <button className="btn-primary" disabled={busy} onClick={connect}>{busy ? "…" : "Connect Recap Cloud"}</button>
         </>
       )}
     </div>
@@ -120,22 +120,22 @@ export function ShareToCloud({ videoId, version, canClean }: { videoId: string; 
     setTimeout(() => setCopied(false), 1500);
   }
 
-  if (!open) return <button className="btn-ghost" onClick={() => setOpen(true)}>{state?.url ? "share link ✓" : "share link"}</button>;
+  if (!open) return <button className="btn-ghost" onClick={() => setOpen(true)}>{state?.url ? "Share link ✓" : "Share link"}</button>;
 
   const pct = state?.progress ? Math.floor((state.progress.sent / Math.max(1, state.progress.total)) * 100) : 0;
   return (
     <div className="card w-full space-y-3 p-3 text-[12px] sm:w-80">
       <div className="flex items-center justify-between">
-        <p className="label">share link</p>
+        <p className="label">Share link</p>
         <button className="text-muted hover:text-text" onClick={() => setOpen(false)} aria-label="Close">✕</button>
       </div>
       {status?.state !== "connected" ? (
         <p className="text-muted">
-          Connect Recap Cloud in <a className="text-text underline" href="/settings">settings</a> to share videos as links.
+          Connect Recap Cloud in <a className="text-text underline" href="/settings">Settings</a> to share videos as links.
         </p>
       ) : uploading ? (
         <div className="space-y-1.5">
-          <p>{pct < 100 ? `uploading… ${pct}%` : "finishing…"}</p>
+          <p>{pct < 100 ? `Uploading… ${pct}%` : "Finishing…"}</p>
           <div className="h-1.5 overflow-hidden rounded-full bg-surface-2">
             <div className="h-full bg-accent transition-all" style={{ width: `${pct}%` }} />
           </div>
@@ -146,19 +146,19 @@ export function ShareToCloud({ videoId, version, canClean }: { videoId: string; 
             <div className="space-y-2">
               <p className="break-all text-text">{state.url}</p>
               <div className="flex gap-2">
-                <button className="btn-primary" onClick={() => copy(state.url!)}>{copied ? "copied ✓" : "copy link"}</button>
-                <a className="btn-ghost" href={state.url} target="_blank" rel="noreferrer">open</a>
+                <button className="btn-primary" onClick={() => copy(state.url!)}>{copied ? "Copied ✓" : "Copy link"}</button>
+                <a className="btn-ghost" href={state.url} target="_blank" rel="noreferrer">Open</a>
               </div>
-              <p className="text-muted">shared the {state.sharedVersion === "clean" ? "edited" : "original"} version</p>
+              <p className="text-muted">Shared the {state.sharedVersion === "clean" ? "edited" : "original"} version</p>
             </div>
           )}
           {(state?.progress?.error || error) && <p className="text-muted">{state?.progress?.error || error}</p>}
           <div className="flex flex-wrap gap-2">
             <button className={state?.url ? "btn-ghost" : "btn-primary"} onClick={() => start(version)}>
-              {state?.url ? "upload again" : `upload ${version === "clean" ? "edited" : "original"} & get link`}
+              {state?.url ? "Upload again" : `Upload ${version === "clean" ? "edited" : "original"} & get link`}
             </button>
             {canClean && version === "original" && (
-              <button className="btn-ghost" onClick={() => start("clean")}>upload edited</button>
+              <button className="btn-ghost" onClick={() => start("clean")}>Upload edited</button>
             )}
           </div>
           <p className="text-muted">Uploads to {status.email}&apos;s Recap Cloud account with the transcript from this computer.</p>

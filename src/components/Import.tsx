@@ -135,7 +135,7 @@ export default function Import({ local }: { local: boolean }) {
 
   return (
     <>
-      <button className="btn-ghost" onClick={() => input.current?.click()}>import</button>
+      <button className="btn-quiet" onClick={() => input.current?.click()}>Import</button>
       <input
         ref={input}
         type="file"
@@ -166,13 +166,13 @@ export default function Import({ local }: { local: boolean }) {
                   <div className="flex items-baseline justify-between gap-3">
                     <p className="truncate" title={i.name}>{i.name}</p>
                     {i.state === "sending" && (
-                      <button className="shrink-0 text-muted underline" onClick={() => current.current?.key === i.key && current.current.xhr.abort()}>cancel</button>
+                      <button className="shrink-0 text-muted underline" onClick={() => current.current?.key === i.key && current.current.xhr.abort()}>Cancel</button>
                     )}
                     {i.state === "waiting" && (
-                      <button className="shrink-0 text-muted underline" onClick={() => removeWaiting(i.key)}>remove</button>
+                      <button className="shrink-0 text-muted underline" onClick={() => removeWaiting(i.key)}>Remove</button>
                     )}
                     {i.state === "failed" && (
-                      <button className="shrink-0 text-muted underline" onClick={() => setItems((list) => list.filter((x) => x.key !== i.key))}>dismiss</button>
+                      <button className="shrink-0 text-muted underline" onClick={() => setItems((list) => list.filter((x) => x.key !== i.key))}>Dismiss</button>
                     )}
                   </div>
                   {i.state === "failed" ? (
@@ -180,7 +180,7 @@ export default function Import({ local }: { local: boolean }) {
                   ) : (
                     <>
                       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-surface-2"><div className="h-full bg-current" style={{ width: `${Math.round(i.progress * 100)}%` }} /></div>
-                      <p className="mt-1 text-muted">{i.state === "done" ? "imported, processing…" : i.state === "waiting" ? "waiting…" : `importing ${Math.round(i.progress * 100)}%`}</p>
+                      <p className="mt-1 text-muted">{i.state === "done" ? "Imported, processing…" : i.state === "waiting" ? "Waiting…" : `Importing ${Math.round(i.progress * 100)}%`}</p>
                     </>
                   )}
                 </div>

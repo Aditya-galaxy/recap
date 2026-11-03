@@ -10,7 +10,7 @@ export const metadata: Metadata = { title: "Guide · Recap", robots: { index: fa
 
 export default function GuidePage({ params }: PageProps<"/v/[id]/guide">) {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-8 text-muted">loading…</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-3xl px-4 py-8 text-muted">Loading…</div>}>
       <GuideLoader params={params} />
     </Suspense>
   );

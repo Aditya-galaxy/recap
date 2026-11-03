@@ -54,7 +54,7 @@ const img = (videoId: string, name: string) => `/api/videos/${videoId}/guide?ima
 /** Side-panel tab on the video page: make the guide, skim its steps, open the editor. */
 export function GuidePanel({ videoId, onSeek }: { videoId: string; onSeek: (t: number) => void }) {
   const { guide, make, err } = useGuide(videoId);
-  if (guide === undefined) return <p className="p-5 text-[13px] text-muted">loading…</p>;
+  if (guide === undefined) return <p className="p-5 text-[13px] text-muted">Loading…</p>;
 
   if (!guide || (guide.status !== "ready" && !guide.steps.length)) {
     const making = guide?.status === "making";
@@ -67,10 +67,10 @@ export function GuidePanel({ videoId, onSeek }: { videoId: string; onSeek: (t: n
         <p className="text-muted">Works best when you say each step out loud as you do it.</p>
         {making && <div className="working-bar" />}
         <button className="btn-primary w-full" disabled={making} onClick={make}>
-          {making ? "making your guide…" : "make a step-by-step guide"}
+          {making ? "Making your guide…" : "Make a step-by-step guide"}
         </button>
         {(err || guide?.status === "error") && (
-          <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || guide?.error}</p>
+          <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">Error: </span>{err || guide?.error}</p>
         )}
       </div>
     );
@@ -79,9 +79,9 @@ export function GuidePanel({ videoId, onSeek }: { videoId: string; onSeek: (t: n
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex gap-2 border-b border-border p-3">
-        <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/guide`}>open guide</Link>
+        <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/guide`}>Open guide</Link>
         <button className="btn-ghost" disabled={guide.status === "making" || guide.status === "polishing"} onClick={make} title="Make it again from the recording (your edits are replaced)">
-          {guide.status === "making" ? "remaking…" : "remake"}
+          {guide.status === "making" ? "Remaking…" : "Remake"}
         </button>
       </div>
       <ol className="space-y-3 overflow-y-auto p-4 text-[13px]">
@@ -92,7 +92,7 @@ export function GuidePanel({ videoId, onSeek }: { videoId: string; onSeek: (t: n
               <img src={img(videoId, s.image)} alt="" className="h-12 w-20 shrink-0 rounded border border-border object-cover" />
               <span className="min-w-0">
                 <span className="text-muted">{i + 1} · {fmtTime(s.t)}</span>
-                <span className="line-clamp-2 block">{s.text || <span className="text-muted">no words, add some in the editor</span>}</span>
+                <span className="line-clamp-2 block">{s.text || <span className="text-muted">No words, add some in the editor</span>}</span>
               </span>
             </button>
           </li>
@@ -124,7 +124,7 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
     }, 600);
   }
 
-  if (guide === undefined) return <p className="text-muted">loading…</p>;
+  if (guide === undefined) return <p className="text-muted">Loading…</p>;
   if (guide?.status === "polishing") {
     return (
       <div className="card mx-auto max-w-lg space-y-4 p-6 text-[14px]">
@@ -138,9 +138,9 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
     return (
       <div className="card mx-auto max-w-lg space-y-4 p-6 text-[14px]">
         <p>{guide?.status === "making" ? "Making your guide from the recording…" : "This recording doesn't have a guide yet."}</p>
-        {guide?.status === "making" ? <div className="working-bar" /> : <button className="btn-primary" onClick={make}>make a step-by-step guide</button>}
-        {(err || guide?.status === "error") && <p className="text-[12px] text-muted">error: {err || guide?.error}</p>}
-        <Link className="text-[13px] text-muted underline" href={`/v/${videoId}`}>back to the video</Link>
+        {guide?.status === "making" ? <div className="working-bar" /> : <button className="btn-primary" onClick={make}>Make a step-by-step guide</button>}
+        {(err || guide?.status === "error") && <p className="text-[12px] text-muted">Error: {err || guide?.error}</p>}
+        <Link className="text-[13px] text-muted underline" href={`/v/${videoId}`}>Back to the video</Link>
       </div>
     );
   }
@@ -166,10 +166,10 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <Link className="text-[13px] text-muted hover:text-text" href={`/v/${videoId}`}>← {videoTitle}</Link>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] text-muted">{saved === "saving" ? "saving…" : saved === "error" ? "couldn't save" : "saved"}</span>
-          <button className="btn-ghost" onClick={copyText}>{copied ? "copied ✓" : "copy text"}</button>
+          <span className="text-[12px] text-muted">{saved === "saving" ? "Saving…" : saved === "error" ? "Couldn't save" : "Saved"}</span>
+          <button className="btn-ghost" onClick={copyText}>{copied ? "Copied ✓" : "Copy text"}</button>
           <a className="btn-primary" href={`/api/videos/${videoId}/guide?format=html`} title="One file with the screenshots inside. Opens in any browser; import it into Notion, Google Docs or Confluence, or print it to PDF.">
-            export
+            Export
           </a>
         </div>
       </div>
@@ -189,7 +189,7 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
             <div className="mb-3 flex items-start gap-3">
               <span className="mt-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-[13px] font-semibold text-accent-text">{i + 1}</span>
               <textarea
-                className="min-h-[2.6em] flex-1 resize-y rounded-lg border border-transparent bg-transparent p-1.5 text-[16px] leading-relaxed outline-none hover:border-border focus:border-border-strong"
+                className="min-h-[2.6em] flex-1 resize-none [field-sizing:content] rounded-lg border border-transparent bg-transparent p-1.5 text-[16px] leading-relaxed outline-none hover:border-border focus:border-border-strong"
                 rows={Math.max(1, Math.ceil(s.text.length / 70))}
                 value={s.text}
                 placeholder="Describe this step"
@@ -199,7 +199,7 @@ export function GuideEditor({ videoId, videoTitle }: { videoId: string; videoTit
               <div className="flex shrink-0 gap-1 opacity-60 group-hover:opacity-100">
                 <button className="btn-ghost px-2" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">↑</button>
                 <button className="btn-ghost px-2" disabled={i === steps.length - 1} onClick={() => move(i, 1)} aria-label="Move down">↓</button>
-                <button className="btn-ghost px-2" onClick={() => remove(i)} aria-label="Remove step">remove</button>
+                <button className="btn-ghost px-2" onClick={() => remove(i)} aria-label="Remove step">Remove</button>
               </div>
             </div>
             <Link href={`/v/${videoId}?t=${s.t}`} title={`Watch this moment (${fmtTime(s.t)})`}>
@@ -297,7 +297,7 @@ export function AiPolishBar({ polishUrl, polished, error, onStarted, onUndo, wha
       {polished ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-muted">✦ Polished by on-device AI. Check each step before you share it.</span>
-          <button className="btn-ghost" onClick={onUndo}>undo polish</button>
+          <button className="btn-ghost" onClick={onUndo}>Undo polish</button>
         </div>
       ) : ai.model === "downloading" ? (
         <div className="space-y-2">
@@ -308,8 +308,8 @@ export function AiPolishBar({ polishUrl, polished, error, onStarted, onUndo, wha
         <div className="space-y-3">
           <p>Polish rewrites what you said as short, clear writing. It runs entirely on this computer and needs a one-time {gb} GB download.</p>
           <div className="flex gap-2">
-            <button className="btn-primary" onClick={download}>download and polish</button>
-            <button className="btn-ghost" onClick={() => setAsking(false)}>not now</button>
+            <button className="btn-primary" onClick={download}>Download and polish</button>
+            <button className="btn-ghost" onClick={() => setAsking(false)}>Not now</button>
           </div>
         </div>
       ) : (

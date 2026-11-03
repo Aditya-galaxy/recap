@@ -13,7 +13,7 @@
     }
     .bar button {
       -webkit-app-region: no-drag; background: transparent; color: #fff; cursor: pointer;
-      border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 999px; padding: 4px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.24); border-radius: 8px; padding: 4px 10px;
     }
     .bar button.primary { background: #fff; color: #000; border-color: #fff; }
     .dot { width: 8px; height: 8px; border-radius: 50%; background: #fff; }
@@ -41,6 +41,15 @@
       return b;
     }
 
+    // The camera's shape as a small drawn icon: text glyphs like ◯ render differently on every system.
+    function shapeBtn(rect) {
+      const b = btn("", "bubble-shape", "icon", rect ? "Camera shape: rectangle (switch to circle)" : "Camera shape: circle (switch to rectangle)");
+      b.innerHTML = rect
+        ? '<svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><rect x="1" y="1" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>'
+        : '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="5.75" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
+      return b;
+    }
+
     window.recap.on("state", (s) => {
       const key = `${s.phase}|${s.bubbleOn}|${s.bubbleSize}|${s.bubbleShape}|${s.bubblePx}|${s.drawing}`;
       if (key === lastPhase && ["recording", "paused"].includes(s.phase)) {
@@ -52,8 +61,8 @@
       if (s.phase === "countdown") {
         const t = document.createElement("span");
         t.className = "grow";
-        t.textContent = `starting in ${s.countdown}`;
-        bar.append(t, btn("cancel", "discard"));
+        t.textContent = `Starting in ${s.countdown}`;
+        bar.append(t, btn("Cancel", "discard"));
       } else if (s.phase === "recording" || s.phase === "paused") {
         const dot = document.createElement("span");
         dot.className = "dot " + (s.phase === "recording" ? "live" : "paused");
@@ -66,22 +75,22 @@
           dot, time, grow,
           ...(s.canDraw
             ? [
-                btn(s.drawing ? "done" : "draw", "draw", s.drawing ? "primary" : "", s.drawing ? "Stop drawing and clear" : "Draw on the screen"),
-                ...(s.drawing ? [btn("clear", "draw-clear", "", "Clear the drawing")] : []),
+                btn(s.drawing ? "Done" : "Draw", "draw", s.drawing ? "primary" : "", s.drawing ? "Stop drawing and clear" : "Draw on the screen"),
+                ...(s.drawing ? [btn("Clear", "draw-clear", "", "Clear the drawing")] : []),
               ]
             : []),
           ...(s.bubbleOn
             ? [
-                btn(s.bubbleShape === "rect" ? "▭" : "◯", "bubble-shape", "", "Camera shape: circle or rectangle"),
-                btn(s.bubblePx ? "size" : `size ${s.bubbleSize ?? "m"}`, "bubble", "", "Camera size"),
+                shapeBtn(s.bubbleShape === "rect"),
+                btn(s.bubblePx ? "Size" : `Size ${(s.bubbleSize ?? "m").toUpperCase()}`, "bubble", "", "Camera size"),
               ]
             : []),
-          s.phase === "recording" ? btn("pause", "pause") : btn("resume", "resume"),
-          btn("stop", "stop", "primary"),
-          btn("discard", "discard"),
+          s.phase === "recording" ? btn("Pause", "pause") : btn("Resume", "resume"),
+          btn("Stop", "stop", "primary"),
+          btn("Discard", "discard"),
         );
       } else {
-        bar.textContent = s.phase === "uploading" ? "uploading…" : "saving…";
+        bar.textContent = s.phase === "uploading" ? "Uploading…" : "Saving…";
       }
     });
     window.recap.requestState();

@@ -49,7 +49,7 @@ export function ReactionsBar({ videoId, now, duration }: { videoId: string; now:
       {duration > 0 && marks.length > 0 && (
         <div className="relative h-4" aria-label="Reactions on the timeline">
           {marks.map((m, i) => (
-            <span key={i} className="absolute -translate-x-1/2 text-[11px]" style={{ left: `${Math.min(100, (m.t / duration) * 100)}%` }} title={fmtTime(m.t)}>
+            <span key={i} className="absolute -translate-x-1/2 text-[12px]" style={{ left: `${Math.min(100, (m.t / duration) * 100)}%` }} title={fmtTime(m.t)}>
               {m.emoji}
             </span>
           ))}
@@ -63,7 +63,7 @@ export function ReactionsBar({ videoId, now, duration }: { videoId: string; now:
             className={`rounded-lg border border-border px-2 py-1 text-[13px] transition hover:border-border-strong ${flash === e ? "scale-110" : ""}`}
             title={`React at ${fmtTime(now)}`}
           >
-            {e} {counts[e] ? <span className="text-[11px] text-muted">{counts[e]}</span> : null}
+            {e} {counts[e] ? <span className="text-[12px] text-muted">{counts[e]}</span> : null}
           </button>
         ))}
       </div>
@@ -123,7 +123,7 @@ export function CommentsPanel({
         {comments.length === 0 && <p className="text-muted">No comments yet.</p>}
         {comments.map((c) => (
           <div key={c.id}>
-            <div className="flex items-baseline justify-between gap-2 text-[11px] text-muted">
+            <div className="flex items-baseline justify-between gap-2 text-[12px] text-muted">
               <span>
                 <span className="text-text">{c.author}</span>
                 {c.t !== null && (
@@ -134,7 +134,7 @@ export function CommentsPanel({
               </span>
               {(owner || viewer?.id === c.authorId) && (
                 <button className="hover:text-text" onClick={() => remove(c.id)} aria-label="Delete comment">
-                  delete
+                  Delete
                 </button>
               )}
             </div>
@@ -156,16 +156,16 @@ export function CommentsPanel({
               onChange={(e) => setBody(e.target.value)}
               rows={2}
               maxLength={2000}
-              placeholder="add a comment…"
+              placeholder="Add a comment…"
               className="w-full resize-none rounded-lg border border-border bg-surface px-2.5 py-2 text-[13px] outline-none focus:border-border-strong"
             />
-            <div className="flex items-center justify-between gap-2 text-[11px]">
+            <div className="flex items-center justify-between gap-2 text-[12px]">
               <label className="flex items-center gap-1.5 text-muted">
                 <input type="checkbox" checked={atTime} onChange={(e) => setAtTime(e.target.checked)} /> at {fmtTime(now)}
               </label>
-              <button className="btn-primary" disabled={busy || !body.trim()}>{busy ? "…" : "post"}</button>
+              <button className="btn-primary" disabled={busy || !body.trim()}>{busy ? "…" : "Post"}</button>
             </div>
-            {error && <p className="text-[11px] text-muted">{error}</p>}
+            {error && <p className="text-[12px] text-muted">{error}</p>}
           </form>
         )}
       </div>
@@ -189,23 +189,23 @@ export function InsightsPanel({ videoId }: { videoId: string }) {
       .then(setData)
       .catch(() => {});
   }, [videoId]);
-  if (!data) return <p className="p-5 text-[13px] text-muted">loading…</p>;
+  if (!data) return <p className="p-5 text-[13px] text-muted">Loading…</p>;
   if (!data.uniqueViewers) return <p className="p-5 text-[13px] text-muted">No views yet. Share the link and you&apos;ll see who watched and how far.</p>;
   const pct = (n: number) => `${Math.round((n / data.funnel.started) * 100)}%`;
   return (
     <div className="space-y-5 overflow-y-auto p-5 text-[13px]">
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-lg border border-border p-3">
-          <p className="label">viewers</p>
+          <p className="label">Viewers</p>
           <p className="mt-1 text-xl font-light">{data.uniqueViewers}</p>
         </div>
         <div className="rounded-lg border border-border p-3">
-          <p className="label">avg watched</p>
+          <p className="label">Avg watched</p>
           <p className="mt-1 text-xl font-light">{Math.round(data.avgCompletion * 100)}%</p>
         </div>
       </div>
       <div className="space-y-1.5">
-        <p className="label">how far people got</p>
+        <p className="label">How far people got</p>
         {([
           ["started", data.funnel.started],
           ["25%", data.funnel.quarter],
@@ -223,7 +223,7 @@ export function InsightsPanel({ videoId }: { videoId: string }) {
         ))}
       </div>
       <div className="space-y-1.5">
-        <p className="label">recent viewers</p>
+        <p className="label">Recent viewers</p>
         {data.viewers.map((v, i) => (
           <div key={i} className="flex justify-between text-[12px]">
             <span className={v.who === "anonymous viewer" ? "text-muted" : ""}>{v.who}</span>
@@ -257,8 +257,8 @@ export function ReportButton({ videoId }: { videoId: string }) {
 
   if (!open)
     return (
-      <button className="text-[11px] text-muted underline hover:text-text" onClick={() => setOpen(true)}>
-        report
+      <button className="text-[12px] text-muted underline hover:text-text" onClick={() => setOpen(true)}>
+        Report
       </button>
     );
   return (
@@ -267,7 +267,7 @@ export function ReportButton({ videoId }: { videoId: string }) {
         <p>Thanks. An admin will review it.</p>
       ) : (
         <form onSubmit={send} className="space-y-2">
-          <p className="label">report this video</p>
+          <p className="label">Report this video</p>
           <select
             value={reason}
             onChange={(e) => setReason(e.target.value)}
@@ -275,10 +275,10 @@ export function ReportButton({ videoId }: { videoId: string }) {
             className="w-full rounded-lg border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
           >
             <option value="" disabled>
-              why?
+              Why?
             </option>
             {REPORT_REASONS.map((r) => (
-              <option key={r}>{r}</option>
+              <option key={r} value={r}>{r[0].toUpperCase() + r.slice(1)}</option>
             ))}
           </select>
           <textarea
@@ -286,16 +286,16 @@ export function ReportButton({ videoId }: { videoId: string }) {
             onChange={(e) => setDetails(e.target.value)}
             rows={2}
             maxLength={500}
-            placeholder="details (optional)"
+            placeholder="Details (optional)"
             className="w-full resize-none rounded-lg border border-border bg-surface px-2 py-1.5 outline-none focus:border-border-strong"
           />
           {error && <p className="text-muted">{error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
-              cancel
+              Cancel
             </button>
             <button className="btn-primary" disabled={!reason || state === "busy"}>
-              {state === "busy" ? "…" : "send report"}
+              {state === "busy" ? "…" : "Send report"}
             </button>
           </div>
         </form>

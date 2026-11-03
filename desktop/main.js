@@ -186,7 +186,7 @@ function createPanel() {
     if (f) {
       f.stream.end();
       session.lastFile = f.path;
-      setPhase("error", { error: "The recorder stopped unexpectedly. What was recorded so far is saved. Use “retry upload”." });
+      setPhase("error", { error: "The recorder stopped unexpectedly. What was recorded so far is saved. Use “Retry upload”." });
       panel.show();
     }
   });
@@ -558,7 +558,7 @@ async function beginRecording(opts) {
     }
   } else if (!readToken()) {
     panel?.show();
-    return setPhase("error", { error: "Not connected. Open “server” and paste an API token from Settings on your Recap server." });
+    return setPhase("error", { error: "Not connected. Open “Advanced” and paste an API token from Settings on your Recap server." });
   }
   if (process.platform === "darwin") {
     const blocked = await macPermissionProblem(opts);
@@ -658,7 +658,7 @@ async function upload(file, { quiet = false } = {}) {
     const title = (session.opts?.title || "").trim();
     if (title) headers["x-title"] = encodeURIComponent(title);
     const res = await fetch(`${server}/api/videos`, { method: "POST", headers, body: Readable.toWeb(stream), duplex: "half", signal: abort.signal });
-    if (res.status === 401) throw new Error("the server rejected the token; update it under “server”");
+    if (res.status === 401) throw new Error("the server rejected the token. Update it under “Advanced”");
     if (res.status !== 201) {
       const body = await res.text();
       let message = "";
@@ -694,7 +694,7 @@ async function upload(file, { quiet = false } = {}) {
     if (quiet) return setPhase("idle", { progress: 0 }); // recovery: keep the file, try again next launch
     const where = local ? "the local library" : "the server";
     const why = err.plain ? `${err.message}` : `(${err.cause?.code ?? err.message}).`;
-    setPhase("error", { error: `Couldn't add the video to ${where}. ${why} The recording is saved in ${libraryDir()}. Use “retry upload”.` });
+    setPhase("error", { error: `Couldn't add the video to ${where}. ${why} The recording is saved in ${libraryDir()}. Use “Retry upload”.` });
   } finally {
     if (session.uploadAbort === abort) {
       session.uploadAbort = null;
@@ -835,6 +835,18 @@ ipcMain.on("start", (_e, opts) => start(opts));
 ipcMain.on("discard", () => discard());
 ipcMain.on("retry-upload", () => session.lastFile && upload(session.lastFile));
 ipcMain.on("bubble-size", (_e, key) => setBubbleSize(String(key)));
+// The panel sizes itself to what it's showing (an error, a download, camera-only mode), never scrolling or padding.
+ipcMain.on("panel-height", (_e, height) => {
+  const h = Number(height);
+  if (!panel || panel.isDestroyed() || !Number.isFinite(h)) return;
+  const area = screen.getDisplayMatching(panel.getBounds()).workArea;
+  const fit = Math.round(Math.min(Math.max(h, 420), area.height - 40));
+  const [w, now] = panel.getContentSize();
+  if (Math.abs(now - fit) < 2) return;
+  panel.setResizable(true);
+  panel.setContentSize(w, fit);
+  panel.setResizable(false);
+});
 ipcMain.on("bubble-shape", (_e, shape) => setBubbleShape(String(shape)));
 ipcMain.on("bubble-resize", (_e, height) => resizeBubble(height));
 ipcMain.on("control", (_e, action) => {
@@ -1315,7 +1327,7 @@ async function selftest(dir, sample) {
       v.muted = true;
       await v.play();
       const playing = !v.paused;
-      [...document.querySelectorAll("a")].find((a) => a.textContent.trim() === "library").click();
+      [...document.querySelectorAll("a")].find((a) => a.textContent.trim().toLowerCase() === "library").click();
       await new Promise((r) => setTimeout(r, 1500));
       return { playing, paused: v.paused, url: location.pathname };
     })()`, true).catch((err) => ({ error: err.message }));
@@ -1326,7 +1338,7 @@ async function selftest(dir, sample) {
     let share = false;
     let trimHandles = 0;
     for (let i = 0; i < 40 && !(share && trimHandles === 2); i++) {
-      share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim() === "share")`).catch(() => false);
+      share = await library.webContents.executeJavaScript(`[...document.querySelectorAll("button")].some((b) => b.textContent.trim().toLowerCase() === "share")`).catch(() => false);
       trimHandles = await library.webContents.executeJavaScript(`document.querySelectorAll("[data-trim-bar] [role=slider]").length`).catch(() => 0);
       if (!(share && trimHandles === 2)) await wait(250); // the page was just reloaded and may still be starting
     }
@@ -1787,7 +1799,7 @@ async function snapshot(dir) {
   setPhase("recording", { elapsed: 83 });
   await wait(300);
   await shot(bar, "bar-recording.png");
-  setPhase("error", { error: "Upload failed (ECONNREFUSED). The video is saved in ~/Videos/Recap. Use “retry upload”.", lastFile: "x" });
+  setPhase("error", { error: "Upload failed (ECONNREFUSED). The video is saved in ~/Videos/Recap. Use “Retry upload”.", lastFile: "x" });
   closeOverlays();
   panel.show();
   await wait(500);

@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld("recap", {
   discard: () => ipcRenderer.send("discard"),
   control: (action) => ipcRenderer.send("control", action),
   bubbleSize: (key) => ipcRenderer.send("bubble-size", key),
+  fitHeight: (height) => ipcRenderer.send("panel-height", height),
   bubbleShape: (shape) => ipcRenderer.send("bubble-shape", shape),
   bubbleResize: (height) => ipcRenderer.send("bubble-resize", height),
   retryUpload: () => ipcRenderer.send("retry-upload"),

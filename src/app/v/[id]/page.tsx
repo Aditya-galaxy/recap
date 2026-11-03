@@ -37,7 +37,7 @@ export async function generateMetadata({ params }: PageProps<"/v/[id]">): Promis
 
 export default function WatchPage({ params }: PageProps<"/v/[id]">) {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-6 text-muted">loading…</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-6 text-muted">Loading…</div>}>
       <WatchLoader params={params} />
     </Suspense>
   );

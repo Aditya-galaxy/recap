@@ -11,7 +11,7 @@ export default function ResendButton() {
   }
   return (
     <button className="btn-ghost" onClick={resend} disabled={state === "sending" || state === "sent"}>
-      {state === "sent" ? "sent ✓" : state === "error" ? "try again later" : "resend email"}
+      {state === "sent" ? "Sent ✓" : state === "error" ? "Try again later" : "Resend email"}
     </button>
   );
 }

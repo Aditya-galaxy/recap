@@ -18,4 +18,4 @@ The Windows and Linux builds are BtbN's `autobuild-2026-10-31-12-59` archives, u
 Their source is FFmpeg revision [8dca1586f4](https://github.com/FFmpeg/FFmpeg/tree/8dca1586f468bfcbb78ae3ed618af1361d9f140a), built with [BtbN/FFmpeg-Builds at 5031c6f](https://github.com/BtbN/FFmpeg-Builds/tree/5031c6f1082414e53688d39e521849905071070d), whose scripts name the source repository and revision of each bundled library.
 Recap runs FFmpeg as a separate process and doesn't link against it.
 
-Geist (`public/fonts/Geist-Regular.ttf`, used for burned-in captions and end cards) is licensed under the SIL Open Font License 1.1. The license is alongside it in `public/fonts/Geist-OFL.txt`. Source: https://github.com/vercel/geist-font
+Inter (`public/fonts/Inter-SemiBold.ttf` for burned-in captions and title cards, `InterVariable.woff2` for the app's interface) is licensed under the SIL Open Font License 1.1. The license ships alongside each copy as `Inter-OFL.txt`. Source: https://github.com/rsms/inter

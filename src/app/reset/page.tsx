@@ -6,7 +6,7 @@ export const metadata = { title: "Choose a new password · Recap", robots: { ind
 export default function ResetPage({ searchParams }: PageProps<"/reset">) {
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="text-lg font-medium">choose a new password</h1>
+      <h1 className="text-lg font-medium">Choose a new password</h1>
       <Suspense>
         <WithToken searchParams={searchParams} />
       </Suspense>

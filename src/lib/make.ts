@@ -44,8 +44,9 @@ export type VoiceOver = { status: "transcribing" | "ready" | "error"; start: num
 const END_SECONDS = 3.5;
 const INTRO_SECONDS = 3;
 const FADE = 0.4;
-const FONT = "Geist";
-const FONT_FILE = "Geist-Regular.ttf";
+// Inter SemiBold, the app's typeface, bundled so captions look the same on every computer.
+const FONT = "Inter SemiBold";
+const FONT_FILE = "Inter-SemiBold.ttf";
 const DIMENSIONS: Record<MakeFormat, [number, number]> = { wide: [1920, 1080], square: [1080, 1080], vertical: [1080, 1920] };
 
 export const madeFile = (format: MakeFormat) => `made-${format}.mp4`;
@@ -111,7 +112,7 @@ function captionFile(s: Size, cues: Cue[]) {
   const margin = Math.round(s.H * (s.format === "vertical" ? 0.16 : 0.07));
   const side = Math.round(s.W * 0.07);
   return assFile(s.W, s.H,
-    [`Style: Cap,${FONT},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,1,0,0,0,100,100,0,0,3,${Math.round(14 * s.unit)},0,2,${side},${side},${margin},1`],
+    [`Style: Cap,${FONT},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,0,0,0,0,100,100,0,0,3,${Math.round(14 * s.unit)},0,2,${side},${side},${margin},1`],
     cues.map((c) => `Dialogue: 0,${assTime(c.start)},${assTime(Math.max(c.end, c.start + 0.6))},Cap,,0,0,0,,${assText(c.text)}`),
   );
 }
@@ -343,7 +344,7 @@ export async function makeVideo(id: string, opts: MakeOptions) {
     const ass = name(`make-card-${n}.ass`);
     await fs.writeFile(path.join(dir, ass), assFile(W, H,
       [
-        `Style: Title,${FONT},${big},&H00F2F2F0,&H00FFFFFF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,5,${side},${side},0,1`,
+        `Style: Title,${FONT},${big},&H00F2F2F0,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,${side},${side},0,1`,
         `Style: Sub,${FONT},${small},&H00A0A0A0,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,5,${side},${side},0,1`,
       ],
       [

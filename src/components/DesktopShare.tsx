@@ -55,7 +55,7 @@ export default function DesktopShare({ video }: { video: Video }) {
   return (
     <div className="relative" ref={box}>
       <button className="btn-primary" onClick={() => (setOpen((o) => !o), setNote(""))} aria-expanded={open}>
-        share
+        Share
       </button>
       {open && (
         <div className="card absolute right-0 z-20 mt-2 w-72 space-y-1 p-2 text-[13px] shadow-xl">
@@ -68,23 +68,23 @@ export default function DesktopShare({ video }: { video: Video }) {
             className="mb-1 cursor-grab rounded-lg border border-dashed border-border-strong px-3 py-3 text-center active:cursor-grabbing"
             title="Drag this into another app"
           >
-            <p>drag into Slack, Teams or an email</p>
-            <p className="text-[11px] text-muted">{video.version === "clean" ? "edited version" : "original version"} · mp4</p>
+            <p>Drag into Slack, Teams or an email</p>
+            <p className="text-[12px] text-muted">{video.version === "clean" ? "Edited version" : "Original version"} · mp4</p>
           </div>
           {mac && (
             <button className={item} onClick={() => run("menu")}>
-              share… <span className="text-muted">Mail, Messages, AirDrop</span>
+              Share… <span className="text-muted">Mail, Messages, AirDrop</span>
             </button>
           )}
           {api.platform !== "linux" && (
             <button className={item} onClick={() => run("copy")}>
-              copy video
+              Copy video
             </button>
           )}
           <button className={item} onClick={() => run("folder")}>
-            show in {folder}
+            Show in {folder}
           </button>
-          {note && <p className="px-3 pb-1 pt-2 text-[11px] text-muted">{note}</p>}
+          {note && <p className="px-3 pb-1 pt-2 text-[12px] text-muted">{note}</p>}
         </div>
       )}
     </div>

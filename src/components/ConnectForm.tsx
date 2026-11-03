@@ -20,20 +20,20 @@ export default function ConnectForm({ initialCode, client, email, verified }: { 
   if (state === "approved")
     return (
       <Frame>
-        <h1 className="text-lg font-medium">connected ✓</h1>
+        <h1 className="text-lg font-medium">Connected ✓</h1>
         <p className="text-[13px] text-muted">Go back to the Recap app. It can now share videos to your account. You can disconnect it any time in settings.</p>
       </Frame>
     );
   if (state === "denied")
     return (
       <Frame>
-        <h1 className="text-lg font-medium">request denied</h1>
+        <h1 className="text-lg font-medium">Request denied</h1>
         <p className="text-[13px] text-muted">Nothing was connected.</p>
       </Frame>
     );
   return (
     <Frame>
-      <h1 className="text-lg font-medium">connect the Recap app</h1>
+      <h1 className="text-lg font-medium">Connect the Recap app</h1>
       {!verified ? (
         <p className="text-[13px] text-muted">Confirm your email first (check your inbox), then reload this page.</p>
       ) : (
@@ -53,13 +53,13 @@ export default function ConnectForm({ initialCode, client, email, verified }: { 
           {error && <p className="text-[12px] text-muted">{error}</p>}
           <div className="flex gap-2">
             <button className="btn-primary flex-1 py-2.5" disabled={state === "busy" || code.replace(/[^A-Z]/g, "").length !== 8} onClick={() => decide(true)}>
-              approve
+              Approve
             </button>
             <button className="btn-ghost py-2.5" disabled={state === "busy" || !code} onClick={() => decide(false)}>
-              deny
+              Deny
             </button>
           </div>
-          <p className="text-[11px] text-muted">Didn&apos;t start this from the Recap app? Deny it.</p>
+          <p className="text-[12px] text-muted">Didn&apos;t start this from the Recap app? Deny it.</p>
         </>
       )}
     </Frame>

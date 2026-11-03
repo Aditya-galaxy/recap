@@ -74,23 +74,23 @@ export default function Settings({
     return (
       <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">
         <div className="border-b border-border pb-3">
-          <h1 className="text-lg font-medium">settings</h1>
+          <h1 className="text-lg font-medium">Settings</h1>
         </div>
         <section className="space-y-3">
-          <h2 className="label">running locally</h2>
+          <h2 className="label">Running locally</h2>
           <div className="card space-y-3 p-4 text-[13px]">
             <p>Recordings, transcripts and clean-ups stay on this computer. Nothing is uploaded anywhere.</p>
-            <p className="text-muted">library: <code className="text-text">{local.dataDir}</code></p>
-            <p className="text-muted">transcription model: <code className="text-text">{local.model.split(/[\\/]/).pop()}</code></p>
+            <p className="text-muted">Library: <code className="text-text">{local.dataDir}</code></p>
+            <p className="text-muted">Transcription model: <code className="text-text">{local.model.split(/[\\/]/).pop()}</code></p>
           </div>
         </section>
         <section className="space-y-3">
-          <h2 className="label">sharing</h2>
+          <h2 className="label">Sharing</h2>
           {local.cloud && <CloudLinkCard />}
           <div className="card p-4 text-[13px]">
             <p>
-              Open a video and use <span className="text-text">share</span>: drag it into Slack, Teams or an email, copy it and paste it
-              anywhere, or use <span className="text-text">export</span> to save the MP4.
+              Open a video and use <span className="text-text">Share</span>: drag it into Slack, Teams or an email, copy it and paste it
+              anywhere, or use <span className="text-text">Export</span> to save the MP4.
             </p>
           </div>
         </section>
@@ -101,12 +101,12 @@ export default function Settings({
   return (
     <div className="mx-auto max-w-3xl space-y-8 px-4 py-10">
       <div className="flex items-baseline justify-between border-b border-border pb-3">
-        <h1 className="text-lg font-medium">settings</h1>
-        <button className="btn-ghost" onClick={signOut}>sign out</button>
+        <h1 className="text-lg font-medium">Settings</h1>
+        <button className="btn-ghost" onClick={signOut}>Sign out</button>
       </div>
 
       <section className="space-y-3">
-        <h2 className="label">account</h2>
+        <h2 className="label">Account</h2>
         <div className="card space-y-4 p-4 text-[13px]">
           <div>
             {user.name && <p>{user.name}</p>}
@@ -116,18 +116,18 @@ export default function Settings({
             <div className="border-t border-border pt-4">
               {user.founderNumber ? (
                 <p>
-                  <span className="rounded-lg bg-accent px-1.5 py-0.5 text-[11px] text-accent-text">founding member #{user.founderNumber}</span>
-                  <span className="ml-2 text-muted">free for life, with fair-use limits</span>
+                  <span className="rounded-lg bg-accent px-1.5 py-0.5 text-[12px] text-accent-text">Founding member #{user.founderNumber}</span>
+                  <span className="ml-2 text-muted">Free for life, with fair-use limits</span>
                 </p>
               ) : (
                 <p className="text-muted">
-                  standard plan{account.foundersLeft > 0 ? ` · confirm your email to claim one of the ${account.foundersLeft} founding spots left` : ` · paid plan (${account.price}) coming soon`}
+                  Standard plan{account.foundersLeft > 0 ? ` · confirm your email to claim one of the ${account.foundersLeft} founding spots left` : ` · paid plan (${account.price}) coming soon`}
                 </p>
               )}
               {account.quota !== null && (
                 <div className="mt-3">
-                  <div className="flex justify-between text-[11px] text-muted">
-                    <span>storage</span>
+                  <div className="flex justify-between text-[12px] text-muted">
+                    <span>Storage</span>
                     <span>{size(account.used)} of {size(account.quota)}</span>
                   </div>
                   <div className="mt-1 h-1 overflow-hidden rounded-full bg-surface-2">
@@ -141,7 +141,7 @@ export default function Settings({
       </section>
 
       <section className="space-y-3">
-        <h2 className="label">email me when</h2>
+        <h2 className="label">Email me when</h2>
         <div className="card space-y-3 p-4 text-[13px]">
           {([
             ["notifyComments", "someone comments on my video", user.notifyComments],
@@ -160,27 +160,27 @@ export default function Settings({
       </section>
 
       <section className="space-y-3">
-        <h2 className="label">connect the desktop apps</h2>
+        <h2 className="label">Connect the desktop apps</h2>
         <div className="card space-y-4 p-4 text-[13px]">
           <p className="text-muted">
-            In the Mac, Windows or Linux app, open <span className="text-text">server</span> and paste these two values.
+            In the Mac, Windows or Linux app, open <span className="text-text">Server</span> and paste these two values.
           </p>
           <div className="flex items-center gap-2">
             <code className="flex-1 truncate rounded-lg border border-border px-3 py-2">{server}</code>
-            <button className="btn-ghost" onClick={() => copy(server, "server")}>{copied === "server" ? "copied ✓" : "copy"}</button>
+            <button className="btn-ghost" onClick={() => copy(server, "server")}>{copied === "server" ? "Copied ✓" : "Copy"}</button>
           </div>
           {fresh ? (
             <div className="space-y-2 rounded-lg border border-border-strong p-3">
               <p className="text-[12px]">New token. Copy it now; it won&apos;t be shown again.</p>
               <div className="flex items-center gap-2">
                 <code className="flex-1 truncate">{fresh}</code>
-                <button className="btn-primary" onClick={() => copy(fresh, "token")}>{copied === "token" ? "copied ✓" : "copy"}</button>
+                <button className="btn-primary" onClick={() => copy(fresh, "token")}>{copied === "token" ? "Copied ✓" : "Copy"}</button>
               </div>
             </div>
           ) : (
             <div className="flex gap-2">
-              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="token name, e.g. work laptop" className={input} />
-              <button className="btn-primary shrink-0" onClick={create}>create token</button>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Token name, e.g. work laptop" className={input} />
+              <button className="btn-primary shrink-0" onClick={create}>Create token</button>
             </div>
           )}
           {tokens.length > 0 && (
@@ -189,11 +189,11 @@ export default function Settings({
                 <li key={t.id} className="flex items-center justify-between gap-3 py-2.5">
                   <span>
                     {t.name} <span className="text-muted">· {t.prefix}…</span>
-                    <span className="block text-[11px] text-muted">
-                      created {fmtDate(t.createdAt)} · {t.lastUsedAt ? `last used ${fmtDate(t.lastUsedAt)}` : "never used"}
+                    <span className="block text-[12px] text-muted">
+                      Created {fmtDate(t.createdAt)} · {t.lastUsedAt ? `last used ${fmtDate(t.lastUsedAt)}` : "never used"}
                     </span>
                   </span>
-                  <button className="btn-danger" onClick={() => revoke(t.id)}>revoke</button>
+                  <button className="btn-danger" onClick={() => revoke(t.id)}>Revoke</button>
                 </li>
               ))}
             </ul>
@@ -202,7 +202,7 @@ export default function Settings({
       </section>
 
       <section className="space-y-3">
-        <h2 className="label">security</h2>
+        <h2 className="label">Security</h2>
         <div className="card flex flex-wrap items-center justify-between gap-3 p-4 text-[13px]">
           <span className="text-muted">Change your password with a reset link sent to {user.email}.</span>
           <button
@@ -212,31 +212,31 @@ export default function Settings({
               setMsg("Reset link sent. Check your email.");
             }}
           >
-            email me a reset link
+            Email me a reset link
           </button>
         </div>
       </section>
 
       {user.isAdmin && (
         <section className="space-y-3">
-          <h2 className="label">moderation</h2>
+          <h2 className="label">Moderation</h2>
           <p className="text-[13px] text-muted">
-            Reported videos land in the <a href="/admin" className="text-text underline">review queue</a>; you&apos;ll get an email when a video gets its first report.
+            Reported videos land in the <a href="/admin" className="text-text underline">Review queue</a>; you&apos;ll get an email when a video gets its first report.
           </p>
-          <h2 className="label pt-3">add a user</h2>
+          <h2 className="label pt-3">Add a user</h2>
           <form onSubmit={addUser} className="card grid gap-3 p-4 sm:grid-cols-[1fr_1fr_auto]">
-            <input name="email" type="email" required placeholder="email" className={input} />
-            <input name="password" type="text" required minLength={10} placeholder="temporary password" className={input} />
-            <button className="btn-primary">add</button>
+            <input name="email" type="email" required placeholder="Email" className={input} />
+            <input name="password" type="text" required minLength={10} placeholder="Temporary password" className={input} />
+            <button className="btn-primary">Add</button>
             {msg && <p className="text-[12px] text-muted sm:col-span-3">{msg}</p>}
-            <p className="text-[11px] text-muted sm:col-span-3">
-              public sign-up is {signupOpen ? "open" : "closed"} (set ALLOW_SIGNUP={signupOpen ? "false" : "true"} to change).
+            <p className="text-[12px] text-muted sm:col-span-3">
+              Public sign-up is {signupOpen ? "open" : "closed"} (set ALLOW_SIGNUP={signupOpen ? "false" : "true"} to change).
             </p>
           </form>
         </section>
       )}
       <section className="space-y-3">
-        <h2 className="label">danger zone</h2>
+        <h2 className="label">Danger zone</h2>
         <div className="card flex flex-wrap items-center justify-between gap-3 p-4 text-[13px]">
           <span className="text-muted">Delete your account and every video in it. This can&apos;t be undone.</span>
           <button
@@ -251,7 +251,7 @@ export default function Settings({
               } else setMsg((await r.json().catch(() => ({}))).error ?? "Couldn't delete the account.");
             }}
           >
-            delete account
+            Delete account
           </button>
         </div>
         {msg && <p className="text-[12px] text-muted">{msg}</p>}

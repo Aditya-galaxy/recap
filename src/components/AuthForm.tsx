@@ -53,16 +53,16 @@ export default function AuthForm({
   if (checkEmail) {
     return (
       <div className="mx-auto max-w-sm px-4 py-16 text-[13px]">
-        <h1 className="text-lg font-medium">check your email</h1>
+        <h1 className="text-lg font-medium">Check your email</h1>
         <p className="mt-3">We sent a confirmation link to <span className="font-medium">{checkEmail}</span>.</p>
         <p className="mt-2 text-muted">Confirm it to activate your account and claim your spot. It can take a minute; check spam too.</p>
-        <button className="btn-ghost mt-6" onClick={() => { router.replace("/"); router.refresh(); }}>continue</button>
+        <button className="btn-ghost mt-6" onClick={() => { router.replace("/"); router.refresh(); }}>Continue</button>
       </div>
     );
   }
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
-      <h1 className="text-lg font-medium">{mode === "login" ? "sign in" : firstUser ? "create the admin account" : "create an account"}</h1>
+      <h1 className="text-lg font-medium">{mode === "login" ? "Sign in" : firstUser ? "Create the admin account" : "Create an account"}</h1>
       {firstUser && (
         <p className="mt-2 text-[12px] text-muted">
           This is a fresh Recap server. The first account becomes the admin and takes ownership of any existing videos.
@@ -71,23 +71,23 @@ export default function AuthForm({
       <form onSubmit={submit} className="card mt-6 space-y-4 p-5">
         {needsSetupCode && (
           <label className="block">
-            <span className="label mb-1.5 block">setup code</span>
+            <span className="label mb-1.5 block">Setup code</span>
             <input name="setupCode" required autoComplete="off" className={input} />
-            <span className="mt-1 block text-[11px] text-muted">the SETUP_CODE this server was started with</span>
+            <span className="mt-1 block text-[12px] text-muted">The SETUP_CODE this server was started with</span>
           </label>
         )}
         {mode === "signup" && (
           <label className="block">
-            <span className="label mb-1.5 block">name</span>
+            <span className="label mb-1.5 block">Name</span>
             <input name="name" autoComplete="name" className={input} />
           </label>
         )}
         <label className="block">
-          <span className="label mb-1.5 block">email</span>
+          <span className="label mb-1.5 block">Email</span>
           <input name="email" type="email" required autoComplete="email" className={input} />
         </label>
         <label className="block">
-          <span className="label mb-1.5 block">password</span>
+          <span className="label mb-1.5 block">Password</span>
           <input
             name="password"
             type="password"
@@ -96,22 +96,22 @@ export default function AuthForm({
             autoComplete={mode === "login" ? "current-password" : "new-password"}
             className={input}
           />
-          {mode === "signup" && <span className="mt-1 block text-[11px] text-muted">at least 10 characters</span>}
-          {mode === "login" && <Link href="/forgot" className="mt-1 block text-[11px] text-muted underline">forgot password?</Link>}
+          {mode === "signup" && <span className="mt-1 block text-[12px] text-muted">At least 10 characters</span>}
+          {mode === "login" && <Link href="/forgot" className="mt-1 block text-[12px] text-muted underline">Forgot password?</Link>}
         </label>
         {error && (
           <p className="rounded-lg border border-border-strong p-2.5 text-[12px]">
-            <span className="text-muted">error: </span>
+            <span className="text-muted">Error: </span>
             {error}
           </p>
         )}
         <button className="btn-primary w-full py-2.5" disabled={busy}>
-          {busy ? "…" : mode === "login" ? "sign in" : "create account"}
+          {busy ? "…" : mode === "login" ? "Sign in" : "Create account"}
         </button>
         {legal && (
-          <p className="text-center text-[11px] text-muted">
-            by signing up you agree to the <Link href="/terms" className="underline">terms</Link> and{" "}
-            <Link href="/privacy" className="underline">privacy policy</Link>
+          <p className="text-center text-[12px] text-muted">
+            By signing up you agree to the <Link href="/terms" className="underline">Terms</Link> and{" "}
+            <Link href="/privacy" className="underline">Privacy Policy</Link>
           </p>
         )}
       </form>
@@ -119,11 +119,11 @@ export default function AuthForm({
         <p className="mt-4 text-center text-[12px] text-muted">
           {mode === "login" ? (
             <>
-              no account? <Link href="/signup" className="text-text underline">sign up</Link>
+              No account? <Link href="/signup" className="text-text underline">Sign up</Link>
             </>
           ) : (
             <>
-              have an account? <Link href="/login" className="text-text underline">sign in</Link>
+              Have an account? <Link href="/login" className="text-text underline">Sign in</Link>
             </>
           )}
         </p>

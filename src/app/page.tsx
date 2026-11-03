@@ -11,7 +11,7 @@ const PAGE = 48;
 
 export default function Library({ searchParams }: PageProps<"/">) {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-muted">loading…</div>}>
+    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 py-10 text-muted">Loading…</div>}>
       <VideoGrid searchParams={searchParams} />
     </Suspense>
   );
@@ -40,7 +40,7 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
           <input
             name="q"
             defaultValue={q}
-            placeholder="search titles and what was said"
+            placeholder="Search titles and what was said"
             aria-label="Search recordings by title or by what was said"
             className="w-44 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[12px] outline-none focus:border-border-strong sm:w-60"
           />
@@ -59,25 +59,25 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
                 <div className="relative aspect-video border-b border-border bg-surface-2">
                   {v.status === "ready" || v.duration ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={`/api/videos/${v.id}/thumb`} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover grayscale transition group-hover:grayscale-0" />
+                    <img src={`/api/videos/${v.id}/thumb`} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                   ) : null}
                   {v.status !== "ready" && (
-                    <span className="absolute left-2 top-2 rounded-lg bg-black px-1.5 py-0.5 text-[11px] text-white">
-                      {v.status === "error" ? "failed" : (v.stage ?? "processing").toLowerCase() + "…"}
+                    <span className="absolute left-2 top-2 rounded-lg bg-black px-1.5 py-0.5 text-[12px] text-white">
+                      {v.status === "error" ? "Failed" : `${v.stage ?? "Processing"}…`}
                     </span>
                   )}
                   {v.clean.status === "ready" && (
-                    <span className="absolute bottom-2 left-2 rounded-lg bg-white px-1.5 py-0.5 text-[11px] text-black">cleaned</span>
+                    <span className="absolute bottom-2 left-2 rounded-lg bg-white px-1.5 py-0.5 text-[12px] font-medium text-black">Edited</span>
                   )}
                   {v.duration ? (
-                    <span className="absolute bottom-2 right-2 rounded-lg bg-black px-1.5 py-0.5 text-[11px] text-white">
+                    <span className="absolute bottom-2 right-2 rounded-lg bg-black px-1.5 py-0.5 text-[12px] text-white">
                       {fmtTime(v.duration)}
                     </span>
                   ) : null}
                 </div>
                 <div className="flex items-baseline justify-between gap-3 px-3 py-2.5">
                   <p className="truncate text-[13px] group-hover:underline">{v.title}</p>
-                  <p className="shrink-0 text-[11px] text-muted">{fmtDate(v.createdAt)}</p>
+                  <p className="shrink-0 text-[12px] text-muted">{fmtDate(v.createdAt)}</p>
                 </div>
                 {v.match && (
                   <p className="line-clamp-2 border-t border-border px-3 py-2 text-[12px] text-muted">
@@ -93,8 +93,8 @@ async function VideoGrid({ searchParams }: { searchParams: PageProps<"/">["searc
       {pages > 1 && (
         <nav className="mt-8 flex items-center justify-between text-[12px]" aria-label="Pages">
           {page > 1 ? <Link className="btn-ghost" href={href(page - 1)}>← newer</Link> : <span />}
-          <span className="text-muted">page {page} of {pages}</span>
-          {page < pages ? <Link className="btn-ghost" href={href(page + 1)}>older →</Link> : <span />}
+          <span className="text-muted">Page {page} of {pages}</span>
+          {page < pages ? <Link className="btn-ghost" href={href(page + 1)}>Older →</Link> : <span />}
         </nav>
       )}
     </div>
@@ -110,7 +110,7 @@ function Landing({ fresh }: { fresh: boolean }) {
   ];
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
-      <p className="label">self-hosted async video</p>
+      <p className="label">Self-hosted async video</p>
       <h1 className="mt-3 text-2xl font-medium leading-tight sm:text-3xl">
         Record it once. Share a link.
         <br />
@@ -126,11 +126,11 @@ function Landing({ fresh }: { fresh: boolean }) {
       </ul>
       <div className="mt-10 flex gap-2">
         {fresh ? (
-          <Link href="/signup" className="btn-primary">set up this server</Link>
+          <Link href="/signup" className="btn-primary">Set up this server</Link>
         ) : (
           <>
-            <Link href="/login" className="btn-primary">sign in</Link>
-            <Link href="/signup" className="btn-ghost">create account</Link>
+            <Link href="/login" className="btn-primary">Sign in</Link>
+            <Link href="/signup" className="btn-ghost">Create account</Link>
           </>
         )}
       </div>

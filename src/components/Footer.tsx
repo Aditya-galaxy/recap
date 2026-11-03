@@ -13,11 +13,11 @@ export default async function Footer() {
   // The desktop app: people only need a way to reach us (and the version, for bug reports).
   if (config.localToken) {
     return (
-      <footer className="mx-auto flex w-full max-w-6xl justify-between px-4 py-6 text-[11px] text-muted">
+      <footer className="mx-auto flex w-full max-w-6xl justify-between px-4 py-6 text-[12px] text-muted">
         <span className="flex gap-3">
           {feedback}
           <a className="underline" href="https://github.com/sponsors/Aditya-galaxy" target="_blank" rel="noreferrer">
-            support Recap
+            Support Recap
           </a>
         </span>
         {version && <span>Recap {version}</span>}
@@ -25,20 +25,20 @@ export default async function Footer() {
     );
   }
   return (
-    <footer className="mx-auto w-full max-w-6xl px-4 py-6 text-[11px] text-muted">
-      {config.cloud ? "recap cloud" : "self-hosted"} ·{" "}
+    <footer className="mx-auto w-full max-w-6xl px-4 py-6 text-[12px] text-muted">
+      {config.cloud ? "Recap Cloud" : "Self-hosted"} ·{" "}
       <a className="underline" href="https://github.com/Aditya-galaxy/recap">
-        source
+        Source
       </a>
       {config.cloud && (
         <>
           {" · "}
           <Link className="underline" href="/terms">
-            terms
+            Terms
           </Link>
           {" · "}
           <Link className="underline" href="/privacy">
-            privacy
+            Privacy
           </Link>
         </>
       )}

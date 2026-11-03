@@ -41,7 +41,7 @@ export default function Watch({
   const [tab, setTab] = useState<Tab>("transcript");
   // Local (desktop) libraries have one person, so comments and insights only exist on servers.
   const tabs: Tab[] = local ? ["transcript", "guide", "report"] : owner ? ["transcript", "comments", "guide", "report", "insights"] : ["transcript", "comments"];
-  const tabLabel: Record<Tab, string> = { transcript: "transcript", comments: "comments", guide: "guide", report: "bug report", insights: "insights" };
+  const tabLabel: Record<Tab, string> = { transcript: "Transcript", comments: "Comments", guide: "Guide", report: "Bug report", insights: "Insights" };
   const [opts, setOpts] = useState<CleanOptions>(initialMeta.clean.options ?? DEFAULT_CLEAN);
   const [fineTune, setFineTune] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -287,17 +287,17 @@ export default function Watch({
                   title={v === "unlisted" ? "Anyone with the link" : "Only you"}
                   className={`rounded-lg px-2.5 py-1 ${meta.visibility === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
                 >
-                  {v === "unlisted" ? "link" : "private"}
+                  {v === "unlisted" ? "Link" : "Private"}
                 </button>
               ))}
             </div>
           )}
-          {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "copied ✓" : "copy link"}</button>}
+          {!local && <button className="btn-primary" onClick={copyLink}>{copied ? "Copied ✓" : "Copy link"}</button>}
           {cloudShare && ready && <ShareToCloud videoId={id} version={version} canClean={meta.clean.status === "ready"} />}
           {local && ready && <DesktopShare video={{ id, version, title: meta.title }} />}
           {ready && (
             <a className="btn-ghost" href={`/api/videos/${id}/media?${version === "clean" ? "v=clean&" : ""}download`}>
-              {local ? "export mp4" : "download"}
+              {local ? "Export MP4" : "Download"}
             </a>
           )}
         </div>
@@ -334,8 +334,8 @@ export default function Watch({
           <div className="grid aspect-video max-h-[50vh] w-full place-items-center bg-surface-2 text-center">
             {meta.status === "error" ? (
               <div className="max-w-md p-6">
-                <p className="font-medium">processing failed</p>
-                <p className="mt-2 break-words font-mono text-xs text-muted">{meta.error}</p>
+                <p className="font-medium">Processing failed</p>
+                <p className="mt-2 break-words text-[12px] text-muted">{meta.error}</p>
               </div>
             ) : (
               <div className="w-56 space-y-3">
@@ -360,7 +360,7 @@ export default function Watch({
               }}
               className={`rounded-lg px-3 py-1.5 ${version === v ? "bg-accent text-accent-text" : "text-muted hover:text-text"}`}
             >
-              {v === "clean" ? `edited · ${fmtTime(meta.clean.duration)}` : `original · ${fmtTime(meta.duration)}`}
+              {v === "clean" ? `Edited · ${fmtTime(meta.clean.duration)}` : `Original · ${fmtTime(meta.duration)}`}
             </button>
           ))}
         </div>
@@ -389,7 +389,7 @@ export default function Watch({
                 />
               </div>
               <button className="text-[12px] text-muted hover:text-text" aria-expanded={fineTune} onClick={() => setFineTune((o) => !o)}>
-                options
+                Options
               </button>
             </div>
             <div className="flex gap-2">
@@ -409,10 +409,10 @@ export default function Watch({
                   }, 50);
                 }}
               >
-                {previewing ? "stop preview" : "preview"}
+                {previewing ? "Stop preview" : "Preview"}
               </button>
               <button className="btn-primary" disabled={busy || saved || !draftCuts.length || meta.clean.status === "rendering"} onClick={render}>
-                {meta.clean.status === "rendering" ? "saving…" : saved ? "saved" : "save edit"}
+                {meta.clean.status === "rendering" ? "Saving…" : saved ? "Saved" : "Save edit"}
               </button>
             </div>
           </div>
@@ -437,7 +437,7 @@ export default function Watch({
               {opts.silences && (
                 <label className="block">
                   <span className="mb-1 flex justify-between">
-                    <span className="label">pause threshold</span>
+                    <span className="label">Pause threshold</span>
                     <span className="text-[12px]">{opts.minSilence.toFixed(1)}s</span>
                   </span>
                   <input
@@ -456,7 +456,7 @@ export default function Watch({
           )}
 
           {(err || meta.clean.status === "error") && (
-            <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || meta.clean.error}</p>
+            <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">Error: </span>{err || meta.clean.error}</p>
           )}
         </section>
       )}
@@ -468,12 +468,14 @@ export default function Watch({
       )}
 
       <section className="mt-12">
-        <div className="mb-4 flex gap-6">
+        <div className="mb-5 flex gap-6 border-b border-border" role="tablist">
           {tabs.map((t) => (
             <button
               key={t}
+              role="tab"
+              aria-selected={tab === t}
               onClick={() => setTab(t)}
-              className={`border-b pb-1.5 text-[12px] uppercase tracking-[0.12em] ${tab === t ? "border-border-strong text-text" : "border-transparent text-muted hover:text-text"}`}
+              className={`-mb-px border-b-2 pb-2 text-[13px] font-medium ${tab === t ? "border-border-strong text-text" : "border-transparent text-muted hover:text-text"}`}
             >
               {tabLabel[t]}
             </button>
@@ -493,7 +495,7 @@ export default function Watch({
           ) : tab === "insights" ? (
             <InsightsPanel videoId={id} />
           ) : !ready ? (
-            <p className="p-5 text-[13px] text-muted">transcript appears once processing finishes.</p>
+            <p className="p-5 text-[13px] text-muted">Transcript appears once processing finishes.</p>
           ) : tab === "guide" ? (
             <GuidePanel videoId={id} onSeek={seekOriginal} />
           ) : tab === "report" ? (
@@ -501,7 +503,7 @@ export default function Watch({
           ) : (
             <div ref={transcriptBox} className="relative overflow-y-auto p-6 text-[14px] leading-8">
               {words.length === 0 ? (
-                <p className="text-[13px] text-muted">no speech detected.</p>
+                <p className="text-[13px] text-muted">No speech detected.</p>
               ) : (
                 words.map((w, i) => {
                   const active = origNow >= w.start && origNow < w.end;
@@ -532,7 +534,7 @@ export default function Watch({
 
       {owner && (
         <button className="mt-12 text-[12px] text-muted hover:text-text" onClick={remove}>
-          delete this video
+          Delete this video
         </button>
       )}
     </div>
@@ -556,10 +558,10 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint: strin
     <button role="switch" aria-checked={checked} onClick={() => onChange(!checked)} className="flex w-full items-center justify-between gap-3 text-left">
       <span>
         <span className="block">{label}</span>
-        <span className="block text-[11px] text-muted">{hint}</span>
+        <span className="block text-[12px] text-muted">{hint}</span>
       </span>
-      <span className={`relative h-4 w-8 shrink-0 rounded-lg border transition ${checked ? "border-accent bg-accent" : "border-border"}`}>
-        <span className={`absolute top-0.5 h-2.5 w-2.5 rounded-[1px] transition-all ${checked ? "left-[18px] bg-accent-text" : "left-0.5 bg-muted"}`} />
+      <span className={`relative h-5 w-9 shrink-0 rounded-full transition-colors duration-150 ${checked ? "bg-accent" : "bg-[color-mix(in_srgb,var(--text)_16%,transparent)]"}`}>
+        <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-[var(--surface)] shadow-[0_1px_2px_rgb(0_0_0/0.25)] transition-[left] duration-150 ${checked ? "left-[18px]" : "left-0.5"}`} />
       </span>
     </button>
   );

@@ -22,7 +22,7 @@ async function Gate() {
   if (!signupOpen()) {
     return (
       <div className="mx-auto max-w-sm px-4 py-16">
-        <h1 className="text-lg font-medium">sign-ups are closed</h1>
+        <h1 className="text-lg font-medium">Sign-ups are closed</h1>
         <p className="mt-2 text-[13px] text-muted">Ask the admin of this Recap server for an account.</p>
       </div>
     );

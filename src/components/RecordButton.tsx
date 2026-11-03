@@ -13,7 +13,7 @@ export default function RecordButton() {
   const hasBridge = useSyncExternalStore(noop, () => !!desktop()?.record, () => false);
   const label = (
     <>
-      <span className="h-1.5 w-1.5 rounded-full bg-current" /> record
+      <span className="h-1.5 w-1.5 rounded-full bg-current" /> Record
     </>
   );
   return hasBridge ? (

@@ -66,7 +66,7 @@ function markdown(r: Report) {
 /** Side-panel tab: make the report, see its shape, open the editor. */
 export function ReportPanel({ videoId, onSeek }: { videoId: string; onSeek: (t: number) => void }) {
   const { report, make, err } = useReport(videoId);
-  if (report === undefined) return <p className="p-5 text-[13px] text-muted">loading…</p>;
+  if (report === undefined) return <p className="p-5 text-[13px] text-muted">Loading…</p>;
   if (!report || report.status === "making" || (report.status === "error" && !report.steps.length)) {
     const making = report?.status === "making";
     return (
@@ -78,10 +78,10 @@ export function ReportPanel({ videoId, onSeek }: { videoId: string; onSeek: (t: 
         <p className="text-muted">Works best when you do the steps, then say what should happen and what happens instead.</p>
         {making && <div className="working-bar" />}
         <button className="btn-primary w-full" disabled={making} onClick={make}>
-          {making ? "writing the report…" : "make a bug report"}
+          {making ? "Writing the report…" : "Make a bug report"}
         </button>
         {(err || report?.status === "error") && (
-          <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">error: </span>{err || report?.error}</p>
+          <p className="rounded-lg border border-border-strong p-3 text-[12px]"><span className="text-muted">Error: </span>{err || report?.error}</p>
         )}
       </div>
     );
@@ -89,21 +89,21 @@ export function ReportPanel({ videoId, onSeek }: { videoId: string; onSeek: (t: 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex gap-2 border-b border-border p-3">
-        <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/bug`}>open report</Link>
-        <button className="btn-ghost" disabled={report.status !== "ready"} onClick={make} title="Make it again from the recording (your edits are replaced)">remake</button>
+        <Link className="btn-primary flex-1 text-center" href={`/v/${videoId}/bug`}>Open report</Link>
+        <button className="btn-ghost" disabled={report.status !== "ready"} onClick={make} title="Make it again from the recording (your edits are replaced)">Remake</button>
       </div>
       <div className="space-y-3 overflow-y-auto p-4 text-[13px]">
         <p className="font-medium">{report.title}</p>
         <p className="text-muted">{report.steps.length} steps to reproduce</p>
         {report.actual && (
           <button className="block w-full rounded-lg border-l-2 border-[#e5484d] px-3 py-1 text-left hover:bg-accent-soft" onClick={() => report.actualT !== undefined && onSeek(report.actualT)}>
-            <span className="text-muted">actual · {fmtTime(report.actualT ?? 0)}</span>
+            <span className="text-muted">Actual · {fmtTime(report.actualT ?? 0)}</span>
             <span className="line-clamp-3 block">{report.actual}</span>
           </button>
         )}
         {report.expected && (
           <div className="rounded-lg border-l-2 border-border-strong px-3 py-1">
-            <span className="text-muted">expected</span>
+            <span className="text-muted">Expected</span>
             <span className="line-clamp-3 block">{report.expected}</span>
           </div>
         )}
@@ -142,7 +142,7 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
     }, 600);
   }
 
-  if (report === undefined) return <p className="text-muted">loading…</p>;
+  if (report === undefined) return <p className="text-muted">Loading…</p>;
   if (report?.status === "polishing") {
     const total = report.steps.length + 2;
     return (
@@ -157,9 +157,9 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
     return (
       <div className="card mx-auto max-w-lg space-y-4 p-6 text-[14px]">
         <p>{report?.status === "making" ? "Writing the bug report from the recording…" : "This recording doesn't have a bug report yet."}</p>
-        {report?.status === "making" ? <div className="working-bar" /> : <button className="btn-primary" onClick={make}>make a bug report</button>}
-        {(err || report?.status === "error") && <p className="text-[12px] text-muted">error: {err || report?.error}</p>}
-        <Link className="text-[13px] text-muted underline" href={`/v/${videoId}`}>back to the video</Link>
+        {report?.status === "making" ? <div className="working-bar" /> : <button className="btn-primary" onClick={make}>Make a bug report</button>}
+        {(err || report?.status === "error") && <p className="text-[12px] text-muted">Error: {err || report?.error}</p>}
+        <Link className="text-[13px] text-muted underline" href={`/v/${videoId}`}>Back to the video</Link>
       </div>
     );
   }
@@ -187,21 +187,21 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
       /* not remembered: fine */
     }
   }
-  const area = "w-full resize-y rounded-lg border border-transparent bg-transparent p-1.5 text-[16px] leading-relaxed outline-none hover:border-border focus:border-border-strong";
+  const area = "w-full resize-none [field-sizing:content] rounded-lg border border-transparent bg-transparent p-1.5 text-[16px] leading-relaxed outline-none hover:border-border focus:border-border-strong";
 
   return (
     <div className="mx-auto max-w-3xl">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <Link className="text-[13px] text-muted hover:text-text" href={`/v/${videoId}`}>← {videoTitle}</Link>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] text-muted">{saved === "saving" ? "saving…" : saved === "error" ? "couldn't save" : "saved"}</span>
-          <button className="btn-ghost" onClick={copy}>{copied ? "copied ✓" : "copy as Markdown"}</button>
-          <a className="btn-primary" href={`/api/videos/${videoId}/bug?format=html`} title="One file with the screenshots inside: attach it, open it in a browser, or print it to PDF.">export</a>
+          <span className="text-[12px] text-muted">{saved === "saving" ? "Saving…" : saved === "error" ? "Couldn't save" : "Saved"}</span>
+          <button className="btn-ghost" onClick={copy}>{copied ? "Copied ✓" : "Copy as Markdown"}</button>
+          <a className="btn-primary" href={`/api/videos/${videoId}/bug?format=html`} title="One file with the screenshots inside: attach it, open it in a browser, or print it to PDF.">Export</a>
         </div>
       </div>
 
       <input className="mb-1 w-full bg-transparent text-3xl font-semibold tracking-tight outline-none" value={r.title} onChange={(e) => change({ ...r, title: e.target.value })} aria-label="Report title" />
-      <p className="mb-4 text-[13px] text-muted">bug report · edit anything, it saves as you type</p>
+      <p className="mb-4 text-[13px] text-muted">Bug report · edit anything, it saves as you type</p>
       <AiPolishBar
         what="report"
         polishUrl={`/api/videos/${videoId}/bug/polish`}
@@ -224,7 +224,7 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
         }}
       />
 
-      <h2 className="label mb-3 mt-8">steps to reproduce</h2>
+      <h2 className="label mb-3 mt-8">Steps to reproduce</h2>
       {!steps.length && <p className="text-[14px] text-muted">No steps were said before the problem. Add them to the recording, or describe them in the issue.</p>}
       <ol className="space-y-8">
         {steps.map((s, i) => (
@@ -232,7 +232,7 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
             <div className="mb-3 flex items-start gap-3">
               <span className="mt-1.5 grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent text-[13px] font-semibold text-accent-text">{i + 1}</span>
               <textarea className={`${area} min-h-[2.6em] flex-1`} rows={Math.max(1, Math.ceil(s.text.length / 70))} value={s.text} placeholder="Describe this step" onChange={(e) => setStep(i, { text: e.target.value })} aria-label={`Step ${i + 1}`} />
-              <button className="btn-ghost shrink-0 px-2 opacity-60 group-hover:opacity-100" onClick={() => remove(i)} aria-label="Remove step">remove</button>
+              <button className="btn-ghost shrink-0 px-2 opacity-60 group-hover:opacity-100" onClick={() => remove(i)} aria-label="Remove step">Remove</button>
             </div>
             <Link href={`/v/${videoId}?t=${s.t}`} title={`Watch this moment (${fmtTime(s.t)})`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -242,10 +242,10 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
         ))}
       </ol>
 
-      <h2 className="label mb-2 mt-10">expected</h2>
+      <h2 className="label mb-2 mt-10">Expected</h2>
       <textarea className={`${area} border-l-2 border-l-border-strong`} rows={2} value={r.expected} placeholder="What should have happened" onChange={(e) => change({ ...r, expected: e.target.value })} aria-label="Expected" />
 
-      <h2 className="label mb-2 mt-8">actual</h2>
+      <h2 className="label mb-2 mt-8">Actual</h2>
       <textarea className={`${area} border-l-2 border-l-[#e5484d]`} rows={2} value={r.actual} placeholder="What happened instead" onChange={(e) => change({ ...r, actual: e.target.value })} aria-label="Actual" />
       {r.actualImage && (
         <Link href={`/v/${videoId}?t=${r.actualT ?? 0}`} title="Watch this moment" className="mt-3 block">
@@ -254,19 +254,19 @@ export function ReportEditor({ videoId, videoTitle }: { videoId: string; videoTi
         </Link>
       )}
 
-      <h2 className="label mb-2 mt-8">environment</h2>
+      <h2 className="label mb-2 mt-8">Environment</h2>
       <textarea className={area} rows={Math.max(2, r.environment.length)} value={r.environment.join("\n")} onChange={(e) => change({ ...r, environment: e.target.value.split("\n") })} aria-label="Environment" placeholder="App version, browser, account…" />
 
       <div className="card mt-10 space-y-3 p-5 text-[13px]">
         <p className="font-medium">File it</p>
         <div className="flex flex-wrap items-center gap-2">
           <input className="w-56 rounded-lg border border-border bg-surface px-3 py-2 outline-none focus:border-border-strong" placeholder="owner/repo" value={repo} onChange={(e) => saveRepo(e.target.value)} aria-label="GitHub repository" />
-          <a className={`btn-primary ${validRepo ? "" : "pointer-events-none opacity-40"}`} href={issueUrl || undefined} aria-disabled={!validRepo || undefined} target="_blank" rel="noreferrer">open GitHub issue</a>
-          <a className="btn-ghost" href={`/api/videos/${videoId}/media?download`}>export recording</a>
+          <a className={`btn-primary ${validRepo ? "" : "pointer-events-none opacity-40"}`} href={issueUrl || undefined} aria-disabled={!validRepo || undefined} target="_blank" rel="noreferrer">Open GitHub issue</a>
+          <a className="btn-ghost" href={`/api/videos/${videoId}/media?download`}>Export recording</a>
         </div>
         <p className="text-muted">
           The issue opens filled in. Drag the exported recording or report file into it to attach screenshots. For Linear or
-          Jira, use <span className="text-text">copy as Markdown</span> and paste.
+          Jira, use <span className="text-text">Copy as Markdown</span> and paste.
         </p>
       </div>
     </div>

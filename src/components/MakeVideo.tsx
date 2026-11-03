@@ -36,17 +36,17 @@ function Clips({ id, clips, setClips }: { id: string; clips: string[]; setClips:
   };
   return (
     <div className="space-y-2">
-      <p className="label">clips to add after this video</p>
+      <p className="label">Clips to add after this video</p>
       {clips.map((c, i) => (
         <div key={c} className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
           <span className="flex-1 truncate">{titleOf(c)}</span>
           <button className="text-muted disabled:opacity-30" disabled={i === 0} aria-label="Move up" onClick={() => move(i, -1)}>↑</button>
           <button className="text-muted disabled:opacity-30" disabled={i === clips.length - 1} aria-label="Move down" onClick={() => move(i, 1)}>↓</button>
-          <button className="text-[12px] text-muted underline" onClick={() => setClips(clips.filter((x) => x !== c))}>remove</button>
+          <button className="text-[12px] text-muted underline" onClick={() => setClips(clips.filter((x) => x !== c))}>Remove</button>
         </div>
       ))}
       <select aria-label="Add a clip" className={input} value="" onChange={(e) => e.target.value && setClips([...clips, e.target.value])} disabled={!choices.length}>
-        <option value="">{choices.length ? "add a video from your library…" : "no other finished videos yet"}</option>
+        <option value="">{choices.length ? "Add a video from your library…" : "No other finished videos yet"}</option>
         {choices.map((v) => <option key={v.id} value={v.id}>{v.title}</option>)}
       </select>
     </div>
@@ -68,7 +68,7 @@ function Blurs({ src, areas, setAreas }: { src: string; areas: BlurArea[]; setAr
   const style = (a: { x: number; y: number; w: number; h: number }) => ({ left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.w * 100}%`, height: `${a.h * 100}%` });
   return (
     <div className="space-y-2">
-      <p className="label">blur sensitive areas</p>
+      <p className="label">Blur sensitive areas</p>
       <p className="text-[12px] text-muted">Pause on the frame, then drag over what should be hidden. The hidden area can&apos;t be recovered from the finished video. Your recording itself isn&apos;t changed, so share the finished video.</p>
       <div className="relative overflow-hidden rounded-lg bg-black">
         <video ref={video} src={src} controls muted playsInline preload="metadata" className="w-full" onLoadedMetadata={(e) => setLength(e.currentTarget.duration)} />
@@ -94,7 +94,7 @@ function Blurs({ src, areas, setAreas }: { src: string; areas: BlurArea[]; setAr
           }}
         >
           {areas.map((a, i) => (
-            <div key={i} className="absolute border border-white/80 bg-white/30 backdrop-blur-md" style={style(a)}><span className="p-1 text-[11px] text-white">{i + 1}</span></div>
+            <div key={i} className="absolute border border-white/80 bg-white/30 backdrop-blur-md" style={style(a)}><span className="p-1 text-[12px] text-white">{i + 1}</span></div>
           ))}
           {draft && <div className="absolute border border-dashed border-white bg-white/20" style={style(box(draft))} />}
         </div>
@@ -103,9 +103,9 @@ function Blurs({ src, areas, setAreas }: { src: string; areas: BlurArea[]; setAr
         <div key={i} className="flex flex-wrap items-center gap-2 text-[12px]">
           <span>{i + 1}.</span>
           <span className="tabular-nums">{clock(a.start)} – {clock(Math.min(a.end, length || a.end))}</span>
-          <button className="text-muted underline" onClick={() => patch(i, { start: now() })}>start here</button>
-          <button className="text-muted underline" onClick={() => patch(i, { end: now() })}>end here</button>
-          <button className="text-muted underline" onClick={() => setAreas(areas.filter((_, n) => n !== i))}>remove</button>
+          <button className="text-muted underline" onClick={() => patch(i, { start: now() })}>Start here</button>
+          <button className="text-muted underline" onClick={() => patch(i, { end: now() })}>End here</button>
+          <button className="text-muted underline" onClick={() => setAreas(areas.filter((_, n) => n !== i))}>Remove</button>
         </div>
       ))}
     </div>
@@ -161,18 +161,18 @@ function Voice({ id, src, edited, voice, reload, audio, setAudio }: { id: string
 
   return (
     <div className="space-y-2">
-      <p className="label">voice-over</p>
+      <p className="label">Voice-over</p>
       <p className="text-[12px] text-muted">Pause where you want to start, then record. The video plays silently while you talk. A new take replaces the last one.</p>
       <video ref={video} src={src} controls muted playsInline preload="metadata" className="max-h-[36vh] w-full rounded-lg bg-black" onEnded={() => rec.current?.recorder.stop()} />
       <div className="flex flex-wrap items-center gap-3">
         {recording
-          ? <button className="btn-primary" onClick={() => rec.current?.recorder.stop()}>stop recording</button>
-          : <button className="btn-ghost" disabled={busy} onClick={start}>{voice ? "record again" : "record voice-over"}</button>}
-        {voice?.status === "transcribing" && <span className="text-[12px] text-muted">writing captions for your voice…</span>}
+          ? <button className="btn-primary" onClick={() => rec.current?.recorder.stop()}>Stop recording</button>
+          : <button className="btn-ghost" disabled={busy} onClick={start}>{voice ? "Record again" : "Record voice-over"}</button>}
+        {voice?.status === "transcribing" && <span className="text-[12px] text-muted">Writing captions for your voice…</span>}
         {voice?.status === "ready" && (
           <>
             <audio controls src={`/api/videos/${id}/voice?audio&t=${voice.duration ?? 0}`} className="h-8 max-w-56" />
-            <button className="text-[12px] text-muted underline" onClick={async () => { await fetch(`/api/videos/${id}/voice`, { method: "DELETE" }); setAudio("original"); reload(); }}>remove</button>
+            <button className="text-[12px] text-muted underline" onClick={async () => { await fetch(`/api/videos/${id}/voice`, { method: "DELETE" }); setAudio("original"); reload(); }}>Remove</button>
           </>
         )}
       </div>
@@ -183,7 +183,7 @@ function Voice({ id, src, edited, voice, reload, audio, setAudio }: { id: string
           ))}
         </div>
       )}
-      {err && <p className="text-[12px]"><span className="text-muted">error: </span>{err}</p>}
+      {err && <p className="text-[12px]"><span className="text-muted">Error: </span>{err}</p>}
     </div>
   );
 }
@@ -259,21 +259,24 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
   }
 
   const extra = (key: "clips" | "blur" | "voice", label: string, count: number) => (
-    <button aria-expanded={more === key} onClick={() => setMore(more === key ? "" : key)} className={`rounded-lg border px-3 py-1.5 ${more === key ? "border-border-strong" : "border-border text-muted"}`}>
+    <button aria-expanded={more === key} onClick={() => setMore(more === key ? "" : key)} className={`btn border ${more === key ? "border-border-strong bg-accent-soft" : "border-border bg-surface hover:border-[color-mix(in_srgb,var(--text)_28%,var(--border))]"}`}>
       {label}{count ? ` · ${count}` : ""}
     </button>
   );
 
   return (
     <details className="card p-4 text-[13px]" aria-label="Make it a video">
-      <summary className="cursor-pointer font-medium">Make it a video</summary>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 font-medium [&::-webkit-details-marker]:hidden">
+        <span>Make it a video</span>
+        <svg aria-hidden width="12" height="12" viewBox="0 0 12 12" className="text-muted transition-transform duration-150 [details[open]_&]:rotate-180"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+      </summary>
       <div className="mt-4 space-y-4">
         <p className="text-[12px] text-muted">A finished video to share. Your recording stays as it is.</p>
         <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Shape">
           {FORMATS.map((f) => (
             <button key={f.value} role="radio" aria-checked={format === f.value} onClick={() => setFormat(f.value)} className={`rounded-lg border px-3 py-2 text-left ${format === f.value ? "border-border-strong" : "border-border text-muted"}`}>
               <span className="block">{f.label}</span>
-              <span className="block text-[11px] text-muted">{f.hint}</span>
+              <span className="block text-[12px] text-muted">{f.hint}</span>
             </button>
           ))}
         </div>
@@ -287,14 +290,14 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
         </div>
         {intro && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block"><span className="label mb-1 block">intro title</span><input className={input} maxLength={120} value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} /></label>
-            <label className="block"><span className="label mb-1 block">subtitle</span><input className={input} maxLength={120} value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} /></label>
+            <label className="block"><span className="label mb-1 block">Intro title</span><input className={input} maxLength={120} value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} /></label>
+            <label className="block"><span className="label mb-1 block">Subtitle</span><input className={input} maxLength={120} value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} /></label>
           </div>
         )}
         {endCard && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block"><span className="label mb-1 block">end card title</span><input className={input} maxLength={120} value={endTitle} onChange={(e) => setEndTitle(e.target.value)} /></label>
-            <label className="block"><span className="label mb-1 block">link or name</span><input className={input} maxLength={120} placeholder="yoursite.com" value={endLink} onChange={(e) => setEndLink(e.target.value)} /></label>
+            <label className="block"><span className="label mb-1 block">End card title</span><input className={input} maxLength={120} value={endTitle} onChange={(e) => setEndTitle(e.target.value)} /></label>
+            <label className="block"><span className="label mb-1 block">Link or name</span><input className={input} maxLength={120} placeholder="yoursite.com" value={endLink} onChange={(e) => setEndLink(e.target.value)} /></label>
           </div>
         )}
         <div className="flex flex-wrap gap-2">
@@ -305,13 +308,13 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
         {more === "clips" && <Clips id={id} clips={clips} setClips={setClips} />}
         {more === "voice" && <Voice id={id} src={source} edited={edited} voice={voice} reload={() => setTick((t) => t + 1)} audio={audio} setAudio={setAudio} />}
         {more === "blur" && <Blurs src={source} areas={blurs} setAreas={setBlurs} />}
-        <button className="btn-primary" disabled={rendering || transcribing} onClick={make}>{rendering ? "making…" : made?.status === "ready" ? "make again" : "make video"}</button>
-        {(err || made?.status === "error") && <p className="text-[12px]"><span className="text-muted">error: </span>{err || made?.error}</p>}
+        <button className="btn-primary" disabled={rendering || transcribing} onClick={make}>{rendering ? "Making…" : made?.status === "ready" ? "Make again" : "Make video"}</button>
+        {(err || made?.status === "error") && <p className="text-[12px]"><span className="text-muted">Error: </span>{err || made?.error}</p>}
         {made?.status === "ready" && (
           <div className="space-y-2">
             <p className="text-[12px] text-muted">{FORMATS.find((f) => f.value === made.options.format)?.label} video{made.duration ? `, ${Math.round(made.duration)} seconds` : ""}</p>
             <video ref={player} key={rev} controls playsInline preload="metadata" src={`/api/videos/${id}/media?v=made${rev ? `&r=${rev}` : ""}`} className="max-h-[50vh] w-full rounded-lg bg-black" />
-            <a className="btn-ghost inline-flex" href={`/api/videos/${id}/media?v=made&download`}>export mp4</a>
+            <a className="btn-ghost inline-flex" href={`/api/videos/${id}/media?v=made&download`}>Export MP4</a>
           </div>
         )}
       </div>

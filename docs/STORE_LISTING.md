@@ -10,7 +10,7 @@ Productivity (secondary, if offered: Photo & video)
 
 ## Short description (one line)
 
-Record your screen and camera, then get a transcript, a step-by-step guide or a bug report. Everything stays on your PC.
+Record your screen and camera, then get a step-by-step guide, a bug report or a finished video. Everything stays on your PC.
 
 ## Description
 
@@ -57,9 +57,31 @@ screen recorder, screen recording, step by step guide, bug report, transcription
 - Website: https://recap.kronagent.dev
 - Support: https://github.com/Aditya-galaxy/recap/issues
 
-## Screenshots (at least 1, 1366×768 or larger, PNG)
+## Store logos
 
-Use the app itself: the library, a video with its transcript, a step-by-step guide, a bug report.
+From `promo-assets/store-0.9.1/logos/` (Partner Center → Store listings → Store logos):
+
+| Partner Center field | File |
+| --- | --- |
+| 1:1 App tile icon (300 × 300) | `store-logo-300.png` (transparent background) |
+| 1:1 Box art (1080 × 1080, or 2160 × 2160) | `box-art-1080.png`, `box-art-2160.png` |
+| 9:16 Poster art (720 × 1080, or 1440 × 2160) | `poster-art-720x1080.png`, `poster-art-1440x2160.png` |
+
+## Screenshots
+
+From `promo-assets/store-0.9.1/screenshots/` (2048 × 1152 PNG, in this order), with captions:
+
+1. `1-step-by-step-guide.png`: Do a task once while talking. Recap writes the steps, with a screenshot of each click.
+2. `2-bug-report.png`: Reproduce a bug out loud and get steps to reproduce, expected and actual, and screenshots.
+3. `3-make-it-a-video.png`: Make a finished video in wide, square or vertical, with captions and an end card.
+4. `4-editor.png`: Trim the ends and remove the "um"s and long pauses in one click. Your original stays untouched.
+5. `5-search-what-was-said.png`: Search everything you said and jump straight to that moment.
+6. `6-transcript.png`: Every recording is transcribed on your PC. Nothing is uploaded.
+7. `7-editor-dark.png`: Light and dark, to match Windows.
+
+## What's new in this version (v0.9.1)
+
+A cleaner look throughout, and new ways to make a finished video: import any video, then add captions, intro and end cards, joined clips, voice-over, blurred areas and auto-zoom. Draw on screen and highlight clicks while recording.
 
 ## Age rating questionnaire (IARC)
 

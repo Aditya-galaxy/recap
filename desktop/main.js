@@ -1557,9 +1557,12 @@ async function selftest(dir, sample) {
       const auto3 = await auto(fresh, { destination: "youtube" });
       const freshMeta = (await (await api(`/api/videos/${fresh}`)).json()).meta;
       step("make it for me: cleans up first, no title card for an automatic name",
-        auto3.started.cleaning === true && auto3.made?.status === "ready" && freshMeta.clean.status === "ready" && auto3.made.options.edited && !auto3.made.options.intro &&
-          Math.abs((auto3.made?.duration ?? 0) - (freshMeta.clean.duration ?? 0)) < 1,
-        { cleaning: auto3.started.cleaning, status: auto3.made?.status, clean: freshMeta.clean.status, duration: auto3.made?.duration, cleanLength: freshMeta.clean.duration, notes: auto3.made?.auto?.notes });
+        // Whether there's a second of ums and pauses to cut depends on the voice that read the sample (each OS has
+        // its own): when there is, it's cleaned first and the video is the clean one; when not, the original is used.
+        auto3.made?.status === "ready" && !auto3.made.options.intro && (auto3.started.cleaning === true
+          ? freshMeta.clean.status === "ready" && auto3.made.options.edited && Math.abs((auto3.made?.duration ?? 0) - (freshMeta.clean.duration ?? 0)) < 1
+          : !auto3.made.options.edited && Math.abs((auto3.made?.duration ?? 0) - (freshMeta.duration ?? 0)) < 1),
+        { cleaning: auto3.started.cleaning, status: auto3.made?.status, clean: freshMeta.clean.status, duration: auto3.made?.duration, cleanLength: freshMeta.clean.duration, length: freshMeta.duration, notes: auto3.made?.auto?.notes });
       await api(`/api/videos/${fresh}`, { method: "DELETE" });
       step("make a video: ends on the end card", a.made?.status === "ready" && lit > 0.0005 && lit < 0.05 && Math.abs((a.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3.5) < 0.4, { lit, withCard: a.made?.duration, without: b.made?.duration });
     } catch (err) {

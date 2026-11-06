@@ -22,13 +22,15 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/mak
   const meta = await readMeta(id);
   if (!meta || !isOwner(meta, user)) return Response.json({ error: "not found" }, { status: 404 });
   if (meta.status !== "ready") return Response.json({ error: "Video is still processing." }, { status: 409 });
-  if ((await readMade(id))?.status === "rendering") return Response.json({ error: "Already making one." }, { status: 409 });
+  const current = await readMade(id);
+  if (current?.status === "rendering") return Response.json({ error: "Already making one." }, { status: 409 });
 
-  const b = await req.json().catch(() => ({}));
+  const body: unknown = await req.json().catch(() => null);
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   // One click: Recap decides, from what it knows about this video and what the person chose before.
   if (b.auto === true) {
-    const destination: Destination = b.destination in DESTINATIONS ? b.destination : "youtube";
+    const destination: Destination = typeof b.destination === "string" && Object.hasOwn(DESTINATIONS, b.destination) ? (b.destination as Destination) : "youtube";
     const transcript = await readTranscript(id);
     const cuts = transcript && meta.duration ? cutRanges(transcript, DEFAULT_CLEAN, meta.duration) : [];
     const choice = autoOptions({
@@ -40,7 +42,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/mak
       spoken: (transcript?.words.length ?? 0) >= 3,
       focus: (await readFocus(id)).length,
       voice: await readVoice(id),
-      previous: (await readMade(id))?.options ?? null,
+      previous: current?.options ?? null,
     });
     if (choice.cleanFirst) {
       try {
@@ -48,6 +50,7 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/mak
         enqueue("clean", id, DEFAULT_CLEAN);
       } catch {
         choice.options.edited = false; // nothing worth cutting after all: use the original
+        choice.notes = choice.notes.filter((n) => n !== "cut the ums and long pauses");
       }
     }
     // Queued after the clean cut, so it picks up the new edit.

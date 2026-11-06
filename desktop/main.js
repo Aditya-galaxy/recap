@@ -1529,7 +1529,8 @@ async function selftest(dir, sample) {
         const res = await api(`/api/videos/${vid}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto: true, ...body }) });
         const started = await res.json().catch(() => ({}));
         let made = null;
-        for (let i = 0; i < 360 && !["ready", "error"].includes(made?.status); i++) {
+        // Up to 6 minutes: a fresh recording is cleaned first, then rendered, and CI's Mac runners are slow.
+        for (let i = 0; i < 720 && !["ready", "error"].includes(made?.status); i++) {
           await wait(500);
           made = (await (await api(`/api/videos/${vid}/make`)).json()).made;
         }

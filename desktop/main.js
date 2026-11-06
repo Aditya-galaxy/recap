@@ -1524,6 +1524,46 @@ async function selftest(dir, sample) {
       const db = (s) => Number(String(s).match(/mean_volume: (-?[\d.]+)/)?.[1] ?? -99);
       step("make a video: voice-over replaces the sound, in the right place", dubbed.made?.status === "ready" && db(during) > db(levels) + 15, { before: db(levels), during: db(during), error: dubbed.made?.error });
       await api(`/api/videos/${video.id}/voice`, { method: "DELETE" });
+      // Make it for me: decisions follow the video and what was chosen before, and the result matches them.
+      const auto = async (vid, body) => {
+        const res = await api(`/api/videos/${vid}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto: true, ...body }) });
+        const started = await res.json().catch(() => ({}));
+        let made = null;
+        for (let i = 0; i < 360 && !["ready", "error"].includes(made?.status); i++) {
+          await wait(500);
+          made = (await (await api(`/api/videos/${vid}/make`)).json()).made;
+        }
+        return { started, made };
+      };
+      const auto1 = await auto(video.id, { destination: "shorts", link: "example.com" });
+      const o = auto1.made?.options ?? {};
+      const cleanLength = (await (await api(`/api/videos/${video.id}`)).json()).meta.clean.duration ?? 0;
+      step("make it for me: vertical, uses the edit, captions, zoom, intro and end card",
+        auto1.made?.status === "ready" && (auto1.made.auto?.notes ?? []).includes("auto-zoom on your clicks") && o.format === "vertical" && o.edited && o.captions && o.zoom && o.intro && o.endCard && o.endLink === "example.com" &&
+          Math.abs((auto1.made?.duration ?? 0) - cleanLength - 3 - 3.5) < 1,
+        { status: auto1.made?.status, error: auto1.made?.error, options: o, notes: auto1.made?.auto?.notes, duration: auto1.made?.duration, cleanLength });
+      await make({ format: "wide", small: true, captions: false, endCard: false, blurs: [{ x: 0.1, y: 0.1, w: 0.3, h: 0.3, start: 0, end: 9999 }], edited: true });
+      const auto2 = await auto(video.id, { destination: "email" });
+      step("make it for me: keeps blurred areas, smaller file for email",
+        auto2.made?.status === "ready" && auto2.made.options.blurs?.length === 1 && auto2.made.options.small && auto2.made.options.format === "wide" && /blurred/.test((auto2.made.auto?.notes ?? []).join(" ")),
+        { status: auto2.made?.status, blurs: auto2.made?.options?.blurs?.length, notes: auto2.made?.auto?.notes });
+      // A fresh recording nobody named and nobody edited: cleaned first, no title card for "Recording …".
+      const freshRes = await api("/api/videos", { method: "POST", headers: { "x-title": "Recording Nov 6, 10:00 AM" }, body: fs.readFileSync(sample) });
+      const fresh = (await freshRes.json()).id;
+      for (let i = 0; i < 240; i++) {
+        if ((await (await api(`/api/videos/${fresh}`)).json()).meta.status === "ready") break;
+        await wait(500);
+      }
+      const auto3 = await auto(fresh, { destination: "youtube" });
+      const freshMeta = (await (await api(`/api/videos/${fresh}`)).json()).meta;
+      step("make it for me: cleans up first, no title card for an automatic name",
+        // Whether there's a second of ums and pauses to cut depends on the voice that read the sample (each OS has
+        // its own): when there is, it's cleaned first and the video is the clean one; when not, the original is used.
+        auto3.made?.status === "ready" && !auto3.made.options.intro && (auto3.started.cleaning === true
+          ? freshMeta.clean.status === "ready" && auto3.made.options.edited && Math.abs((auto3.made?.duration ?? 0) - (freshMeta.clean.duration ?? 0)) < 1
+          : !auto3.made.options.edited && Math.abs((auto3.made?.duration ?? 0) - (freshMeta.duration ?? 0)) < 1),
+        { cleaning: auto3.started.cleaning, status: auto3.made?.status, clean: freshMeta.clean.status, duration: auto3.made?.duration, cleanLength: freshMeta.clean.duration, length: freshMeta.duration, notes: auto3.made?.auto?.notes });
+      await api(`/api/videos/${fresh}`, { method: "DELETE" });
       step("make a video: ends on the end card", a.made?.status === "ready" && lit > 0.0005 && lit < 0.05 && Math.abs((a.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3.5) < 0.4, { lit, withCard: a.made?.duration, without: b.made?.duration });
     } catch (err) {
       step("make a video", false, { error: err.message });

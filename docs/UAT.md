@@ -32,6 +32,7 @@ Use a fresh install (uninstall first, and on macOS run `tccutil reset All dev.re
 | 22 | Turn on **highlight my clicks**, record, click around | A ring shows at each click, on screen and in the video. macOS asks for Accessibility first. Typing is unaffected |
 | 23 | During a recording, **draw**, sketch over the screen, **done** | The sketch shows in the video and disappears on **done**; camera and bar stay clickable; apps work normally once done |
 | 24 | Make it a video with **Auto-zoom** on | Zooms smoothly to where you clicked (or where the cursor settled), then back out. Picture stays sharp and steady |
-| 25 | Uninstall | App removed; library stays in your user folder unless deleted |
+| 25 | Make it a video → choose **Reels, Shorts or TikTok**, add your link, **Make it for me** | A vertical video with captions, your title at the start and your link at the end, cleaned up; the line above it says what it did. Blurred areas you'd set are still blurred |
+| 26 | Uninstall | App removed; library stays in your user folder unless deleted |
 
 Note anything that's confusing, slow or shows technical text (paths, `$` signs, error codes).

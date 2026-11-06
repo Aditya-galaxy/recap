@@ -1,7 +1,10 @@
 import { currentUser, unauthorized } from "@/lib/auth";
 import { enqueue } from "@/lib/jobs";
-import { readFocus, readMade, readVoice, writeMade, type BlurArea, type MakeFormat, type MakeOptions } from "@/lib/make";
-import { isOwner, readMeta } from "@/lib/store";
+import { autoOptions, DESTINATIONS, readFocus, readMade, readVoice, writeMade, type BlurArea, type Destination, type MakeFormat, type MakeOptions } from "@/lib/make";
+import { cutRanges } from "@/lib/cuts";
+import { prepareClean } from "@/lib/pipeline";
+import { DEFAULT_CLEAN } from "@/lib/types";
+import { isOwner, readMeta, readTranscript } from "@/lib/store";
 
 export async function GET(_req: Request, ctx: RouteContext<"/api/videos/[id]/make">) {
   const { id } = await ctx.params;
@@ -22,6 +25,37 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/mak
   if ((await readMade(id))?.status === "rendering") return Response.json({ error: "Already making one." }, { status: 409 });
 
   const b = await req.json().catch(() => ({}));
+
+  // One click: Recap decides, from what it knows about this video and what the person chose before.
+  if (b.auto === true) {
+    const destination: Destination = b.destination in DESTINATIONS ? b.destination : "youtube";
+    const transcript = await readTranscript(id);
+    const cuts = transcript && meta.duration ? cutRanges(transcript, DEFAULT_CLEAN, meta.duration) : [];
+    const choice = autoOptions({
+      title: meta.title,
+      destination,
+      link: typeof b.link === "string" ? b.link : "",
+      hasEdit: meta.clean.status === "ready",
+      wouldClean: cuts.reduce((s, c) => s + (c.end - c.start), 0) >= 1,
+      spoken: (transcript?.words.length ?? 0) >= 3,
+      focus: (await readFocus(id)).length,
+      voice: await readVoice(id),
+      previous: (await readMade(id))?.options ?? null,
+    });
+    if (choice.cleanFirst) {
+      try {
+        await prepareClean(id, DEFAULT_CLEAN);
+        enqueue("clean", id, DEFAULT_CLEAN);
+      } catch {
+        choice.options.edited = false; // nothing worth cutting after all: use the original
+      }
+    }
+    // Queued after the clean cut, so it picks up the new edit.
+    await writeMade(id, { status: "rendering", options: choice.options, auto: { destination, notes: choice.notes } });
+    enqueue("make", id, choice.options);
+    return Response.json({ ok: true, options: choice.options, notes: choice.notes, cleaning: choice.cleanFirst && choice.options.edited }, { status: 202 });
+  }
+
   const line = (v: unknown) => (typeof v === "string" ? v.slice(0, 120) : "");
   const num = (v: unknown, min: number, max: number) => Math.min(max, Math.max(min, Number(v) || 0));
   const blurs: BlurArea[] = (Array.isArray(b.blurs) ? b.blurs : []).slice(0, 40).map((a: Record<string, unknown>) => ({

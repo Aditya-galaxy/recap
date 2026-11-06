@@ -38,7 +38,7 @@ export type MakeOptions = {
   zoom: boolean;
 };
 type Focus = { t: number; x: number; y: number };
-export type Made = { status: "rendering" | "ready" | "error"; options: MakeOptions; error?: string; duration?: number };
+export type Made = { status: "rendering" | "ready" | "error"; options: MakeOptions; error?: string; duration?: number; auto?: { destination: Destination; notes: string[] } };
 export type VoiceOver = { status: "transcribing" | "ready" | "error"; start: number; edited: boolean; duration?: number; words?: Word[]; error?: string };
 
 const END_SECONDS = 3.5;
@@ -385,5 +385,88 @@ export async function makeVideo(id: string, opts: MakeOptions) {
   await fs.rename(path.join(dir, tmp), file(id, out));
   for (const f of temp) await fs.rm(path.join(dir, f), { force: true });
   const made = await inspect(file(id, out));
-  await writeMade(id, { status: "ready", options: opts, duration: made.duration });
+  // Keep the "made for …" summary a one-click request wrote when it started.
+  const started = await readMade(id);
+  await writeMade(id, { status: "ready", options: opts, duration: made.duration, ...(started?.auto ? { auto: started.auto } : {}) });
+}
+
+// ---- "Make it for me": every choice made from what's known about the video ----------------------------------
+
+export type Destination = "youtube" | "x" | "shorts" | "feed" | "email";
+export const DESTINATIONS: Record<Destination, { label: string; format: MakeFormat; small: boolean }> = {
+  youtube: { label: "YouTube or LinkedIn", format: "wide", small: false },
+  x: { label: "X", format: "wide", small: false },
+  shorts: { label: "Reels, Shorts or TikTok", format: "vertical", small: false },
+  feed: { label: "Instagram or LinkedIn feed", format: "square", small: false },
+  email: { label: "Email or chat", format: "wide", small: true },
+};
+
+/** Titles Recap gives a recording when nobody named it: not worth putting on a title card. */
+export const isAutomaticTitle = (title: string) => /^(Recording |Recovered recording|Untitled)/i.test(title.trim()) || !title.trim();
+
+export type AutoChoice = { options: MakeOptions; cleanFirst: boolean; notes: string[] };
+
+/**
+ * Decide everything for a one-click video. What the person already chose always wins: an existing edit (and its trim),
+ * a recorded voice-over, and above all the areas they blurred last time, which are kept on the version they were drawn on.
+ */
+export function autoOptions(input: {
+  title: string;
+  destination: Destination;
+  link: string;
+  hasEdit: boolean;
+  wouldClean: boolean;
+  spoken: boolean;
+  focus: number;
+  voice: VoiceOver | null;
+  previous: MakeOptions | null;
+}): AutoChoice {
+  const d = DESTINATIONS[input.destination];
+  const named = !isAutomaticTitle(input.title);
+  const notes: string[] = [];
+  const blurs = input.previous?.blurs ?? [];
+  let edited = input.hasEdit || input.wouldClean;
+  let audio: MakeOptions["audio"] = input.voice?.status === "ready" ? "voice" : "original";
+  if (blurs.length && input.previous) {
+    edited = input.previous.edited;
+    notes.push(`kept your ${blurs.length === 1 ? "blurred area" : `${blurs.length} blurred areas`}`);
+    if (audio === "voice" && input.voice && input.voice.edited !== edited) {
+      audio = "original";
+      notes.push("left out the voice-over, which was recorded over a different version than your blurred areas");
+    }
+  } else if (audio === "voice" && input.voice) {
+    edited = input.voice.edited && input.hasEdit;
+  }
+  const cleanFirst = edited && !input.hasEdit && input.wouldClean;
+  if (cleanFirst) notes.push("cut the ums and long pauses");
+  else if (edited) notes.push("used your edit");
+  if (audio === "voice") notes.push("used your voice-over");
+  const captions = input.spoken || (audio === "voice" && !!input.voice?.words?.length);
+  if (captions) notes.push("captions");
+  const zoom = input.focus > 0;
+  if (zoom) notes.push("auto-zoom on your clicks");
+  const link = input.link.trim().slice(0, 120);
+  const endCard = named || !!link;
+  if (named) notes.push("intro card");
+  if (endCard) notes.push("end card");
+  return {
+    cleanFirst,
+    notes,
+    options: {
+      format: d.format,
+      small: d.small,
+      captions,
+      intro: named,
+      introTitle: named ? input.title.slice(0, 120) : "",
+      introSubtitle: "",
+      endCard,
+      endTitle: named ? input.title.slice(0, 120) : "",
+      endLink: link,
+      edited,
+      clips: [],
+      blurs,
+      audio,
+      zoom,
+    },
+  };
 }

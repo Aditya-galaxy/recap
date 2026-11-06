@@ -1529,7 +1529,8 @@ async function selftest(dir, sample) {
         const res = await api(`/api/videos/${vid}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto: true, ...body }) });
         const started = await res.json().catch(() => ({}));
         let made = null;
-        for (let i = 0; i < 360 && !["ready", "error"].includes(made?.status); i++) {
+        // Up to 6 minutes: a fresh recording is cleaned first, then rendered, and CI's Mac runners are slow.
+        for (let i = 0; i < 720 && !["ready", "error"].includes(made?.status); i++) {
           await wait(500);
           made = (await (await api(`/api/videos/${vid}/make`)).json()).made;
         }
@@ -1538,10 +1539,45 @@ async function selftest(dir, sample) {
       const auto1 = await auto(video.id, { destination: "shorts", link: "example.com" });
       const o = auto1.made?.options ?? {};
       const cleanLength = (await (await api(`/api/videos/${video.id}`)).json()).meta.clean.duration ?? 0;
-      step("make it for me: vertical, uses the edit, captions, zoom, intro and end card",
-        auto1.made?.status === "ready" && (auto1.made.auto?.notes ?? []).includes("auto-zoom on your clicks") && o.format === "vertical" && o.edited && o.captions && o.zoom && o.intro && o.endCard && o.endLink === "example.com" &&
-          Math.abs((auto1.made?.duration ?? 0) - cleanLength - 3 - 3.5) < 1,
-        { status: auto1.made?.status, error: auto1.made?.error, options: o, notes: auto1.made?.auto?.notes, duration: auto1.made?.duration, cleanLength });
+      step("make it for me: vertical for feeds: edit, word captions, title over the opening, follows the clicks, end card",
+        auto1.made?.status === "ready" && o.format === "vertical" && o.edited && o.captions && o.captionStyle === "words" && o.titleOverlay && !o.intro && o.reframe && o.endCard &&
+          o.endLink === "example.com" && Math.abs((auto1.made?.duration ?? 0) - cleanLength - 3.5) < 1,
+        { status: auto1.made?.status, error: auto1.made?.error, notes: auto1.made?.auto?.notes, duration: auto1.made?.duration, cleanLength });
+      // What it looks like, measured on the file: the highlighted word, and the frame following the click.
+      const feedOut = path.join(dir, "made-feed.mp4");
+      fs.writeFileSync(feedOut, Buffer.from(await (await api(`/api/videos/${video.id}/media?v=made`)).arrayBuffer()));
+      const cleanOut = path.join(dir, "clean-source.mp4");
+      fs.writeFileSync(cleanOut, Buffer.from(await (await api(`/api/videos/${video.id}/media?v=clean`)).arrayBuffer()));
+      const keepRanges = JSON.parse(fs.readFileSync(path.join(dir, "library", "videos", video.id, "clean.keep.json"), "utf8"));
+      let acc = 0;
+      let clickOnEdit = null;
+      for (const k of keepRanges) {
+        if (clickAt < k.start) { clickOnEdit = acc; break; }
+        if (clickAt <= k.end) { clickOnEdit = acc + clickAt - k.start; break; }
+        acc += k.end - k.start;
+      }
+      const look = clickOnEdit ?? 0;
+      const words2 = (await (await api(`/api/videos/${video.id}`)).json()).transcript.words;
+      const spoken = words2.find((w) => w.start > clickAt + 1) ?? words2[Math.floor(words2.length / 2)];
+      const yellowAt = await frame(feedOut, Math.max(0.5, look + 2));
+      const yp = yellowAt.toBitmap();
+      let yellow = 0;
+      for (let i = 0; i < yp.length; i += 4) if (yp[i + 2] > 200 && yp[i + 1] > 150 && yp[i] < 90) yellow++;
+      const [srcF, outF] = [await frame(cleanOut, look + 0.6), await frame(feedOut, look + 0.6)];
+      const { width: sw, height: sh } = srcF.getSize();
+      const { width: ow, height: oh } = outF.getSize();
+      const [sp, op] = [srcF.toBitmap(), outF.toBitmap()];
+      const px = (buf, w, h, u, v) => { const i = (Math.round(v * h) * w + Math.round(u * w)) * 4; return [buf[i], buf[i + 1], buf[i + 2]]; };
+      const cropW = (sh * ow) / oh;
+      let followed = 0;
+      for (const du of [-0.04, -0.02, 0, 0.02, 0.04]) {
+        for (const dv of [-0.1, -0.05, 0, 0.05, 0.1]) {
+          const a = px(op, ow, oh, 0.5 + (du * sw) / cropW, 0.5 + dv);
+          const b = px(sp, sw, sh, 0.72 + du, 0.5 + dv);
+          if (Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]) + Math.abs(a[2] - b[2]) < 60) followed++;
+        }
+      }
+      step("make it for me: captions light up word by word, and the frame follows the click", yellow > 80 && followed >= 18, { yellow, followed, spoken: spoken?.text });
       await make({ format: "wide", small: true, captions: false, endCard: false, blurs: [{ x: 0.1, y: 0.1, w: 0.3, h: 0.3, start: 0, end: 9999 }], edited: true });
       const auto2 = await auto(video.id, { destination: "email" });
       step("make it for me: keeps blurred areas, smaller file for email",

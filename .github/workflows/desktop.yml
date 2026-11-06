@@ -106,7 +106,8 @@ jobs:
               APP=("$DEST/Recap.exe") ;;
           esac
           # macOS has no `timeout`; perl's alarm does the same job there.
-          if command -v timeout >/dev/null; then LIMIT=(timeout 900); else LIMIT=(perl -e 'alarm shift; exec @ARGV' 900); fi
+          # 25 minutes: Make it a video renders several finished videos, and the macOS runners are the slowest.
+          if command -v timeout >/dev/null; then LIMIT=(timeout 1500); else LIMIT=(perl -e 'alarm shift; exec @ARGV' 1500); fi
           RECAP_SELFTEST="$OUT" RECAP_SELFTEST_FILE="$RUNNER_TEMP/sample.mkv" "${LIMIT[@]}" "${APP[@]}" || true
           cat "$OUT/report.json"
           PY=$(command -v python3 || command -v python)

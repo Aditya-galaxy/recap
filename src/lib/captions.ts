@@ -25,11 +25,11 @@ export function toCues(words: Word[], keep?: Range[], maxWords = 10) {
     if (r) mapped.push({ ...w, ...r });
   }
 
-  const cues: { start: number; end: number; text: string }[] = [];
+  const cues: { start: number; end: number; text: string; words: Word[] }[] = [];
   let cur: Word[] = [];
   const flush = () => {
     if (!cur.length) return;
-    cues.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cur.map((w) => w.text).join(" ") });
+    cues.push({ start: cur[0].start, end: cur[cur.length - 1].end, text: cur.map((w) => w.text).join(" "), words: cur });
     cur = [];
   };
   for (const w of mapped) {

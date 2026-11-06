@@ -215,6 +215,9 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
   const [blurs, setBlurs] = useState<BlurArea[]>([]);
   const [audio, setAudio] = useState<MakeOptions["audio"]>("original");
   const [focus, setFocus] = useState(0);
+  const [titleOverlay, setTitleOverlay] = useState(false);
+  const [wordCaptions, setWordCaptions] = useState(false);
+  const [reframe, setReframe] = useState(true);
   const [zoom, setZoom] = useState(true);
   const [more, setMore] = useState<"" | "clips" | "blur" | "voice">("");
   const [rev, setRev] = useState(0);
@@ -224,6 +227,33 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
   // Where it's going (a one-click video); once the person picks, a later refresh doesn't override them.
   const [place, setPlace] = useState<Destination>("youtube");
   const placeChosen = useRef(false);
+
+  // Done for you (one click) or do it yourself (every setting). Opens on the way the last video was made.
+  const [mode, setModeState] = useState<"done" | "diy">("done");
+  const modeChosen = useRef(false);
+  const setMode = (m: "done" | "diy") => {
+    modeChosen.current = true;
+    setModeState(m);
+  };
+
+  /** Open what "Done for you" picked in "Do it yourself", to change one thing and make it again. */
+  function adjust(o: MakeOptions) {
+    setFormat(o.format);
+    setCaptions(o.captions);
+    setWordCaptions(o.captionStyle === "words");
+    setReframe(!!o.reframe);
+    setTitleOverlay(!!o.titleOverlay);
+    setZoom(!!o.zoom);
+    setIntro(o.intro);
+    setIntroTitle(o.introTitle || title);
+    setIntroSubtitle(o.introSubtitle ?? "");
+    setEndCard(o.endCard);
+    setEndTitle(o.endTitle || title);
+    setEndLink(o.endLink ?? "");
+    setSmall(o.small);
+    if (hasEdit) setUseEdit(o.edited);
+    setMode("diy");
+  }
 
   // Next keeps pages alive when you navigate away; without this the preview would keep playing, unseen.
   const player = useRef<HTMLVideoElement>(null);
@@ -246,6 +276,7 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
         if (live) setFocus(body.focus ?? 0);
         // Start from where the last one-click video went.
         if (live && next?.auto && !placeChosen.current) setPlace(next.auto.destination);
+        if (live && next && !modeChosen.current) setModeState(next.auto ? "done" : "diy");
         if (live) setMade((old) => {
           if (old?.status === "rendering" && next?.status === "ready") setRev(Date.now());
           return next;
@@ -296,7 +327,7 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
 
   async function make() {
     setErr("");
-    const options: MakeOptions = { format, captions, intro, introTitle, introSubtitle, endCard, endTitle, endLink, small, edited, clips, blurs, audio, zoom: zoom && focus > 0 };
+    const options: MakeOptions = { format, captions, intro, introTitle, introSubtitle, endCard, endTitle, endLink, small, edited, clips, blurs, audio, zoom: zoom && focus > 0, titleOverlay, captionStyle: wordCaptions ? "words" : "lines", reframe: reframe && focus > 0 && format !== "wide" };
     const r = await fetch(`/api/videos/${id}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(options) });
     if (!r.ok) return setErr((await r.json().catch(() => ({}))).error ?? "Couldn't start.");
     setMade({ status: "rendering", options });
@@ -316,22 +347,32 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
       </summary>
       <div className="mt-4 space-y-4">
         <p className="text-[12px] text-muted">A finished video to share. Your recording stays as it is.</p>
-        <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <label className="block"><span className="label mb-1 block">Where is it going?</span>
-            <select className={input} value={place} onChange={(e) => { placeChosen.current = true; setPlace(e.target.value as Destination); }}>
-              {PLACES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </label>
-          <label className="block"><span className="label mb-1 block">Your link, for the end card</span><input ref={rememberLink} className={input} maxLength={120} placeholder="yoursite.com (optional)" /></label>
-          <button className="btn-primary" disabled={rendering || transcribing} onClick={makeForMe}>{rendering ? "Making…" : "Make it for me"}</button>
+        <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="How to make it">
+          {([
+            ["done", "Done for you", "Pick where it's going. Recap chooses the rest."],
+            ["diy", "Do it yourself", "Choose the shape, captions, cards and more."],
+          ] as const).map(([value, label, hint]) => (
+            <button key={value} role="radio" aria-checked={mode === value} onClick={() => setMode(value)} className={`rounded-lg border px-3 py-2 text-left ${mode === value ? "border-border-strong bg-accent-soft" : "border-border text-muted hover:text-text"}`}>
+              <span className="block font-medium">{label}</span>
+              <span className="block text-[12px] text-muted">{hint}</span>
+            </button>
+          ))}
         </div>
-        <p className="text-[12px] text-muted">Picks the shape, cleans up the ums and pauses, and adds captions, auto-zoom and title cards. Anything you set up yourself, like blurred areas or a voice-over, is kept.</p>
-        <details className="group/manual border-t border-border pt-3">
-          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-medium text-muted hover:text-text [&::-webkit-details-marker]:hidden">
-            Choose everything yourself
-            <svg aria-hidden width="10" height="10" viewBox="0 0 12 12" className="transition-transform duration-150 group-open/manual:rotate-180"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          </summary>
-          <div className="mt-4 space-y-4">
+        {mode === "done" ? (
+          <div className="space-y-3">
+            <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+              <label className="block"><span className="label mb-1 block">Where is it going?</span>
+                <select className={input} value={place} onChange={(e) => { placeChosen.current = true; setPlace(e.target.value as Destination); }}>
+                  {PLACES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </label>
+              <label className="block"><span className="label mb-1 block">Your link, for the end card</span><input ref={rememberLink} className={input} maxLength={120} placeholder="yoursite.com (optional)" /></label>
+              <button className="btn-primary" disabled={rendering || transcribing} onClick={makeForMe}>{rendering ? "Making…" : "Make it for me"}</button>
+            </div>
+            <p className="text-[12px] text-muted">Picks the shape, cleans up the ums and pauses, and adds captions, titles and an end card. For phones it follows your clicks. Blurred areas and a voice-over you set up are kept.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
         <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Shape">
           {FORMATS.map((f) => (
             <button key={f.value} role="radio" aria-checked={format === f.value} onClick={() => setFormat(f.value)} className={`rounded-lg border px-3 py-2 text-left ${format === f.value ? "border-border-strong" : "border-border text-muted"}`}>
@@ -342,15 +383,19 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
         </div>
         <div className="flex flex-wrap gap-x-6 gap-y-2">
           <Check label="Captions" value={captions} set={setCaptions} />
-          {focus > 0 && <Check label="Auto-zoom" value={zoom} set={setZoom} />}
+          {captions && <Check label="Highlight each word" value={wordCaptions} set={setWordCaptions} />}
+          {focus > 0 && format !== "wide" && <Check label="Follow the action" value={reframe} set={setReframe} />}
+          <Check label="Title over the opening" value={titleOverlay} set={setTitleOverlay} />
+          {/* Following the action already moves the frame, so zooming too is left out. */}
+          {focus > 0 && !(reframe && format !== "wide") && <Check label="Auto-zoom" value={zoom} set={setZoom} />}
           <Check label="Intro card" value={intro} set={setIntro} />
           <Check label="End card" value={endCard} set={setEndCard} />
           <Check label="Smaller file" value={small} set={setSmall} />
           {hasEdit && <Check label="Use my edit" value={useEdit} set={setUseEdit} />}
         </div>
-        {intro && (
+        {(intro || titleOverlay) && (
           <div className="grid gap-2 sm:grid-cols-2">
-            <label className="block"><span className="label mb-1 block">Intro title</span><input className={input} maxLength={120} value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} /></label>
+            <label className="block"><span className="label mb-1 block">Title</span><input className={input} maxLength={120} value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} /></label>
             <label className="block"><span className="label mb-1 block">Subtitle</span><input className={input} maxLength={120} value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} /></label>
           </div>
         )}
@@ -368,9 +413,9 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
         {more === "clips" && <Clips id={id} clips={clips} setClips={setClips} />}
         {more === "voice" && <Voice id={id} src={source} edited={edited} voice={voice} reload={() => setTick((t) => t + 1)} audio={audio} setAudio={setAudio} />}
         {more === "blur" && <Blurs src={source} areas={blurs} setAreas={setBlurs} />}
-        <button className="btn-ghost" disabled={rendering || transcribing} onClick={make}>{rendering ? "Making…" : "Make with these settings"}</button>
+        <button className="btn-primary" disabled={rendering || transcribing} onClick={make}>{rendering ? "Making…" : "Make the video"}</button>
           </div>
-        </details>
+        )}
         {(err || made?.status === "error") && <p className="text-[12px]"><span className="text-muted">Error: </span>{err || made?.error}</p>}
         {made?.status === "ready" && (
           <div className="space-y-2">
@@ -402,7 +447,10 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
                 }}
               />
             </div>
-            <a className="btn-ghost inline-flex" href={`/api/videos/${id}/media?v=made&download`}>Export MP4</a>
+            <div className="flex flex-wrap gap-2">
+              <a className="btn-ghost inline-flex" href={`/api/videos/${id}/media?v=made&download`}>Export MP4</a>
+              {made.auto && <button className="btn-quiet" disabled={rendering || transcribing} onClick={() => adjust(made.options)}>Change something</button>}
+            </div>
           </div>
         )}
       </div>

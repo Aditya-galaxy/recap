@@ -1586,7 +1586,8 @@ async function selftest(dir, sample) {
       // A fresh recording nobody named and nobody edited: cleaned first, no title card for "Recording …".
       const freshRes = await api("/api/videos", { method: "POST", headers: { "x-title": "Recording Nov 6, 10:00 AM" }, body: fs.readFileSync(sample) });
       const fresh = (await freshRes.json()).id;
-      for (let i = 0; i < 240; i++) {
+      // Up to 6 minutes: it's processed and transcribed like any upload, which is slow on CI's Mac runners.
+      for (let i = 0; i < 720; i++) {
         if ((await (await api(`/api/videos/${fresh}`)).json()).meta.status === "ready") break;
         await wait(500);
       }
@@ -1598,7 +1599,7 @@ async function selftest(dir, sample) {
         auto3.made?.status === "ready" && !auto3.made.options.intro && (auto3.started.cleaning === true
           ? freshMeta.clean.status === "ready" && auto3.made.options.edited && Math.abs((auto3.made?.duration ?? 0) - (freshMeta.clean.duration ?? 0)) < 1
           : !auto3.made.options.edited && Math.abs((auto3.made?.duration ?? 0) - (freshMeta.duration ?? 0)) < 1),
-        { cleaning: auto3.started.cleaning, status: auto3.made?.status, clean: freshMeta.clean.status, duration: auto3.made?.duration, cleanLength: freshMeta.clean.duration, length: freshMeta.duration, notes: auto3.made?.auto?.notes });
+        { error: auto3.started.error, freshStatus: freshMeta.status, cleaning: auto3.started.cleaning, status: auto3.made?.status, clean: freshMeta.clean.status, duration: auto3.made?.duration, cleanLength: freshMeta.clean.duration, length: freshMeta.duration, notes: auto3.made?.auto?.notes });
       await api(`/api/videos/${fresh}`, { method: "DELETE" });
       step("make a video: ends on the end card", a.made?.status === "ready" && lit > 0.0005 && lit < 0.05 && Math.abs((a.made?.duration ?? 0) - (b.made?.duration ?? 0) - 3.5) < 0.4, { lit, withCard: a.made?.duration, without: b.made?.duration });
     } catch (err) {

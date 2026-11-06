@@ -167,15 +167,23 @@ function reframeGraph(from: string, events: Focus[], dur: number, width: number,
   const keys: Key[] = [];
   const add = (t: number, x: number) => {
     const at = Math.min(dur, Math.max(0, t));
-    if (!keys.length || at > keys[keys.length - 1].t + 0.05) keys.push({ t: at, z: 1, x, y: 0.5 });
+    if (keys.length && at <= keys[keys.length - 1].t + 0.05) return false;
+    keys.push({ t: at, z: 1, x, y: 0.5 });
+    return true;
   };
-  const sorted = [...events].sort((a, b) => a.t - b.t).filter((e) => e.t < dur);
+  // Clicks moments apart (or several in one cut pause, which all land where the video resumes) can't each get
+  // a glide: the frame goes to the last of them.
+  const merged: Focus[] = [];
+  for (const e of [...events].sort((a, b) => a.t - b.t).filter((e) => e.t < dur)) {
+    const prev = merged[merged.length - 1];
+    if (prev && e.t - prev.t < 0.8) merged[merged.length - 1] = { ...prev, x: e.x };
+    else merged.push(e);
+  }
   let last = 0.5;
-  for (const e of sorted) {
+  for (const e of merged) {
     if (Math.abs(e.x - last) < 0.06) continue; // already in view: don't wobble
     add(e.t - 0.9, last); // hold, then glide over in time for the click
-    add(e.t - 0.1, e.x);
-    last = e.x;
+    if (add(e.t - 0.1, e.x)) last = e.x; // only where the frame really goes
   }
   if (!keys.length) add(0, 0.5);
   const x = keyExpr(keys, (k) => k.x);
@@ -307,6 +315,8 @@ export async function makeVideo(id: string, opts: MakeOptions) {
     const info = await inspect(source).catch(() => null);
     if (!info?.duration || !info.width || !info.height) throw new PermanentError(main ? "That video can't be read." : "One of the added clips can't be read. It may have been deleted.");
     const dur = info.duration;
+    // Blurred areas are timed to the version they were drawn on: never put them on a different one.
+    if (main && edited && !keep && opts.blurs.length) throw new PermanentError("The edit your blurred areas were drawn on is gone. Draw them again on this version.");
     const voice = main && opts.audio !== "original" ? await readVoice(sourceId) : null;
     const graph: string[] = [];
     const inputs = ["-i", source];

@@ -252,6 +252,10 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
     setEndLink(o.endLink ?? "");
     setSmall(o.small);
     if (hasEdit) setUseEdit(o.edited);
+    // What Done for you kept from before comes along too: above all the blurred areas.
+    setBlurs(o.blurs);
+    setClips(o.clips);
+    setAudio(o.audio);
     setMode("diy");
   }
 
@@ -396,7 +400,8 @@ export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: 
         {(intro || titleOverlay) && (
           <div className="grid gap-2 sm:grid-cols-2">
             <label className="block"><span className="label mb-1 block">Title</span><input className={input} maxLength={120} value={introTitle} onChange={(e) => setIntroTitle(e.target.value)} /></label>
-            <label className="block"><span className="label mb-1 block">Subtitle</span><input className={input} maxLength={120} value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} /></label>
+            {/* The title over the opening is one line: only the intro card has a subtitle. */}
+            {intro && <label className="block"><span className="label mb-1 block">Subtitle</span><input className={input} maxLength={120} value={introSubtitle} onChange={(e) => setIntroSubtitle(e.target.value)} /></label>}
           </div>
         )}
         {endCard && (

@@ -86,6 +86,9 @@ export async function POST(req: Request, ctx: RouteContext<"/api/videos/[id]/mak
     blurs,
     audio,
     zoom: b.zoom === true,
+    titleOverlay: b.titleOverlay === true,
+    captionStyle: b.captionStyle === "words" ? "words" : "lines",
+    reframe: b.reframe === true,
   };
   await writeMade(id, { status: "rendering", options });
   enqueue("make", id, options);

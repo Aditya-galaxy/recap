@@ -36,6 +36,12 @@ export type MakeOptions = {
   audio: "original" | "voice" | "both";
   /** Follow clicks (or where the cursor settled) in the main video. */
   zoom: boolean;
+  /** The title over the first seconds of the video, instead of a separate card (better for feeds). */
+  titleOverlay?: boolean;
+  /** "words" highlights each word as it's said; "lines" shows plain lines. */
+  captionStyle?: "lines" | "words";
+  /** Vertical or square from a wide recording: crop to follow the action instead of shrinking the whole screen. */
+  reframe?: boolean;
 };
 type Focus = { t: number; x: number; y: number };
 export type Made = { status: "rendering" | "ready" | "error"; options: MakeOptions; error?: string; duration?: number; auto?: { destination: Destination; notes: string[] } };
@@ -105,16 +111,75 @@ export async function transcribeVoice(id: string) {
 }
 
 type Size = { W: number; H: number; unit: number; format: MakeFormat };
-type Cue = { start: number; end: number; text: string };
+type Cue = { start: number; end: number; text: string; words?: Word[] };
 
-function captionFile(s: Size, cues: Cue[]) {
-  const size = Math.round((s.format === "vertical" ? 62 : 52) * s.unit);
-  const margin = Math.round(s.H * (s.format === "vertical" ? 0.16 : 0.07));
+const HIGHLIGHT = "&H000AD6FF&"; // a warm yellow (ASS colours are BGR)
+
+function captionFile(s: Size, cues: Cue[], style: "lines" | "words" = "lines") {
   const side = Math.round(s.W * 0.07);
+  if (style === "lines") {
+    const size = Math.round((s.format === "vertical" ? 62 : 52) * s.unit);
+    const margin = Math.round(s.H * (s.format === "vertical" ? 0.16 : 0.07));
+    return assFile(s.W, s.H,
+      [`Style: Cap,${FONT},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,0,0,0,0,100,100,0,0,3,${Math.round(14 * s.unit)},0,2,${side},${side},${margin},1`],
+      cues.map((c) => `Dialogue: 0,${assTime(c.start)},${assTime(Math.max(c.end, c.start + 0.6))},Cap,,0,0,0,,${assText(c.text)}`),
+    );
+  }
+  // Word by word, for feeds: larger, outlined rather than boxed, higher up (clear of the apps' own buttons),
+  // and the word being said lights up.
+  const size = Math.round((s.format === "vertical" ? 78 : s.format === "square" ? 66 : 60) * s.unit);
+  const margin = Math.round(s.H * (s.format === "vertical" ? 0.24 : 0.09));
+  const events: string[] = [];
+  for (const c of cues) {
+    const words = c.words?.length ? c.words : [{ start: c.start, end: c.end, text: c.text }];
+    words.forEach((w, i) => {
+      const from = i === 0 ? c.start : w.start;
+      const to = i === words.length - 1 ? Math.max(c.end, c.start + 0.6) : words[i + 1].start;
+      if (to <= from) return;
+      const text = words.map((x, j) => (j === i ? `{\\c${HIGHLIGHT}}${assText(x.text)}{\\c&H00FFFFFF&}` : assText(x.text))).join(" ");
+      events.push(`Dialogue: 0,${assTime(from)},${assTime(to)},Cap,,0,0,0,,${text}`);
+    });
+  }
   return assFile(s.W, s.H,
-    [`Style: Cap,${FONT},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H99000000,0,0,0,0,100,100,0,0,3,${Math.round(14 * s.unit)},0,2,${side},${side},${margin},1`],
-    cues.map((c) => `Dialogue: 0,${assTime(c.start)},${assTime(Math.max(c.end, c.start + 0.6))},Cap,,0,0,0,,${assText(c.text)}`),
+    [`Style: Cap,${FONT},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,0,0,0,0,100,100,0,0,1,${Math.max(3, Math.round(5 * s.unit))},${Math.round(2 * s.unit)},2,${side},${side},${margin},1`],
+    events,
   );
+}
+
+/** The title over the opening seconds, for feeds where a separate title card loses people. */
+function titleOverlayFile(s: Size, title: string) {
+  const size = Math.round((s.format === "vertical" ? 84 : 72) * s.unit);
+  const side = Math.round(s.W * 0.08);
+  const top = Math.round(s.H * (s.format === "vertical" ? 0.14 : 0.1));
+  return assFile(s.W, s.H,
+    [`Style: Title,${FONT},${size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H66000000,0,0,0,0,100,100,0,0,3,${Math.round(18 * s.unit)},0,8,${side},${side},${top},1`],
+    [`Dialogue: 0,0:00:00.00,${assTime(TITLE_SECONDS)},Title,,0,0,0,,{\\fad(150,350)}${assText(title)}`],
+  );
+}
+const TITLE_SECONDS = 2.8;
+
+/**
+ * Vertical or square from a wide recording: a full-height window that follows the clicks (or where the cursor
+ * settled), easing between them, instead of shrinking the whole screen into a strip.
+ */
+function reframeGraph(from: string, events: Focus[], dur: number, width: number, height: number, W: number, H: number) {
+  const cw = Math.min(width, Math.round((height * W) / H / 2) * 2);
+  const keys: Key[] = [];
+  const add = (t: number, x: number) => {
+    const at = Math.min(dur, Math.max(0, t));
+    if (!keys.length || at > keys[keys.length - 1].t + 0.05) keys.push({ t: at, z: 1, x, y: 0.5 });
+  };
+  const sorted = [...events].sort((a, b) => a.t - b.t).filter((e) => e.t < dur);
+  let last = 0.5;
+  for (const e of sorted) {
+    if (Math.abs(e.x - last) < 0.06) continue; // already in view: don't wobble
+    add(e.t - 0.9, last); // hold, then glide over in time for the click
+    add(e.t - 0.1, e.x);
+    last = e.x;
+  }
+  if (!keys.length) add(0, 0.5);
+  const x = keyExpr(keys, (k) => k.x);
+  return [`[${from}]crop=${cw}:${height}:x='min(max(0,${x}*${width}-${cw}/2),${width}-${cw})':y=0,scale=${W}:${H}:flags=lanczos,setsar=1,fps=30,format=yuv420p[base]`];
 }
 
 /** Blur that can't be undone: the region is shrunk to a few pixels and scaled back, so no text survives. */
@@ -251,18 +316,32 @@ export async function makeVideo(id: string, opts: MakeOptions) {
       graph.push(...blurred.graph);
       video = blurred.out;
     }
-    if (main && opts.zoom) {
-      const events = (await readFocus(sourceId)).flatMap((e) => {
-        const t = keep ? remap(e.t, keep) : e.t;
-        return t === null ? [] : [{ ...e, t }];
-      });
+    // People pause while they click, and the clean-up cuts pauses: a click inside a cut moves to the moment the
+    // video carries on, rather than being lost (which left edited videos with nothing to zoom to or follow).
+    const onEdit = (t: number) => {
+      if (!keep) return t;
+      const exact = remap(t, keep);
+      if (exact !== null) return exact;
+      const next = keep.find((k) => k.start >= t);
+      return next ? remap(next.start, keep) : null;
+    };
+    const events = main ? (await readFocus(sourceId)).flatMap((e) => {
+      const t = onEdit(e.t);
+      return t === null ? [] : [{ ...e, t }];
+    }) : [];
+    const sameShape = Math.abs(info.width / info.height - W / H) < 0.01;
+    // Following the action already frames it closely: zooming on top of that would be dizzying.
+    const reframe = main && !!opts.reframe && !sameShape && info.width / info.height > W / H && events.length > 0;
+    if (main && opts.zoom && !reframe) {
       const keys = zoomKeys(events, dur);
       if (keys.length) {
         graph.push(...zoomGraph(video, keys, info.width, info.height));
         video = "zoomed";
       }
     }
-    if (Math.abs(info.width / info.height - W / H) < 0.01) {
+    if (reframe) {
+      graph.push(...reframeGraph(video, events, dur, info.width, info.height, W, H));
+    } else if (sameShape) {
       graph.push(`[${video}]scale=${W}:${H}:flags=lanczos,setsar=1,fps=30,format=yuv420p[base]`);
     } else {
       // A different shape: the whole picture stays visible, over a blurred copy of itself.
@@ -281,10 +360,16 @@ export async function makeVideo(id: string, opts: MakeOptions) {
       const cues = toCues(words, voice?.words?.length ? undefined : keep ?? undefined, most);
       if (cues.length) {
         const ass = name(`make-captions-${n}.ass`);
-        await fs.writeFile(path.join(dir, ass), captionFile(size, cues));
+        await fs.writeFile(path.join(dir, ass), captionFile(size, cues, opts.captionStyle ?? "lines"));
         graph.push(`[${video}]ass=${ass}:fontsdir=.[cap]`);
         video = "cap";
       }
+    }
+    if (main && opts.titleOverlay && assText(opts.introTitle) && dur > TITLE_SECONDS) {
+      const ass = name(`make-title-${n}.ass`);
+      await fs.writeFile(path.join(dir, ass), titleOverlayFile(size, opts.introTitle));
+      graph.push(`[${video}]ass=${ass}:fontsdir=.[titled]`);
+      video = "titled";
     }
     const fades = [
       ...(fadeIn ? [`fade=t=in:st=0:d=${FADE}:c=0x0a0a0a`] : []),
@@ -447,7 +532,13 @@ export function autoOptions(input: {
   if (zoom) notes.push("auto-zoom on your clicks");
   const link = input.link.trim().slice(0, 120);
   const endCard = named || !!link;
-  if (named) notes.push("intro card");
+  // Feeds decide in the first seconds: the title goes over the video, not on a card before it, and captions
+  // light up word by word. A tall or square video follows the action instead of shrinking the screen.
+  const feed = input.destination === "shorts" || input.destination === "x" || input.destination === "feed";
+  const reframe = d.format !== "wide" && input.focus > 0;
+  if (named) notes.push(feed ? "title over the opening" : "intro card");
+  if (captions && feed) notes[notes.indexOf("captions")] = "word-by-word captions";
+  if (reframe) notes[notes.indexOf("auto-zoom on your clicks")] = "framed to follow your clicks";
   if (endCard) notes.push("end card");
   return {
     cleanFirst,
@@ -456,7 +547,10 @@ export function autoOptions(input: {
       format: d.format,
       small: d.small,
       captions,
-      intro: named,
+      intro: named && !feed,
+      titleOverlay: named && feed,
+      captionStyle: feed ? "words" : "lines",
+      reframe,
       introTitle: named ? input.title.slice(0, 120) : "",
       introSubtitle: "",
       endCard,

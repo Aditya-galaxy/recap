@@ -463,7 +463,7 @@ export default function Watch({
 
       {owner && ready && (
         <div className="mt-6">
-          <MakeVideo id={id} title={meta.title} hasEdit={meta.clean.status === "ready"} />
+          <MakeVideo id={id} title={meta.title} hasEdit={meta.clean.status === "ready"} onCleanStarted={() => setMeta((m) => ({ ...m, clean: { ...m.clean, status: "rendering" } }))} />
         </div>
       )}
 

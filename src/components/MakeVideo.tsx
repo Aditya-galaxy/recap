@@ -1,13 +1,22 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { BlurArea, Made, MakeFormat, MakeOptions, VoiceOver } from "@/lib/make";
+import type { BlurArea, Destination, Made, MakeFormat, MakeOptions, VoiceOver } from "@/lib/make";
 
 const FORMATS: { value: MakeFormat; label: string; hint: string }[] = [
   { value: "wide", label: "Wide", hint: "YouTube, LinkedIn, X" },
   { value: "square", label: "Square", hint: "Feeds" },
   { value: "vertical", label: "Vertical", hint: "Reels, Shorts, TikTok" },
 ];
+// Kept in step with DESTINATIONS in lib/make (that module is server-only).
+const PLACES: { value: Destination; label: string }[] = [
+  { value: "youtube", label: "YouTube or LinkedIn" },
+  { value: "x", label: "X" },
+  { value: "shorts", label: "Reels, Shorts or TikTok" },
+  { value: "feed", label: "Instagram or LinkedIn feed" },
+  { value: "email", label: "Email or chat" },
+];
+const LINK_KEY = "recap.endLink";
 const input = "w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-[13px] outline-none focus:border-border-strong";
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
@@ -189,7 +198,7 @@ function Voice({ id, src, edited, voice, reload, audio, setAudio }: { id: string
 }
 
 /** A finished video for sharing: shape, captions, cards, joined clips, voice-over, blur. The recording isn't changed. */
-export default function MakeVideo({ id, title, hasEdit }: { id: string; title: string; hasEdit: boolean }) {
+export default function MakeVideo({ id, title, hasEdit, onCleanStarted }: { id: string; title: string; hasEdit: boolean; onCleanStarted?: () => void }) {
   const [made, setMade] = useState<Made | null>(null);
   const [voice, setVoice] = useState<VoiceOver | null>(null);
   const [format, setFormat] = useState<MakeFormat>("wide");
@@ -212,6 +221,10 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
   const [err, setErr] = useState("");
   const [tick, setTick] = useState(0);
 
+  // Where it's going (a one-click video); once the person picks, a later refresh doesn't override them.
+  const [place, setPlace] = useState<Destination>("youtube");
+  const placeChosen = useRef(false);
+
   // Next keeps pages alive when you navigate away; without this the preview would keep playing, unseen.
   const player = useRef<HTMLVideoElement>(null);
   useLayoutEffect(() => {
@@ -231,6 +244,8 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
         const body = await m.json();
         const next: Made | null = body.made;
         if (live) setFocus(body.focus ?? 0);
+        // Start from where the last one-click video went.
+        if (live && next?.auto && !placeChosen.current) setPlace(next.auto.destination);
         if (live) setMade((old) => {
           if (old?.status === "rendering" && next?.status === "ready") setRev(Date.now());
           return next;
@@ -249,6 +264,35 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
   // A voice-over and blurred areas are timed to one version of the video.
   const edited = hasEdit && (audio !== "original" && voice ? voice.edited : useEdit);
   const source = `/api/videos/${id}/media${edited ? "?v=clean" : ""}`;
+
+  // The link for the end card (remembered on this computer).
+
+  const linkRef = useRef<HTMLInputElement | null>(null);
+  const rememberLink = (el: HTMLInputElement | null) => {
+    linkRef.current = el;
+    if (el && !el.value) {
+      try {
+        el.value = localStorage.getItem(LINK_KEY) ?? "";
+      } catch {
+        /* storage unavailable: start empty */
+      }
+    }
+  };
+
+  async function makeForMe() {
+    setErr("");
+    const link = linkRef.current?.value.trim() ?? "";
+    try {
+      localStorage.setItem(LINK_KEY, link);
+    } catch {
+      /* not remembered, still used */
+    }
+    const r = await fetch(`/api/videos/${id}/make`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ auto: true, destination: place, link }) });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) return setErr(body.error ?? "Couldn't start.");
+    if (body.cleaning) onCleanStarted?.();
+    setMade({ status: "rendering", options: body.options, auto: { destination: place, notes: body.notes ?? [] } });
+  }
 
   async function make() {
     setErr("");
@@ -272,6 +316,22 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
       </summary>
       <div className="mt-4 space-y-4">
         <p className="text-[12px] text-muted">A finished video to share. Your recording stays as it is.</p>
+        <div className="grid items-end gap-2 sm:grid-cols-[1fr_1fr_auto]">
+          <label className="block"><span className="label mb-1 block">Where is it going?</span>
+            <select className={input} value={place} onChange={(e) => { placeChosen.current = true; setPlace(e.target.value as Destination); }}>
+              {PLACES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </label>
+          <label className="block"><span className="label mb-1 block">Your link, for the end card</span><input ref={rememberLink} className={input} maxLength={120} placeholder="yoursite.com (optional)" /></label>
+          <button className="btn-primary" disabled={rendering || transcribing} onClick={makeForMe}>{rendering ? "Making…" : "Make it for me"}</button>
+        </div>
+        <p className="text-[12px] text-muted">Picks the shape, cleans up the ums and pauses, and adds captions, auto-zoom and title cards. Anything you set up yourself, like blurred areas or a voice-over, is kept.</p>
+        <details className="group/manual border-t border-border pt-3">
+          <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[13px] font-medium text-muted hover:text-text [&::-webkit-details-marker]:hidden">
+            Choose everything yourself
+            <svg aria-hidden width="10" height="10" viewBox="0 0 12 12" className="transition-transform duration-150 group-open/manual:rotate-180"><path d="M2.5 4.5 6 8l3.5-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          </summary>
+          <div className="mt-4 space-y-4">
         <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Shape">
           {FORMATS.map((f) => (
             <button key={f.value} role="radio" aria-checked={format === f.value} onClick={() => setFormat(f.value)} className={`rounded-lg border px-3 py-2 text-left ${format === f.value ? "border-border-strong" : "border-border text-muted"}`}>
@@ -308,12 +368,40 @@ export default function MakeVideo({ id, title, hasEdit }: { id: string; title: s
         {more === "clips" && <Clips id={id} clips={clips} setClips={setClips} />}
         {more === "voice" && <Voice id={id} src={source} edited={edited} voice={voice} reload={() => setTick((t) => t + 1)} audio={audio} setAudio={setAudio} />}
         {more === "blur" && <Blurs src={source} areas={blurs} setAreas={setBlurs} />}
-        <button className="btn-primary" disabled={rendering || transcribing} onClick={make}>{rendering ? "Making…" : made?.status === "ready" ? "Make again" : "Make video"}</button>
+        <button className="btn-ghost" disabled={rendering || transcribing} onClick={make}>{rendering ? "Making…" : "Make with these settings"}</button>
+          </div>
+        </details>
         {(err || made?.status === "error") && <p className="text-[12px]"><span className="text-muted">Error: </span>{err || made?.error}</p>}
         {made?.status === "ready" && (
           <div className="space-y-2">
-            <p className="text-[12px] text-muted">{FORMATS.find((f) => f.value === made.options.format)?.label} video{made.duration ? `, ${Math.round(made.duration)} seconds` : ""}</p>
-            <video ref={player} key={rev} controls playsInline preload="metadata" src={`/api/videos/${id}/media?v=made${rev ? `&r=${rev}` : ""}`} className="max-h-[50vh] w-full rounded-lg bg-black" />
+            <p className="text-[12px] text-muted">
+              {FORMATS.find((f) => f.value === made.options.format)?.label} video{made.duration ? `, ${clock(made.duration)}` : ""}
+              {made.auto ? `, for ${PLACES.find((p) => p.value === made.auto?.destination)?.label}${made.auto.notes.length ? `: ${made.auto.notes.join(", ")}` : ""}.` : ""}
+            </p>
+            <div className="flex justify-center rounded-lg bg-black">
+              <video
+                ref={player}
+                key={rev}
+                controls
+                playsInline
+                preload="metadata"
+                src={`/api/videos/${id}/media?v=made${rev ? `&r=${rev}` : ""}`}
+                // Fit the video's own shape, so a vertical one isn't lost in a wide black box.
+                className={`max-h-[56vh] rounded-lg ${made.options.format === "wide" ? "w-full" : "w-auto"}`}
+                // The first frames are the fade-in from the title card: show a moment from the video instead.
+                onLoadedMetadata={(e) => {
+                  const v = e.currentTarget;
+                  if (!v.played.length) v.currentTime = Math.min(v.duration / 3, (made.options.intro ? 3 : 0) + 2);
+                }}
+                onPlay={(e) => {
+                  const v = e.currentTarget;
+                  if (v.played.length <= 1 && v.dataset.started !== "1") {
+                    v.dataset.started = "1";
+                    v.currentTime = 0;
+                  }
+                }}
+              />
+            </div>
             <a className="btn-ghost inline-flex" href={`/api/videos/${id}/media?v=made&download`}>Export MP4</a>
           </div>
         )}

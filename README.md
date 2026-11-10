@@ -4,6 +4,8 @@
 share link with a transcript and captions, and remove the "um"s and dead air in one click.
 Transcription runs on your own machine with whisper.cpp. No account, no API keys.
 
+<a href="https://apps.microsoft.com/detail/9P2Z7WK8FTS7?mode=direct"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Get Recap from the Microsoft Store"></a>
+
 > **Status: early release (v0.4).** The desktop app runs everything on your own computer: recording,
 > transcription and clean-up, with no account needed. Teams that want share links can run their own server.
 > See [docs/ROADMAP.md](docs/ROADMAP.md). Issues and PRs welcome.
